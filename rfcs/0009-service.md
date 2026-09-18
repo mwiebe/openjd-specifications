@@ -18,8 +18,9 @@ Service is a long-lived process that a scheduler starts *before* any Task in its
 keeps running for the lifetime of its scope (the whole Job, or a single Step), and stops once that
 scope no longer needs it. Unlike an Environment, a Service publishes one or more named network
 ports, may be placed on a different host than the Tasks that use it, and has an explicit readiness
-signal that gates the scheduling of the Tasks in its scope. Every entity in the Service's scope can
-discover the Service's endpoint through a new `Service.*` format-string scope.
+signal that gates the scheduling of the Tasks in its scope. The template names the ports; the
+scheduler chooses the actual port numbers and addresses when it places the Service, and every entity
+in the Service's scope reads them through a new `Service.*` format-string scope.
 
 A Service can also be supplied from outside the Job: an Environment Template may define a
 `services:` list alongside or instead of its `environment:`, so that a scheduler can start per-Job
@@ -40,9 +41,14 @@ Service (or any Step) can require placement on capacity that will not be reclaim
 
 This job starts a single [Valkey](https://valkey.io/) in-memory data store before scheduling any
 Task, and every Task in the Job connects to it to cache and coordinate intermediate results. The
-service may run on a different host from any Task; Tasks discover the endpoint via
-`Service.Cache.main.connectAddress`. If the service process dies the scheduler relaunches it, and
-because a cache can be repopulated, completed Tasks keep their results (`completedTasks: KEEP`).
+template declares one named port, `main`, but no port number: the scheduler picks a free port on
+whatever host it places the Service on, and hands the number to both sides. The service process
+reads it as `Service.Cache.main.port` (with the interface to bind as
+`Service.Cache.main.bindAddress`), and Tasks, which may be on other hosts, read the same number as
+`Service.Cache.main.port` alongside the address to connect to, `Service.Cache.main.connectAddress`.
+An author who needs a specific port number can request one with `port:` on the port entry. If the
+service process dies the scheduler relaunches it, and because a cache can be repopulated, completed
+Tasks keep their results (`completedTasks: KEEP`).
 
 ```yaml
 specificationVersion: "jobtemplate-2023-09"
