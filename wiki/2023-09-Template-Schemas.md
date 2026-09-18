@@ -43,7 +43,7 @@ name: <JobName> # @fmtstring
 description: <Description> # @optional
 parameterDefinitions:  [ <JobParameterDefinition>, ... ] # @optional
 jobEnvironments: [ <Environment>, ... ] # @optional
-jobServices: [ <Service> | <ExternalServiceRequirement>, ... ] # @optional @extension SERVICE
+jobServices: [ <Service>, ... ] # @optional @extension SERVICE
 steps: [<StepTemplate>, ...]
 ```
 
@@ -76,20 +76,13 @@ Where:
          defined in any Step within the same Job Template.
 8. *jobServices* — An ordered list of the Services required by Tasks in the Jobs created by this Job Template. Each
    Service is started, in list order, before any Task of the Job is scheduled, and is stopped, in reverse order, once
-   no Task of the Job remains to be run. An element may instead be an `<ExternalServiceRequirement>`, which declares
-   that a Service of the given name and ports is supplied by the scheduler from an Environment
-   Template (see [Services from Environment Templates](#122-services-from-environment-templates)). Available only
-   when using the `SERVICE` extension.
-   See: [&lt;Service&gt;](#9-service-extension-service) and
-   [&lt;ExternalServiceRequirement&gt;](#97-externalservicerequirement). Constraints:
+   no Task of the Job remains to be run. Available only when using the `SERVICE` extension.
+   See: [&lt;Service&gt;](#9-service-extension-service). Constraints:
       1. Minimum number of elements: If provided, then this list must contain at least one element.
       2. Maximum number of elements: The list must not contain more than 10 elements.
-      3. No two elements in this list may have the same value for the `name` property.
-      4. The elements of this list must not have the same `name` as a Service defined in any Step within the
+      3. No two Services in this list may have the same value for the `name` property.
+      4. The Services defined in this list must not have the same `name` as a Service defined in any Step within the
          same Job Template.
-      5. `<ExternalServiceRequirement>` elements are satisfied before any `<Service>` element starts, so they should
-         be listed first; a `<Service>` may reference the ports of an `<ExternalServiceRequirement>` anywhere in the
-         list.
 9. *steps* — A list of the Steps in the Job. See: [&lt;StepTemplate&gt;](#3-steptemplate).
 
 #### 1.1.1. `<JobName>`
@@ -113,8 +106,8 @@ specificationVersion: environment-2023-09
 $schema: <string> # @optional
 extensions: [ <ExtensionName>, ... ] # @optional
 parameterDefinitions: [ <JobParameterDefinition>, ... ] # @optional
-environment: <Environment> # @optional @incompatible service
-service: <Service> # @optional @incompatible environment @extension SERVICE
+environment: <Environment> # @optional
+services: [ <Service>, ... ] # @optional @extension SERVICE
 ```
 
 1. *specificationVersion* — A literal that identifies the document as adhering to this schema.
@@ -134,11 +127,16 @@ service: <Service> # @optional @incompatible environment @extension SERVICE
       * Minimum number of elements: If provided, then this list must contain at least one element.
       * Maximum number of elements: The list must not contain more than 50 elements.
 5. *environment* — The definition of the Environment that the Environment Template defines.
-   See [&lt;Environment&gt;](#4-environment).
-6. *service* — The definition of a Service that the Environment Template defines, in place of an Environment. Available
-   only when using the `SERVICE` extension. See [&lt;Service&gt;](#9-service-extension-service) and
-   [Services from Environment Templates](#122-services-from-environment-templates).
-7. Exactly one of *environment* or *service* must be provided.
+   See [&lt;Environment&gt;](#4-environment). When *services* is also provided, format strings within the Environment may
+   reference those Services' endpoints via `Service.<name>.<port>.port` and `Service.<name>.<port>.connectAddress`.
+6. *services* — An ordered list of Services that the Environment Template defines. Available only when using the
+   `SERVICE` extension. See [&lt;Service&gt;](#9-service-extension-service) and
+   [Services from Environment Templates](#122-services-from-environment-templates). Constraints:
+      1. Minimum number of elements: If provided, then this list must contain at least one element.
+      2. Maximum number of elements: The list must not contain more than 10 elements.
+      3. No two Services in this list may have the same value for the `name` property.
+      4. A Service in this list may reference the endpoints only of Services earlier in the list, as in `jobServices`.
+7. At least one of *environment* or *services* must be provided.
 
 #### 1.2.1. Merging Environment Template Parameter Definitions
 
@@ -165,33 +163,40 @@ valid -- for example, the value of the `default` property must adhere to the con
 
 Available when using the `SERVICE` extension.
 
-An Environment Template whose root is *service* defines a Service that a scheduler applies to every
-Job Template submitted through it, in the same way that an Environment Template whose root is *environment* defines an
-Environment that is applied to every submission. Such a Service is called an **external Service** from the point of
-view of the Job Template. External Services are applied per Job: each Job created from a submission gets its own
-instance of each external Service, with Job scope, exactly as if the Service had appeared in the Job Template's
-`jobServices`. A Service defined this way does not outlive the Job; a process shared across many Jobs is
-infrastructure outside the scope of this specification.
+An Environment Template that defines *services* defines Services that a scheduler applies to every Job Template
+submitted through it, in the same way that its *environment* defines an Environment that is applied to every
+submission. Such Services are called **external Services** from the point of view of the Job Template. External
+Services are applied per Job: each Job created from a submission gets its own instance of each external Service, with
+Job scope, exactly as if the Services had appeared in the Job Template's `jobServices`. A Service defined this way does
+not outlive the Job; a process shared across many Jobs is infrastructure outside the scope of this specification.
+
+When a document defines both an *environment* and *services*, the entities compose as they would in a Job Template:
+the Services are Job-scoped and are ready before any Session starts, and the Environment is Session-scoped and may
+reference any of the Services' `port` and `connectAddress` values in its *variables*, actions, and embedded files. This
+is how an attachment publishes a Service to Tasks that do not reference `Service.*` themselves, by setting environment
+variables or writing a configuration file that the Tasks' tools already read.
+
+A `Service.*` reference within an Environment Template must resolve to a Service in the same document's *services*
+list (and, within that list, to an earlier Service). References to Services defined in other documents are not
+permitted, so every `Service.*` reference in every template can be validated without knowledge of the scheduler's
+configuration.
+
+A Job Template never references an external Service. Its `Service.*` references must resolve to Services it declares
+itself; an external Service reaches a Job's Tasks only through the effects of the Environment defined alongside it
+(environment variables, files written to the Session working directory, and so on), exactly as a queue Environment
+reaches them today. A Job Template therefore needs neither the `SERVICE` extension nor any declaration to benefit from
+a queue-supplied Service.
 
 When a submission combines a Job Template with one or more Environment Templates:
 
-1. The external Services are ordered as the scheduler orders the Environment Templates, and are
-   placed before every Service in the Job Template's `jobServices`. The combined list is started and stopped as a
-   single `jobServices` list (see [How Jobs Are Run](How-Jobs-Are-Run#services)). Consequently, a Service in the Job
-   Template's `jobServices`, and every Environment, Step, and Task in the Job, may reference the endpoint of any
-   external Service; an external Service may reference the endpoint of an external Service from an Environment
-   Template earlier in the scheduler's order.
-2. The `name` of an external Service must not equal the `name` of any Service declared in the Job Template's
-   `jobServices` or in any Step's `stepServices`, except an
-   [&lt;ExternalServiceRequirement&gt;](#97-externalservicerequirement) that it satisfies. The submission must be
-   rejected on any other collision.
-3. Every `<ExternalServiceRequirement>` in the Job Template's `jobServices` must be satisfied by exactly one external
-   Service with the same `name` whose *ports* include every port name the requirement lists. The submission must be
-   rejected if any requirement is unsatisfied.
-4. A `Service.*` reference within an Environment Template to a Service that the same document does not declare is
-   resolved at submission time against the external Services from Environment Templates earlier in the
-   scheduler's order. The submission must be rejected if such a reference cannot be resolved. (A Job Template
-   may not make such an undeclared reference; it declares an `<ExternalServiceRequirement>` instead.)
+1. The external Services are ordered as the scheduler orders the Environment Templates, and within one template in its
+   *services* order, and are placed before every Service in the Job Template's `jobServices`; the attached Environments
+   are placed in `jobEnvironments` as today. The combined `jobServices` list is started and stopped as a single list
+   (see [How Jobs Are Run](How-Jobs-Are-Run#services)).
+2. The `name` of an external Service must not equal the `name` of any other external Service, nor of any Service
+   declared in the Job Template's `jobServices` or in any Step's `stepServices`. The submission must be rejected on a
+   collision. Queue operators should give external Services names that Job Template authors are unlikely to choose
+   (for example, a studio prefix), since a collision makes an existing Job Template unsubmittable.
 
 An external Service has the same effect on a Job as a Service the Job Template declared itself: the Job's Tasks are
 not scheduled until it is ready, its host requirements are allocated for the Job's lifetime, and its restart policy
@@ -2116,7 +2121,7 @@ different sets of values are known, which determines which format strings can be
 | Stage | When | Known Values | Unknown Values | What Happens |
 |-------|------|-------------|----------------|--------------|
 | **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Service.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. |
-| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Service.*` | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH parameter defaults are joined with the job template directory; PATH parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. |
+| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Service.*` | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH parameter defaults are joined with the job template directory; PATH parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` and `<Service>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. |
 | **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Service.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>`, `<EnvironmentScript>`, and `<ServiceScript>` are evaluated; all remaining expressions are fully evaluated. |
 
 With the `SERVICE` extension, a Service's own actions are resolved at an analogous **Service execution** stage on the
@@ -2360,8 +2365,10 @@ for the lifetime of its scope, and stops once the scope no longer needs it. The 
 Service listed in `jobServices`, and the declaring Step for a Service listed in `stepServices`. A Service publishes one
 or more named TCP ports that the runtime allocates on the Service's host, and every entity in the Service's scope
 (Tasks, Environments, and later Services) can discover the resulting endpoint via the `Service.*` format-string scope.
-Unlike an Environment, a Service may be placed on a different Worker Host than the Tasks that use it. See
-[How Jobs Are Run](How-Jobs-Are-Run#services) for the lifecycle, readiness gating, and failure semantics.
+Unlike an Environment, a Service may be placed on a different Worker Host than the Tasks that use it. A Service runs
+in a Session of its own on that host, inside the Environments of its scope (the Job's `jobEnvironments`, and for a Step
+Service also the Step's `stepEnvironments`), excluding any Environment that references a Service later in the start
+order. See [How Jobs Are Run](How-Jobs-Are-Run#services) for the lifecycle, readiness gating, and failure semantics.
 
 A `<Service>` is the object:
 
@@ -2384,8 +2391,9 @@ Where:
    See: [&lt;ServiceName&gt;](#91-servicename).
 2. *description* — A description to apply to the Service. It has no functional purpose, but may appear in UI elements.
    See: [&lt;Description&gt;](#72-description).
-3. *let* — An ordered list of expression bindings evaluated once when the Service is started. Bound names are available
-   in *hostRequirements*, *variables*, and *script*. See: [&lt;LetBindings&gt;](#36-letbindings).
+3. *let* — An ordered list of expression bindings evaluated once, at job creation, like a `<StepTemplate>`'s *let*.
+   Bindings may not reference `Session.*` or `Service.*`, which are not known until the Service is placed. Bound names
+   are available in *hostRequirements*, *variables*, and *script*. See: [&lt;LetBindings&gt;](#36-letbindings).
 4. *hostRequirements* — Describes the requirements on the Worker Host's capabilities that must be satisfied for the
    Service to be placed on the host. Amount capabilities are allocated to the Service for its lifetime. This is
    independent of the *hostRequirements* of any Step whose Tasks use the Service.
@@ -2411,7 +2419,7 @@ The format string scopes available to format strings within a `<Service>` are:
 
 1. `Param.*` and `RawParam.*` — Values of Job Parameters.
 2. `Session.*` — Values such as the Service's working directory. `Session.WorkingDirectory` refers to the Service's own
-   working directory on the service host, not to the working directory of any Session running Tasks.
+   Session's working directory on the service host, not to the working directory of any Session running Tasks.
 3. `Service.File.*` — The filesystem location of embedded files defined within this Service's *script*.
 4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports, and of any Service earlier in the same list
    (for a Step Service, also of any Job Service). See [Value References](#731-value-references).
@@ -2425,12 +2433,13 @@ The `Service.<name>.<port>.*` values of a Service `<name>` are in scope in:
 
 1. The Service `<name>` itself.
 2. Any Service later in the same `jobServices` or `stepServices` list, and, for a Job Service, any Step Service in the
-   Job. A Service earlier in the same list, or a Step Service of a different Step, is not referenceable. This ordering
-   rule guarantees that a referenced Service is ready before the referencing Service starts.
-3. For a Job Service: every `jobEnvironments` entry, and every Step's `stepEnvironments`, `stepServices`, `script`, and
-   `hostRequirements` attribute values.
-4. For a Step Service: the declaring Step's `stepEnvironments`, later `stepServices`, `script`, and `hostRequirements`
-   attribute values.
+   Job. A Service cannot reference a Service later in its own list, nor a Step Service of a different Step. This
+   ordering rule guarantees that a referenced Service is ready before the referencing Service starts.
+3. For a Job Service: every `jobEnvironments` entry, and every Step's `stepEnvironments`, `stepServices`, and `script`.
+4. For a Step Service: the declaring Step's `stepEnvironments`, later `stepServices`, and `script`.
+
+`Service.*` is never in scope in a `hostRequirements` object, neither a Step's nor a Service's: host requirements are
+resolved when the scheduler chooses a host, before any Service endpoint is known.
 
 `Service.<name>.<port>.bindAddress` is available only within the declaring Service. A template that references a
 `Service.*` value outside these scopes, or that references a Service or port name that is not declared, is invalid and
@@ -2486,8 +2495,9 @@ Where:
 
 1. *type* — The probe mechanism:
     * `TCP_CONNECT` — The Service is ready once a TCP connection to each of the listed ports succeeds. The connection is
-      made from the service host to the allocated `bindAddress` and `port`, and closed immediately. The scheduler
-      retries at an implementation-defined interval (recommended: 1 second) until success or timeout.
+      made from the service host to the allocated `port` on the loopback interface, or on `bindAddress` when it is not
+      a wildcard address (`0.0.0.0` or `::`), and is closed immediately. The scheduler retries at an
+      implementation-defined interval (recommended: 1 second) until success or timeout.
     * `COMMAND` — The Service is ready once the *probe* action exits with status 0. The probe is run on the service
       host, in the Service's working directory, with the Service's *variables* set and the Service's full format-string
       scope available. It is re-run every *intervalSeconds* until it succeeds, *timeoutSeconds* elapses, or `onRun` exits.
@@ -2542,8 +2552,10 @@ actions: <ServiceActions>
 embeddedFiles: [ <EmbeddedFile>, ... ] # @optional
 ```
 
-1. *let* — An ordered list of expression bindings evaluated once when the Service is started. Bound names are available
-   in *actions* and *embeddedFiles*. See: [&lt;LetBindings&gt;](#36-letbindings).
+1. *let* — An ordered list of expression bindings evaluated once, on the service host, when the Service is started. This
+   is the host-context counterpart of the `<Service>`'s *let* and may reference `Session.*`, `Service.File.*`, and
+   in-scope `Service.<name>.<port>.*`. Bound names are available in *actions* and *embeddedFiles*.
+   See: [&lt;LetBindings&gt;](#36-letbindings).
 2. *actions* — The actions to run at the different stages of the Service's lifecycle.
    See: [&lt;ServiceActions&gt;](#96-serviceactions).
 3. *embeddedFiles* — Files embedded into the Service that are materialized to the Service's working directory before
@@ -2563,8 +2575,10 @@ onExit: <Action> # @optional
 
 Where:
 
-1. *onEnter* — A one-time setup action run before the first `onRun` of the Service on a host. It runs to completion. A
-   non-zero exit status fails the Service without consuming a restart attempt. It is re-run only when the scheduler
+1. *onEnter* — A one-time setup action run before the first `onRun` of the Service on a host. It is an ordinary action,
+   like an Environment's `onEnter`: it runs to completion, its `timeout` and `cancelation` apply as for any `<Action>`,
+   and the scheduler cancels it with its cancelation method if the scope ends while it is running. A non-zero exit
+   status or a timeout makes the Service fail; *onEnter* is never relaunched. It is re-run only when the scheduler
    relocates the Service to a new host.
 2. *onRun* — The long-lived action whose process is the service. The scheduler starts it, watches it for readiness, and
    expects it to run until canceled. If *onRun* exits for any reason, with any exit status, before the scheduler cancels
@@ -2588,40 +2602,6 @@ subsequent action of the same Service — every instance of *onRun*, the `COMMAN
 retained across relaunches of *onRun* on the same host. Variables set by *onEnter* take precedence over the Service's
 *variables*. These messages are ignored when emitted by *onRun*, the probe, or *onExit*, and nothing set within a Service
 is propagated to the entities in the Service's scope.
-
-### 9.7. `<ExternalServiceRequirement>`
-
-An `<ExternalServiceRequirement>` is an element of a Job Template's `jobServices` that declares a dependency on a
-Service supplied by the scheduler from an Environment Template
-(see [Services from Environment Templates](#122-services-from-environment-templates)), rather than defining the Service
-in the Job Template. It makes the dependency visible to tooling and lets the Job Template's `Service.*` references be
-validated without knowledge of the scheduler's configuration.
-
-An `<ExternalServiceRequirement>` is the object:
-
-```yaml
-name: <ServiceName>
-description: <Description> # @optional
-external: true
-ports: [ <Identifier>, ... ]
-```
-
-Where:
-
-1. *name* — The `name` of the external Service that must be supplied. Subject to the same uniqueness constraints as a
-   Service `name` in `jobServices`.
-2. *description* — A description of what the Job expects from the Service. It has no functional purpose, but may
-   appear in UI elements.
-3. *external* — The literal `true`. This property distinguishes an `<ExternalServiceRequirement>` from a `<Service>`.
-4. *ports* — The names of the ports of the external Service that the Job Template references. Each must be declared
-   by the supplied Service. Minimum number of elements: 1. Maximum number of elements: 10.
-
-Within the Job Template, `Service.<name>.<port>.port` and `Service.<name>.<port>.connectAddress` for each listed port
-are in scope everywhere that the corresponding values of a Job Service would be. `bindAddress` is not available, since
-the Job Template does not define the service process.
-
-A submission of a Job Template containing an `<ExternalServiceRequirement>` must be rejected unless the render
-management system supplies a Service with the same `name` that declares every listed port.
 
 ## 10. Additional Information
 
