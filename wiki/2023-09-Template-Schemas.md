@@ -194,7 +194,8 @@ When a submission combines a Job Template with one or more Environment Templates
 1. The external Services are ordered as the scheduler orders the Environment Templates, and within one template in its
    *services* order, and are placed before every Service in the Job Template's `jobServices`; the attached Environments
    are placed in `jobEnvironments` as today. The combined `jobServices` list is started and stopped as a single list
-   (see [How Jobs Are Run](How-Jobs-Are-Run#services)).
+   (see [How Jobs Are Run](How-Jobs-Are-Run#services)). The limit of 10 Services applies to each document's list, not to
+   the combined list; the number of Environment Templates attached is the scheduler's decision and bounds it.
 2. The `name` of an external Service must not equal the `name` of any other external Service, nor of any Service
    declared in the Job Template's `jobServices` or in any Step's `stepServices`. The submission must be rejected on a
    collision. Queue operators should give external Services names that Job Template authors are unlikely to choose
@@ -2538,10 +2539,14 @@ Where:
       a wildcard address (`0.0.0.0` or `::`), and is closed immediately. The scheduler retries at an
       implementation-defined interval (recommended: 1 second) until success or timeout.
     * `COMMAND` — The Service is ready once its *onReadinessCheck* action (see [&lt;ServiceActions&gt;](#96-serviceactions))
-      exits with status 0. The Service must define *onReadinessCheck* when this type is used. The action runs in the
-      Service Session like every other Service action, and is re-run every *intervalSeconds* until it succeeds,
-      *timeoutSeconds* elapses, or `onRun` exits. Its own `timeout` (default: 30 seconds) bounds one invocation. An exit
-      status other than 0 means "not yet ready" and is never a failure of the Service.
+      exits with status 0 while `onRun` is still running. The Service must define *onReadinessCheck* when this type is
+      used. The action runs in the Service Session concurrently with `onRun`; see
+      [Concurrency of onReadinessCheck with onRun](#961-concurrency-of-onreadinesscheck-with-onrun). Invocations are
+      sequential: the first begins once `onRun` has been launched, and each subsequent one begins *intervalSeconds*
+      after the previous one ends. Invocations continue until one succeeds, *timeoutSeconds* elapses, or `onRun` exits.
+      The action's own `timeout` (default: 30 seconds) bounds one invocation; an invocation that exceeds it is canceled
+      and counts as "not yet ready", as does any exit status other than 0. Neither is a failure of the Service. Once the
+      instance is ready the action is not run again.
     * `STDOUT` — The Service is ready once its `onRun` action writes a line matching the regular expression
       `^openjd_service_ready(: .*)?$` to stdout. The optional message has no functional purpose but may be surfaced in
       UI elements.
@@ -2550,7 +2555,8 @@ Where:
 3. *intervalSeconds* (`COMMAND` only) — Seconds to wait between the end of one *onReadinessCheck* invocation and the
    start of the next. Default: 5.
 4. *timeoutSeconds* — The maximum time, measured from the start of the `onRun` action, that the scheduler waits for the
-   Service to become ready. If exceeded, the Service instance has failed. Default: 300.
+   Service to become ready. It runs continuously, including while an *onReadinessCheck* invocation is in progress. If
+   exceeded, the Service instance has failed. Default: 300.
 
 Readiness applies to every instance of the Service: after a restart, the new `onRun` must pass the readiness check before
 Tasks in the scope are scheduled again.
@@ -2625,22 +2631,27 @@ Where:
    expects it to run until canceled. If *onRun* exits for any reason, with any exit status, before the scheduler cancels
    it, the Service instance has failed. The scheduler stops the Service by canceling *onRun* according to its
    `cancelation` method.
-3. *onReadinessCheck* — A short action the scheduler runs repeatedly to decide whether the Service is ready, when the
-   Service's `readinessCheck` has type `COMMAND`. Exit status 0 means ready; any other status means not yet. Must be
-   defined if and only if the readiness check type is `COMMAND`. See [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck).
+3. *onReadinessCheck* — A short action the scheduler runs repeatedly, while *onRun* is running, to decide whether the
+   Service is ready, when the Service's `readinessCheck` has type `COMMAND`. Exit status 0 means ready; any other status
+   means not yet. Must be defined if and only if the readiness check type is `COMMAND`. It should be read-only with
+   respect to the Service Session's working directory, which it shares with *onRun*.
+   See [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck) and
+   [Concurrency of onReadinessCheck with onRun](#961-concurrency-of-onreadinesscheck-with-onrun).
 4. *onExit* — A cleanup action run after the Service's other actions have stopped for the last time in a Service
    Session, whether the Service stopped normally, failed, or was canceled, and whether or not *onRun* was ever launched.
    It runs to completion. A non-zero exit status is reported but does not change the outcome of the scope.
 
 All four actions run in the Service Session with the format string scopes listed for [&lt;Service&gt;](#9-service-extension-service),
-and embedded files are materialized before each of them runs.
+and embedded files are materialized before each of them runs, subject to the rules in
+[Concurrency of onReadinessCheck with onRun](#961-concurrency-of-onreadinesscheck-with-onrun).
 
    > **NOTE:** When *onExit* does not define a *timeout* the action defaults to 300 seconds, or five minutes, for the
    same reasons as an Environment's *onExit*.
 
-Implementations of this specification must watch the stdout of every `<ServiceActions>` action for the standard
+Implementations of this specification must watch the stdout of *onEnter*, *onRun*, and *onExit* for the standard
 `openjd_status`, `openjd_progress`, and `openjd_fail` messages, and the stdout of *onRun* for the line
-`openjd_service_ready` when the Service's readiness check *type* is `STDOUT`.
+`openjd_service_ready` when the Service's readiness check *type* is `STDOUT`. Messages on the stdout of
+*onReadinessCheck* are not honored.
 
 Implementations must additionally watch the stdout of *onEnter* for `openjd_env`, `openjd_redacted_env`, and
 `openjd_unset_env`, with the same syntax and redaction rules as for an Environment's `onEnter`
@@ -2649,6 +2660,32 @@ subsequent action of the same Service Session — every instance of *onRun*, *on
 retained across relaunches of *onRun* within the Session. Variables set by *onEnter* take precedence over the Service's
 *variables*. These messages are ignored when emitted by *onRun*, *onReadinessCheck*, or *onExit*, and nothing set within
 a Service is propagated to the entities in the Service's scope.
+
+#### 9.6.1. Concurrency of onReadinessCheck with onRun
+
+*onReadinessCheck* is the only action in this specification that runs while another action of the same Session,
+*onRun*, is running. Every other action in a Session runs one at a time. The following rules apply:
+
+1. Materializing embedded files for one action must not modify any file that a still-running action of the same
+   Session was given. Implementations may materialize each invocation's files to a distinct location
+   (`Service.File.<name>` may resolve to a different path in each action), or may leave a file whose content is
+   unchanged in place; a Service Session's format string values are constant for its lifetime.
+2. The stdout of *onReadinessCheck* is captured to the log, but no `openjd_*` message on it is honored. Its result is
+   its exit status.
+3. Every line of stdout or stderr captured in a Service Session must be attributable to the action that produced it,
+   including the output of wrap scripts under the `WRAP_ACTIONS` extension. How the attribution is recorded is
+   implementation-defined. An implementation that produces a single plain-text log should tag each line from
+   *onReadinessCheck* with the action name (for example, `[onReadinessCheck] connection refused`) and may leave the
+   lines from *onRun* untagged. The tag is added by the implementation, not by the Service's processes. An
+   implementation may suppress or collapse the output of invocations that succeed, provided the full output of every
+   invocation that fails or exceeds its timeout is retained.
+4. Invocations of *onReadinessCheck* never overlap one another, never run while *onEnter* or *onExit* is running, and
+   never run after the instance is ready.
+5. An instance is ready only if *onRun* is still running when the scheduler observes a successful invocation. If
+   *onRun* exits while an invocation is in progress, the invocation is canceled with its cancelation method and its
+   result is discarded. An invocation in progress when the Service Session ends is canceled before *onExit* runs.
+6. Under the `WRAP_ACTIONS` extension, `onWrapServiceReadinessCheck` runs while `onWrapServiceRun` is running. Wrap
+   scripts used in a Service Session must tolerate concurrent invocation.
 
 ## 10. Additional Information
 
