@@ -79,6 +79,74 @@ The following diagram provides an overview of the steps taken to run a Session.
 
 ![Actions Run in a Session](./images/2023-09_how_jobs_are_run.png)
 
+## Services
+
+When the SERVICE extension is in use (introduced in
+[RFC 0009](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0009-service.md)), a Job or
+Step can additionally declare **Services**. A **Service** is a long-lived process that the scheduler starts *before*
+scheduling any Task in its scope, keeps running for the lifetime of its scope, and stops once the scope no longer
+needs it. The scope of a Job Service (`jobServices`) is the whole Job; the scope of a Step Service (`stepServices`) is
+the declaring Step. A **Service** publishes one or more named TCP ports; the scheduler allocates a concrete address and
+port on the **Service**'s host and makes them available to every entity in the scope through the `Service.*`
+format-string scope, so that a Task on any Worker Host knows where to connect.
+
+Unlike an **Environment**, a **Service** is not tied to the host that runs Tasks and is not tied to any **Session**.
+It runs in its own working directory on a **Service host** chosen by the scheduler subject to the **Service**'s host
+requirements, and it outlives every **Session** that uses it. Placement is up to the scheduler: a distributed render
+manager might dedicate a host to a **Service**, while a single-host runner starts it alongside the Tasks on loopback.
+Whatever the placement, the scheduler is responsible for making `connectAddress` and `port`, as seen from any host in the
+scope, reach the service process.
+
+### Service lifecycle
+
+A **Service** is always in one of three states: **UNREADY** (no instance is ready), **READY** (the current instance has
+passed its readiness probe and has not exited), or **FAILED** (the **Service** will not be relaunched and its scope has
+failed). The scheduler starts a **Service** by choosing a host and allocating its amount capabilities for the lifetime
+of the **Service**, allocating a TCP port for each declared port, creating the **Service**'s working directory, running
+`onEnter` if defined, launching `onRun`, and then applying the readiness probe. When the probe passes, the **Service** is
+**READY**.
+
+**Services** in a list are started in order: a **Service** is not launched until every **Service** before it in the same
+list is **READY**, because a later **Service** may reference an earlier one's endpoint. All Job Services are **READY**
+before any Step Service is started. The scheduler does not schedule any Task of a Step until every Job Service and every
+Step Service of that Step is **READY**. Once they are, Tasks are scheduled exactly as described above, with no change to
+how **Sessions** are formed.
+
+A **Service** is stopped when its scope completes: when the Job (for a Job Service) or the Step (for a Step Service)
+has no Tasks that could still run, whether because they all completed or because the scope failed or was canceled.
+**Services** are stopped in reverse list order. To stop a **Service** the scheduler cancels `onRun` using its cancelation
+method, runs `onExit` if defined, deletes the **Service**'s working directory, and releases the host's allocated
+amounts. `onExit` runs even when the **Service** is **UNREADY** or **FAILED**, so partial state can be cleaned up.
+
+### Service failure and restart
+
+An **instance failure** occurs when `onRun` exits, with any exit status, before the scheduler cancels it, or when the
+readiness probe times out. The **Service** becomes **UNREADY**, and the scheduler cancels every Task in the scope that is
+currently running and returns it to the queue; this is not counted as a Task failure. If the **Service**'s restart policy
+has attempts remaining, the scheduler relaunches `onRun` on the same host, in the same working directory, with the same
+ports, and applies the readiness probe again. If the policy's `completedTasks` is `RERUN`, every Task in the scope that
+had completed successfully is also returned to the queue, because the **Service** held state that made those results
+depend on the lost instance; with `KEEP`, completed Tasks keep their results. If no attempts remain, the **Service**
+becomes **FAILED** and its scope fails: a failed Job Service fails the Job, and a failed Step Service fails the Step.
+
+A scheduler may relocate a **Service** to a different host as part of a restart, for example when the original host is
+lost or preempted. Relocation counts as one relaunch and repeats the full start sequence on the new host, including
+`onEnter`; every `Service.<name>.*` value may change. Because Tasks in the scope resolve `Service.*` at task execution time on
+the Worker Host, a Task scheduled after relocation sees the new endpoint automatically.
+
+A Task failure never fails a **Service**. A Task that fails because it could not reach a **Service** that the scheduler
+still considers **READY** is an ordinary Task failure.
+
+### Services from Environment Templates
+
+A scheduler may supply **Services** to every Job submitted through it by attaching Environment
+Templates whose root is `service:` rather than `environment:`, in the same way it supplies **Environments** today. Each
+Job gets its own instance of every such **external Service**, placed before the Job's own `jobServices` in the render
+management system's attachment order, and otherwise indistinguishable from a Job Service: the Job's Tasks are gated on
+its readiness, and its restart policy governs the Job's Tasks. A Job Template that references an external **Service**
+declares an `<ExternalServiceRequirement>` (the **Service**'s name and the ports it uses) in its `jobServices`, and the
+submission is rejected if no attached template satisfies it.
+
 ## Session Environment Variables
 
 The following environment variables are automatically set for all **Actions** running within a **Session**:
@@ -137,13 +205,20 @@ messages to convey information about the **Action** to the render management sys
   an **Action** has failed.
 * `openjd_env: <var>=<value>` where `<var>` is the string name of an environment variable, and `<value>` is a string. This
   can only be emitted by the **Action** for entering an **Environment**. It defines the value of an environment variable for
-  all subsequent **Action**s in the **Session** until the defining **Environment** is exited.
+  all subsequent **Action**s in the **Session** until the defining **Environment** is exited. With the SERVICE extension,
+  it may also be emitted by a **Service**'s `onEnter` **Action**, in which case it defines the variable for that
+  **Service**'s own subsequent **Action**s only.
 * `openjd_redacted_env: <var>=<value>` has identical behavior to openjd_env except `<value>` shall be redacted by the
   application running the action in the emitted stdout line and in any future lines. Requires the REDACTED_ENV_VARS
   extension, however supporting applications must honor the redaction even when the extension is not specified.
 * `openjd_unset_env: <var>` where `<var>` is the string name of an environment variable. This can only be emitted by the
-  **Action** for entering an **Environment**. This unsets the given environment variable for all subsequent **Action**s
-  in the **Session** until the **Environment** that emitted it is exited.
+  **Action** for entering an **Environment** (or, with the SERVICE extension, a **Service**'s `onEnter`). This unsets the
+  given environment variable for all subsequent **Action**s in the **Session** until the **Environment** that emitted it
+  is exited, or for the **Service**'s own subsequent **Action**s.
+* `openjd_service_ready` or `openjd_service_ready: <message>` where `<message>` is any string. Requires the SERVICE
+  extension. This can only be emitted by the `onRun` **Action** of a **Service** whose readiness check type is `STDOUT`, and
+  indicates that the service is accepting connections on all of its declared ports. Emitting it more than once has no
+  additional effect; emitting it from any other **Action** is ignored.
 
 When the WRAP_ACTIONS extension is in use, schedulers must scan the stdout of the wrap script (`onWrapEnvEnter`,
 `onWrapTaskRun`, or `onWrapEnvExit`) for these macros, not the stdout of the wrapped process. Wrap scripts must

@@ -845,6 +845,18 @@ representation of frame ranges. Use `list(Task.Param.Frame)` to convert to a lis
 |--------|------|-------------|
 | `Task.File.<name>` | `path` | Location of the embedded file within a Step Script |
 | `Env.File.<name>` | `path` | Location of the embedded file within an Environment |
+| `Service.File.<name>` | `path` | Location of the embedded file within a Service (`SERVICE` extension) |
+
+##### Service Symbols
+
+Available with the `SERVICE` extension. All three are resolved at task execution (or service execution) time and
+type-check as `unresolved[...]` at earlier stages.
+
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `Service.<name>.<port>.port` | `int` | The TCP port number allocated for port `<port>` of Service `<name>` |
+| `Service.<name>.<port>.bindAddress` | `string` | The interface address the service process binds. Available within the declaring Service only |
+| `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address entities in the Service's scope use to reach the Service |
 
 #### 1.2.3. Implicit Type Coercion
 
