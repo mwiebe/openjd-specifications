@@ -263,6 +263,13 @@ messages to convey information about the **Action** to the render management sys
   additional effect; emitting it from any other **Action** is ignored. When `onRun` is wrapped by `onWrapServiceRun`,
   the line is recognized on the wrap script's stdout, as for every `openjd_*` message under WRAP_ACTIONS.
 
+In a **Service Session**, `openjd_status`, `openjd_progress`, and `openjd_fail` are honored from the **Service**'s
+`onEnter`, `onRun`, and `onExit`, and not from `onReadinessCheck`. `openjd_fail` supplies the reason reported when the
+**Action** fails; the exit status decides whether it failed. A failure of `onEnter` is a start failure, of `onRun` an
+instance failure, and of `onExit` an `onExit` failure (see [Service lifecycle](#service-lifecycle)). The environment
+variables defined for every **Session** in [Session Environment Variables](#session-environment-variables), currently
+`OPENJD_SESSION_WORKING_DIR`, are set in every **Action** of a **Service Session** with their usual meanings.
+
 When the WRAP_ACTIONS extension is in use, schedulers must scan the stdout of the wrap script (`onWrapEnvEnter`,
 `onWrapTaskRun`, or `onWrapEnvExit`) for these macros, not the stdout of the wrapped process. Wrap scripts must
 forward the wrapped process's stdout and stderr verbatim — without buffering, filtering, or transformation —
