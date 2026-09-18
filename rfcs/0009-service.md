@@ -183,7 +183,7 @@ Template is new in this RFC.
 
 ```yaml
 specificationVersion: "environment-2023-09"
-extensions: [SERVICE]
+extensions: [SERVICE, FEATURE_BUNDLE_1]
 parameterDefinitions:
   - name: CacheMemoryMiB
     type: INT
@@ -220,8 +220,8 @@ environment:
 ```
 
 Every Task in every Job submitted through the queue starts with `VALKEY_HOST` and `VALKEY_PORT` set,
-whether or not its Job Template has heard of the Service. (The `min` format string on the amount
-requirement requires the `FEATURE_BUNDLE_1` extension; it is shown for illustration.) A Job Template
+whether or not its Job Template has heard of the Service. (`FEATURE_BUNDLE_1` is declared for the
+format string in the amount requirement's `min`.) A Job Template
 consumes the Service the same way it consumes any queue Environment: through the effects the
 Environment has on its Tasks. This Job Template does not use the `SERVICE` extension at all.
 
