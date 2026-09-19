@@ -346,8 +346,9 @@ entity is immediately familiar and reuses the existing machinery.
    through: a PMIx server for MPI ranks, the scheduler process for Dask workers. The coordinator
    is a Service; the workers are the Tasks of a Step, each connecting to the coordinator's
    endpoint and taking its identity (its rank) from a Task parameter. Running these workloads
-   well additionally requires that the Step's Tasks be scheduled concurrently, which is outside
-   this RFC; see [Future Work](#future-work).
+   well additionally requires that the scheduler launch the Step's Tasks only once a threshold
+   number of hosts is available for them, and that the Tasks' hosts be able to reach one another;
+   both are outside this RFC. See [Future Work](#future-work).
 
 ### Backward compatibility
 
@@ -1573,15 +1574,17 @@ references resolved at submission time were also considered and rejected, becaus
   client connect to. Each Task takes its rank from a Task parameter and the coordinator's address
   from `Service.*`; the ranks run the program directly, so each is an ordinary Task with its own log
   and status, and the Step completes when the program exits. (For Dask, one Task runs the client and
-  calls `client.shutdown()` when done, which ends the worker Tasks.) What is missing is a guarantee
-  that the Tasks run *concurrently*: an MPI job with a fixed world of 30 ranks deadlocks in
-  `MPI_Init` if only 10 are scheduled, and a Dask client needs at least some workers alive while it
-  runs. A follow-up RFC should add a Step-level co-scheduling constraint — a minimum number of the
-  Step's Tasks (or all of them) that the scheduler must be able to run at once before it starts any,
-  with all-or-nothing allocation — together with a gang failure policy (cancel the sibling Tasks
-  when one fails, and retry as a group) and a requirement that the Tasks' hosts be mutually
-  reachable, since ranks talk peer-to-peer once they have found each other. That primitive is useful
-  independently of Services, so it is not part of this RFC.
+  calls `client.shutdown()` when done, which ends the worker Tasks.) Tasks already run concurrently
+  when capacity allows; what is missing is a *reservation*: an MPI job with a fixed world of 30
+  ranks deadlocks in `MPI_Init` if the scheduler launches 10 Tasks and the other 20 wait for hosts,
+  and a Dask client needs at least some workers alive while it runs. A follow-up RFC should add a
+  Step-level reservation constraint — a minimum number of the Step's Tasks (or all of them) for
+  which hosts must be available before the scheduler launches any, allocated all-or-nothing —
+  together with a gang failure policy (cancel the sibling Tasks when one fails, and retry as a
+  group) and a way to require network connectivity between the Tasks' hosts, since ranks talk
+  peer-to-peer once they have found each other and this RFC guarantees reachability only from a
+  Task's host to a Service host. That primitive is useful independently of Services, so it is not
+  part of this RFC.
 * **Replicated Services.** A `replicas:` count producing `Service.<name>.<port>.connectAddresses`
   as a `list[string]`, for a pool of identical daemons serving a single driver (a distributed
   cache, for example). Deferred until the single-instance model has been exercised; the
