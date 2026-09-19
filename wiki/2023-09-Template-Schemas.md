@@ -2547,9 +2547,10 @@ Where:
       The action's own `timeout` (default: 30 seconds) bounds one invocation; an invocation that exceeds it is canceled
       and counts as "not yet ready", as does any exit status other than 0. Neither is a failure of the Service. Once the
       instance is ready the action is not run again.
-    * `STDOUT` — The Service is ready once its `onRun` action writes a line matching the regular expression
-      `^openjd_service_ready(: .*)?$` to stdout. The optional message has no functional purpose but may be surfaced in
-      UI elements.
+    * `STDOUT` — The Service is ready once its `onRun` action writes a line of the form
+      `openjd_service_ready: <message>` to stdout, with the same syntax as the other `openjd_*` messages (see
+      [How Jobs Are Run](How-Jobs-Are-Run#stdoutstderr-messages)). The message has no functional purpose but may be
+      surfaced in UI elements.
 2. *ports* (`TCP_CONNECT` only) — The names of the ports to probe. Each must be declared in the Service's *ports*.
    Defaults to all of them.
 3. *intervalSeconds* (`COMMAND` only) — Seconds to wait between the end of one *onReadinessCheck* invocation and the
