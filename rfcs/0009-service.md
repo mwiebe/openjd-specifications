@@ -159,8 +159,8 @@ steps:
                 - "{{ Service.Coordinator.api.bindAddress }}:{{ Service.Coordinator.api.port }}"
                 - "--metrics"
                 - "{{ Service.Coordinator.metrics.bindAddress }}:{{ Service.Coordinator.metrics.port }}"
-                # The coordinator prints "openjd_service_ready" to stdout once its
-                # listeners are accepting connections.
+                # The coordinator prints "openjd_service_ready: listening" to stdout
+                # once its listeners are accepting connections.
             onExit:
               command: coordinator
               args: ["export-report", "--data-dir", "{{ Session.WorkingDirectory }}/db"]
@@ -772,11 +772,11 @@ Where:
       "not yet ready", as does any exit status other than 0. Neither is ever a failure of the
       Service. Once the instance is READY the action is not run again; readiness is not a
       liveness check (see [Open Questions](#health-monitoring-after-ready)).
-    * `STDOUT` — The Service is READY once its `onRun` action writes a line matching the regular
-      expression `^openjd_service_ready(: .*)?$` to stdout. The optional message after the colon
-      has no functional purpose but MAY be surfaced in UIs. This is consistent with the existing
-      `openjd_*` stdout protocol and is the mechanism of choice for services whose readiness is
-      not observable from outside the process.
+    * `STDOUT` — The Service is READY once its `onRun` action writes a line of the form
+      `openjd_service_ready: <message>` to stdout, with the same syntax as the other `openjd_*`
+      messages. The message has no functional purpose but MAY be surfaced in UIs. This is the
+      mechanism of choice for services whose readiness is not observable from outside the
+      process.
 2. *ports* (`TCP_CONNECT` only) — The names of the ports to probe. Each must be declared in the
    Service's *ports*. Defaults to all of them.
 3. *intervalSeconds* (`COMMAND` only) — Seconds to wait between the end of one *onReadinessCheck*
@@ -1229,9 +1229,9 @@ concern and is not visible in the template.
 
 > Addition to the list in *Stdout/Stderr Messages*
 
-* `openjd_service_ready` or `openjd_service_ready: <message>` — May be emitted only by the `onRun`
-  action of a Service whose readiness check *type* is `STDOUT`. Indicates that the service is
-  accepting connections on all of its declared ports. Emitting it more than once has no additional
+* `openjd_service_ready: <message>` where `<message>` is any string — May be emitted only by the
+  `onRun` action of a Service whose readiness check *type* is `STDOUT`. Indicates that the service
+  is accepting connections on all of its declared ports. Emitting it more than once has no additional
   effect; emitting it from any other action is ignored. When `onRun` is wrapped by
   `onWrapServiceRun`, the line is recognized on the wrap script's stdout, as for every `openjd_*`
   message under `WRAP_ACTIONS`.
@@ -1363,10 +1363,11 @@ an Environment Template written for Tasks works for Services.
 
 Two kinds of Environment exist once Services do: those that provision a process (Conda, a
 container) and belong in every Session, and those that configure Tasks to *use* a Service and
-belong only in Task Sessions. An earlier draft told them apart by inference — an Environment that
-referenced a Service was excluded from the Sessions of that Service and of earlier Services — but
-that rule depended on the start order, which for attached templates is the scheduler's attachment
-order and not knowable from the template. `runScope` makes the distinction a declaration. The
+belong only in Task Sessions. The alternative is to tell them apart by inference — an Environment
+that references a Service is excluded from the Sessions of that Service and of earlier Services —
+but that rule depends on the start order, which for attached templates is the scheduler's
+attachment order and not knowable from the template. `runScope` makes the distinction a
+declaration. The
 default of "every kind of Session" keeps existing Environments working for Services with no
 edits, an Environment that references `Service.*` must say `runScope: [TASK]`, and the check is
 local to the document. It also names the concept that future work needs: the set of Sessions an
@@ -1393,12 +1394,10 @@ and none of them is difficult once stated.
 ### Four `onWrapService*` hooks
 
 RFC 0008 defines one wrap hook per kind of wrapped action and an all-or-nothing rule within the
-group, so that a wrapper has a complete, explicit picture of what it intercepts. Wrapping a
-Service's actions with `onWrapTaskRun` would have been shorter but would have wrapped an `onEnter`
-with a hook named for a Task's `onRun`, made `WrappedStep.Name` meaningless, and broken the
-one-hook-per-kind pattern. Following the pattern costs four hooks, tied to `runScope` so a
-wrapper that never sees a Service Session need not define them. RFC 0008's future unified
-`onWrapAction` would collapse all seven hooks into one and is the right long-term answer.
+group, so that a wrapper has a complete, explicit picture of what it intercepts. A Service has four
+kinds of action, so following the pattern costs four hooks, tied to `runScope` so a wrapper that
+never sees a Service Session need not define them. RFC 0008's future unified `onWrapAction` would
+collapse all seven hooks into one and is the right long-term answer.
 
 ### Start failures consume a restart attempt
 
@@ -1518,10 +1517,10 @@ performance implications; `Service.*` adds a handful of symbols resolved at task
 
 ### Passing the endpoint through environment variables
 
-An earlier idea was to export `OPENJD_SERVICE_<NAME>_<PORT>_ADDRESS` into every Session. This was
-rejected on the Tooling-parseable tenet: environment variables hide data flow from tools that read
-the template, whereas `{{ Service.Cache.main.connectAddress }}` is visible. This is the same
-reasoning recorded for `OPENJD_SESSION_WORKING_DIR` in *How Jobs Are Run*.
+Exporting `OPENJD_SERVICE_<NAME>_<PORT>_ADDRESS` into every Session is rejected on the
+Tooling-parseable tenet: environment variables hide data flow from tools that read the template,
+whereas `{{ Service.Cache.main.connectAddress }}` is visible. This is the same reasoning recorded
+for `OPENJD_SESSION_WORKING_DIR` in *How Jobs Are Run*.
 
 ### Automatic health-check-based liveness in v1
 
@@ -1548,16 +1547,15 @@ Rejected in favor of a `services:` property on the existing Environment Template
 
 ### A typed reference to external Services from Job Templates
 
-An earlier draft let a Job Template declare an `<ExternalServiceRequirement>` in `jobServices` — a
-stub with `external: true`, a Service name, and port names — so that the Job Template could use
-`Service.<name>.*` for a queue-supplied Service with static validation, and the submission would be
-rejected if the queue did not supply a match. It was removed once Environment Templates could carry
-a `services:` list and an `environment:` together: the Environment can publish the endpoint to Tasks
-by the same means queue Environments already use, no other queue-provided entity requires a
-declaration in the Job Template, and the stub added a discriminated union to `jobServices`, a merge
-rule, and an exception to the name-collision and forward-reference rules. Unchecked `Service.*`
-references resolved at submission time were also considered and rejected, because they would make
-`openjd check` unable to catch a typo and hide the dependency from readers.
+A Job Template could declare a requirement on a queue-supplied Service — a stub in `jobServices`
+naming the Service and its ports — so that it could use `Service.<name>.*` with static validation,
+and a submission would be rejected if the queue did not supply a match. This is rejected because
+the Environment defined alongside an external Service can publish the endpoint to Tasks by the
+same means queue Environments already use, so no declaration is needed; no other queue-provided
+entity requires one; and the stub would add a discriminated union to `jobServices`, a merge rule,
+and exceptions to the name-collision and forward-reference rules. Unchecked `Service.*` references
+resolved at submission time are rejected as well, because they would make `openjd check` unable to
+catch a typo and hide the dependency from readers.
 
 ## Future Work
 

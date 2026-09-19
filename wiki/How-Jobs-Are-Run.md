@@ -257,11 +257,11 @@ messages to convey information about the **Action** to the render management sys
   **Action** for entering an **Environment** (or, with the SERVICE extension, a **Service**'s `onEnter`). This unsets the
   given environment variable for all subsequent **Action**s in the **Session** until the **Environment** that emitted it
   is exited, or for the **Service**'s own subsequent **Action**s.
-* `openjd_service_ready` or `openjd_service_ready: <message>` where `<message>` is any string. Requires the SERVICE
-  extension. This can only be emitted by the `onRun` **Action** of a **Service** whose readiness check type is `STDOUT`, and
-  indicates that the service is accepting connections on all of its declared ports. Emitting it more than once has no
-  additional effect; emitting it from any other **Action** is ignored. When `onRun` is wrapped by `onWrapServiceRun`,
-  the line is recognized on the wrap script's stdout, as for every `openjd_*` message under WRAP_ACTIONS.
+* `openjd_service_ready: <message>` where `<message>` is any string. Requires the SERVICE extension. This can only be
+  emitted by the `onRun` **Action** of a **Service** whose readiness check type is `STDOUT`, and indicates that the
+  service is accepting connections on all of its declared ports. Emitting it more than once has no additional effect;
+  emitting it from any other **Action** is ignored. When `onRun` is wrapped by `onWrapServiceRun`, the line is
+  recognized on the wrap script's stdout, as for every `openjd_*` message under WRAP_ACTIONS.
 
 In a **Service Session**, `openjd_status`, `openjd_progress`, and `openjd_fail` are honored from the **Service**'s
 `onEnter`, `onRun`, and `onExit`, and not from `onReadinessCheck`. `openjd_fail` supplies the reason reported when the
