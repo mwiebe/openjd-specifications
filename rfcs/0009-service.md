@@ -358,7 +358,11 @@ This RFC is additive and gated by the `SERVICE` extension name declared under RF
 - A template that uses `jobServices`, `stepServices`, or the `Service.*` format-string scope MUST
   list `SERVICE` in `extensions:`, and a scheduler MUST reject a template that uses any of these
   without declaring the extension.
-- No existing field changes meaning. A template with no `SERVICE` extension is unaffected.
+- No existing field changes meaning. A template with no `SERVICE` extension is unaffected on its
+  own. One combination is newly rejected at submission: a wrapping Environment Template (RFC 0008)
+  that does not declare `SERVICE`, attached to a Job that declares Services; see
+  [Validation](#validation). Queue operators with such a wrapper add `SERVICE` to it and either
+  define the `onWrapService*` hooks or declare `runScope: [TASK]`.
 - The `$schema` and `extensions` keys added to the Environment Template schema are not gated by
   `SERVICE`. `extensions` has been accepted by implementations on Environment Templates since
   RFC 0002 (RFC 0008's example relies on it); this RFC documents existing behavior. Environment
@@ -436,9 +440,7 @@ New and changed properties:
 * *extensions* — If provided, a non-empty list of extensions that this document uses, with the
   same available names as the Job Template. An extension listed here applies to the content of
   this document only; a Job Template does not need to list the extensions used by the Environment
-  Templates a scheduler applies to it, and vice versa. Environment Templates have
-  used this key informally since RFC 0002 (RFC 0008's example declares `WRAP_ACTIONS` and `EXPR`
-  on one); this RFC makes it part of the schema.
+  Templates a scheduler applies to it, and vice versa.
 * *environment* — Now optional. The definition of an Environment that the Environment Template
   defines. When *services* is also provided, format strings within the Environment may reference
   those Services' endpoints via `Service.<name>.<port>.port` and
@@ -586,13 +588,21 @@ New properties, available only when both `WRAP_ACTIONS` (RFC 0008) and `SERVICE`
   through the same `WrappedAction.*` variables RFC 0008 defines, plus `WrappedService.Name`, the
   `name` of the Service being wrapped (the analogue of `WrappedEnv.Name` and `WrappedStep.Name`).
 
-RFC 0008's rules extend to the new group as follows:
+RFC 0008's rules extend to the new hooks as follows:
 
-1. *All-or-nothing, per group.* A wrapping Environment (one that defines `onWrapEnvEnter`,
-   `onWrapTaskRun`, and `onWrapEnvExit`) whose *runScope* includes `SERVICE` MUST also define all
-   four `onWrapService*` hooks, since it will wrap Service Sessions. One with `runScope: [TASK]`
-   MUST NOT define any of them. An Environment MUST NOT define an `onWrapService*` hook without
-   also defining the three RFC 0008 hooks.
+1. *The required hooks follow from `runScope`.* A wrapping Environment is one that defines any wrap
+   hook. Inner Environments are entered in every kind of Session, so every wrapping Environment
+   MUST define `onWrapEnvEnter` and `onWrapEnvExit`. It MUST define `onWrapTaskRun` if and only if
+   its *runScope* includes `TASK`, and MUST define all four `onWrapService*` hooks if and only if
+   its *runScope* includes `SERVICE`. With the default *runScope* this is RFC 0008's three hooks
+   plus the four Service hooks; with `runScope: [TASK]` it is exactly RFC 0008's rule; with
+   `runScope: [SERVICE]` it is `onWrapEnvEnter`, `onWrapEnvExit`, and the four Service hooks. A
+   template that defines a hook its *runScope* does not call for, or omits one it does, MUST be
+   rejected at template validation. A wrapping Environment in a document that does not declare
+   `SERVICE` cannot define the Service hooks and has the default *runScope* of every kind of
+   Session, which is valid for that document on its own; if a submission combines it with a Job
+   that has any Service in its scope, the submission MUST be rejected, identifying that Environment
+   Template as the cause (see [Validation](#validation)).
 2. *Nothing to replace.* `onWrapServiceEnter`, `onWrapServiceReadinessCheck`, and
    `onWrapServiceExit` run only for a Service that defines the corresponding action. Every Service
    defines *onRun*, so `onWrapServiceRun` runs for every wrapped Service.
@@ -607,11 +617,13 @@ RFC 0008's rules extend to the new group as follows:
    [Concurrency with `onRun`](#concurrency-with-onrun)).
 5. *Failure.* A failed `onWrapServiceRun` is an instance failure, a failed `onWrapServiceEnter` is a
    start failure, and a failed `onWrapServiceExit` is an *onExit* failure, exactly as the wrapped
-   action's failure would be.
+   action's failure would be. The exit status of an `onWrapServiceReadinessCheck` invocation has
+   the meaning the wrapped *onReadinessCheck*'s would: 0 means the Service is READY, and any other
+   status, or exceeding the action's `timeout`, means not yet ready and is never a failure of the
+   Service.
 
 A wrapping Environment's own *onEnter* and *onExit* are never wrapped, in a Service Session as in
-any other. The four hooks are the price of RFC 0008's one-hook-per-action-kind pattern; the
-unified `onWrapAction` hook that RFC 0008 lists as future work would replace all seven with one.
+any other.
 
 #### `<Service>`
 
@@ -692,7 +704,7 @@ The format string scopes available to format strings within a `<Service>` are:
 4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports, and of any Service
    earlier in the same list (for a Step Service, also any Job Service). See
    [The `Service.*` scope](#the-service-scope).
-5. `Step.Name` — Available in a Step Service only. Requires the `EXPR` extension.
+5. `Job.Name`, and in a Step Service also `Step.Name`. Both require the `EXPR` extension.
 6. Names bound by `let` in the enclosing `<StepTemplate>` (for a Step Service), in the `<Service>`,
    and in the `<ServiceScript>`. Available with the `EXPR` extension.
 
@@ -722,10 +734,11 @@ Where:
 1. *name* — The name of the port. It is the second component of `Service.<service>.<port>.*`
    references. Must not be `File`.
 2. *port* — If provided, the Service requires this specific TCP port number on its host. If the
-   scheduler cannot provide that port (for example, because it is in use), the Service fails to
-   start. If not provided, the runtime allocates an available port. Range: 1–65535. Authors
-   SHOULD omit this and let the runtime allocate, so that multiple Services and Sessions can share
-   a host.
+   scheduler cannot provide that port on the chosen host (for example, because it is in use), that
+   is a start failure (see [Failure and restart](#failure-and-restart)), and relocation to another
+   host may succeed. If not provided, the runtime allocates an available port. Range: 1–65535.
+   Authors SHOULD omit this and let the runtime allocate, so that multiple Services and Sessions can
+   share a host.
 
 All ports are TCP. Every port is bound and published on the same service host. UDP ports and
 Unix domain sockets are out of scope for this RFC (see [Future Work](#future-work)).
@@ -814,8 +827,7 @@ Where:
       the Service holds state that makes prior results unreliable once lost (a coordinator).
     * Default: `RERUN`. This is the safe default: an author must opt in to keeping results.
 
-If *maxAttempts* is exhausted, or the policy is not provided, an `onRun` exit fails the scope
-regardless of *completedTasks*.
+If *maxAttempts* is exhausted, an `onRun` exit fails the scope regardless of *completedTasks*.
 
 ##### `<ServiceScript>`
 
@@ -1077,8 +1089,9 @@ constraints a scheduler MUST satisfy; how it satisfies them is its own concern.
 
 **Sessions.**
 
-5. A Service has at most one live Service Session at a time, and at most one instance (a launched
-   *onRun*) within it.
+5. A Service has at most one live Service Session at a time, and at most one running *onRun*
+   within it. Before *onRun* is launched again in the same Session, the previous *onRun* process
+   MUST have exited, whether on its own or because the scheduler canceled it.
 6. A Service Session ends when the Service's scope completes (the Job or Step has no Task that
    could still run, whether because every Task completed or because the scope failed or was
    canceled), when the Service is relocated, or when the Session fails to start (see below). A
@@ -1123,7 +1136,8 @@ Service other than those the Service itself references, and those are READY befo
 starts (ordering constraint 2).
 
 Under the `WRAP_ACTIONS` extension, a wrapping Environment whose `runScope` includes `SERVICE`
-wraps the Service's actions with its `onWrapService*` hooks (see
+wraps the Service's actions with its `onWrapService*` hooks, and the inner Environments of the
+Service Session with `onWrapEnvEnter` and `onWrapEnvExit` as in any Session (see
 [`<Environment>`](#environment)). The Service's process then runs inside the container or under
 the remote launcher that the wrapping Environment provides, without the Service knowing it.
 
@@ -1137,16 +1151,18 @@ Two kinds of failure lead to the restart decision:
 
 * An **instance failure** occurs when *onRun* exits (with any status) before the scheduler cancels
   it, when the readiness check times out, or when the scheduler loses the service host.
-* A **start failure** occurs when a Service Session fails before *onRun* is launched: an
-  Environment's `onEnter` fails, or the Service's *onEnter* exits non-zero or times out. The
-  Session ends (constraint 7 applies: *onExit* runs if *onEnter* ran, Environments are exited).
+* A **start failure** occurs when a Service Session fails before *onRun* is launched: a requested
+  *port* cannot be allocated on the chosen host, an Environment's `onEnter` fails, or the Service's
+  *onEnter* exits non-zero or times out. The Session ends (constraint 7 applies: *onExit* runs if
+  *onEnter* ran, Environments are exited).
 
 On either failure the Service becomes UNREADY and the scheduler:
 
 1. Cancels every Task in the Service's scope that is currently running. Each such Task is
    returned to the queue and will run again once the Service is READY; this is not counted as a
    Task failure.
-2. Cancels *onRun* if it is still running (the readiness timeout case).
+2. Cancels *onRun* if it is still running (the readiness timeout case) and waits for it to exit;
+   constraint 5 forbids a second *onRun* in the Session before then.
 3. If the number of relaunches so far is less than `restartPolicy.maxAttempts`:
     1. If `restartPolicy.completedTasks` is `RERUN`, returns every successfully completed Task in
        the scope to the queue.
@@ -1193,8 +1209,8 @@ connect is not a sufficient indicator that the service can do useful work.
 
 #### Validation
 
-Everything this RFC adds is checkable when a template is validated on its own, with one
-exception. At template validation, an implementation MUST check:
+Everything this RFC adds is checkable when a template is validated on its own, with two
+exceptions. At template validation, an implementation MUST check:
 
 1. Every `Service.*` reference resolves to a Service and port declared in the same document, is
    used only where the [scope rules](#the-service-scope) permit, and (for a reference from a
@@ -1205,12 +1221,20 @@ exception. At template validation, an implementation MUST check:
 4. `readinessCheck` is consistent with `<ServiceActions>`: `onReadinessCheck` is defined if and
    only if the type is `COMMAND`, and every port a `TCP_CONNECT` check names is declared.
 5. Service and port names are valid `<Identifier>`s, not `File`, and unique within their lists.
-6. Wrap hooks are complete per group and consistent with `runScope`, per
+6. The wrap hooks an Environment defines are exactly those its `runScope` calls for, per
    [`<Environment>`](#environment).
 
-The one check that requires the combined Job is the external-Service name collision rule in
-[Environment Template](#environment-template), because it compares names across documents that
-only the scheduler sees together. It is performed at submission.
+Two checks require the combined Job, because they relate documents that only the scheduler sees
+together, and are performed at submission:
+
+1. The external-Service name collision rule in
+   [Environment Template](#environment-template).
+2. A wrapping Environment from an attached Environment Template that does not declare `SERVICE`
+   has the default `runScope` (every kind of Session) and cannot define the `onWrapService*` hooks.
+   If the combined Job has any Service in that Environment's scope, the submission MUST be rejected,
+   naming that Environment Template as the cause. Without this check the Service would run in a
+   Session the wrapper enters but cannot wrap. The remedy is for the Environment Template to declare
+   `SERVICE` and either define the four hooks or declare `runScope: [TASK]`.
 
 #### Placement
 
@@ -1229,10 +1253,11 @@ concern and is not visible in the template.
 
 > Addition to the list in *Stdout/Stderr Messages*
 
-* `openjd_service_ready: <message>` where `<message>` is any string — May be emitted only by the
-  `onRun` action of a Service whose readiness check *type* is `STDOUT`. Indicates that the service
-  is accepting connections on all of its declared ports. Emitting it more than once has no additional
-  effect; emitting it from any other action is ignored. When `onRun` is wrapped by
+* `openjd_service_ready: <message>` where `<message>` is any string — Used and interpreted only
+  when emitted by the `onRun` action of a Service whose readiness check *type* is `STDOUT`, where
+  it indicates that the service is accepting connections on all of its declared ports. Emitting it
+  more than once has no additional effect. It is ignored from any other action, and from `onRun`
+  when the readiness check *type* is not `STDOUT`. When `onRun` is wrapped by
   `onWrapServiceRun`, the line is recognized on the wrap script's stdout, as for every `openjd_*`
   message under `WRAP_ACTIONS`.
 
@@ -1351,10 +1376,10 @@ dependence of template validity on the order in which a scheduler happens to att
 
 ### Services run inside the scope's Environments
 
-The alternative — a Service is responsible for all of its own setup — was drafted first for
-simplicity, but it means a Service cannot reuse the Conda, Rez, or container Environments that
-provision software for Tasks, which is the whole reason those Environments exist; every Service
-author would reimplement activation inside *onEnter*. Entering the scope's Environments in the
+The alternative — a Service is responsible for all of its own setup — is simpler, but it means a
+Service cannot reuse the Conda, Rez, or container Environments that provision software for Tasks,
+which is the whole reason those Environments exist; every Service author would reimplement
+activation inside *onEnter*. Entering the scope's Environments in the
 Service Session makes a Service Session a Session in the ordinary sense, so every existing rule
 about Environments (ordering, `openjd_env`, cleanup on failure, wrap hooks) applies unchanged, and
 an Environment Template written for Tasks works for Services.
@@ -1376,12 +1401,11 @@ out of Environments.
 
 ### `onReadinessCheck` is an action of the Service
 
-The readiness command was first modeled as an `<Action>` inside `readinessCheck`. That left it
-outside `script:`, with no principled claim on `let` bindings, embedded files, or the same
-format-string scopes as the other actions, and the RFC and wiki drifted in describing what it
-could reference. Making it a fourth `<ServiceActions>` entry gives every action of a Service one
-scope rule and lets probe scripts use embedded files, which they will want to. The `readinessCheck`
-object keeps the policy (type, interval, timeout); the action keeps the command.
+The alternative is an `<Action>` inside `readinessCheck`. That leaves it outside `script:`, with no
+principled claim on `let` bindings, embedded files, or the same format-string scopes as the other
+actions. Making it a fourth `<ServiceActions>` entry gives every action of a Service one scope rule
+and lets check scripts use embedded files, which they will want to. The `readinessCheck` object
+keeps the policy (type, interval, timeout); the action keeps the command.
 
 The check necessarily runs while *onRun* is running, which no other action in the specification
 does. The alternative that avoids this — dropping `COMMAND` and having authors wrap their binary
@@ -1393,10 +1417,13 @@ and none of them is difficult once stated.
 
 ### Four `onWrapService*` hooks
 
-RFC 0008 defines one wrap hook per kind of wrapped action and an all-or-nothing rule within the
-group, so that a wrapper has a complete, explicit picture of what it intercepts. A Service has four
-kinds of action, so following the pattern costs four hooks, tied to `runScope` so a wrapper that
-never sees a Service Session need not define them. RFC 0008's future unified `onWrapAction` would
+RFC 0008 defines one wrap hook per kind of wrapped action and requires a wrapper to define every
+hook it could need, so that it has a complete, explicit picture of what it intercepts. A Service has
+four kinds of action, so following the pattern costs four hooks. Which hooks a wrapper could need
+follows from `runScope`: inner Environments are entered in every kind of Session, Tasks only in
+Task Sessions, Services only in Service Sessions, so the required set is `onWrapEnvEnter` and
+`onWrapEnvExit` always, `onWrapTaskRun` for `TASK`, and the four Service hooks for `SERVICE`. A
+wrapper never defines a hook that cannot run. RFC 0008's future unified `onWrapAction` would
 collapse all seven hooks into one and is the right long-term answer.
 
 ### Start failures consume a restart attempt
@@ -1444,7 +1471,7 @@ endpoint as environment variables or a file. This is deliberately the same contr
 Environments already have, and it means Job Templates written before a queue Service existed use it
 without modification, and without adopting the `SERVICE` extension. An explicit, typed declaration
 of a dependency on an external Service (a stub entry in `jobServices` naming the Service and its
-ports) was drafted and removed; see [Rejected
+ports) is rejected; see [Rejected
 Ideas](#a-typed-reference-to-external-services-from-job-templates).
 
 ## Open Questions

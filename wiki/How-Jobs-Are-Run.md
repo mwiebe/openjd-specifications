@@ -43,7 +43,9 @@ of an action the inner Environment defines: if an inner Environment defines no `
 script at all), there is nothing to replace and the corresponding wrap hook does not run for it. If more
 than one Environment
 in the session stack defines any wrap hook, the session is invalid and the scheduler must reject it
-before entering any Environment. If an Environment defines any wrap hook, it must define all three.
+before entering any Environment. If an Environment defines any wrap hook, it must define all three; with the SERVICE
+extension, the hooks it must define follow from its `runScope` instead (see
+[Section 4.3](2023-09-Template-Schemas#43-environmentactions)).
 
 A wrap hook is treated as the action it replaces. A failed `onWrapEnvEnter` is an inner `onEnter`
 failure, a failed `onWrapTaskRun` is a task `onRun` failure, and a failed `onWrapEnvExit` is an inner
@@ -101,7 +103,8 @@ Tasks to use a **Service** (and therefore references `Service.*`) declares `runS
 **Service Sessions**. Under the WRAP_ACTIONS extension, a wrapping **Environment** whose `runScope` includes `SERVICE`
 wraps the **Service**'s `onEnter`, `onRun`, `onReadinessCheck`, and `onExit` with its `onWrapServiceEnter`,
 `onWrapServiceRun`, `onWrapServiceReadinessCheck`, and `onWrapServiceExit` hooks, exactly as `onWrapTaskRun` wraps a
-Task's `onRun`. Placement is up to the scheduler: a distributed render
+Task's `onRun`, and wraps the inner **Environments** of the **Service Session** with `onWrapEnvEnter` and
+`onWrapEnvExit` as in any **Session**. Placement is up to the scheduler: a distributed render
 manager might dedicate a host to a **Service**, while a single-host runner starts it alongside the Tasks on loopback.
 Whatever the placement, the scheduler is responsible for making `connectAddress` and `port`, as seen from any host in the
 scope, reach the service process.
@@ -128,7 +131,9 @@ satisfy; how it satisfies them is its own concern.
    are, Tasks are scheduled exactly as described above, with no change to how **Sessions** are formed; Step Services do
    not affect which Tasks may share a **Session**.
 4. **Services** are stopped in the reverse of the order in which they were started.
-5. A **Service** has at most one live **Service Session** at a time, and at most one launched `onRun` within it.
+5. A **Service** has at most one live **Service Session** at a time, and at most one running `onRun` within it. Before
+   `onRun` is launched again in the same **Session**, the previous `onRun` process must have exited, on its own or
+   because the scheduler canceled it.
 6. A **Service Session** ends when the **Service**'s scope completes (the Job or Step has no Task that could still run,
    whether because every Task completed or because the scope failed or was canceled), when the **Service** is relocated,
    or when the **Session** fails to start. A **Service** whose scope completes must have its **Session** ended whatever
@@ -149,12 +154,14 @@ satisfy; how it satisfies them is its own concern.
 Two kinds of failure lead to the restart decision. An **instance failure** occurs when `onRun` exits, with any exit
 status, before the scheduler cancels it, when the readiness check times out, or when the scheduler loses the **Service
 host** (it determines, by its own means, that the host is gone or unreachable). A **start failure** occurs when a
-**Service Session** fails before `onRun` is launched: an **Environment**'s `onEnter` fails, or the **Service**'s `onEnter`
-exits non-zero or times out.
+**Service Session** fails before `onRun` is launched: a requested port cannot be allocated on the chosen host, an
+**Environment**'s `onEnter` fails, or the **Service**'s `onEnter` exits non-zero or times out.
 
 On either failure the **Service** becomes **UNREADY**, and the scheduler cancels every Task in the scope that is currently
-running and returns it to the queue; this is not counted as a Task failure. If the **Service**'s restart policy has
-attempts remaining, the scheduler relaunches the **Service**. After an instance failure on a host that is still
+running and returns it to the queue; this is not counted as a Task failure. If `onRun` is still running (the readiness
+timeout case) the scheduler cancels it and waits for it to exit; constraint 5 above forbids a second `onRun` in the
+**Session** before then. If the **Service**'s restart policy has attempts remaining, the scheduler relaunches the
+**Service**. After an instance failure on a host that is still
 available it may relaunch `onRun` within the existing **Service Session** (same working directory, same ports, `onEnter`
 not re-run, so the state `onEnter` established is preserved), or it may relocate; after a start failure or host loss it
 must begin a new **Service Session**. If the policy's `completedTasks` is `RERUN`, every Task in the scope that had
