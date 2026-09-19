@@ -200,6 +200,13 @@ When a submission combines a Job Template with one or more Environment Templates
    declared in the Job Template's `jobServices` or in any Step's `stepServices`. The submission must be rejected on a
    collision. Queue operators should give external Services names that Job Template authors are unlikely to choose
    (for example, a studio prefix), since a collision makes an existing Job Template unsubmittable.
+3. A wrapping Environment (one defining the `WRAP_ACTIONS` hooks) from an Environment Template that does not declare
+   `SERVICE` has the default `runScope` of every kind of Session and cannot define the `onWrapService*` hooks. If the
+   combined Job has any Service in that Environment's scope, the submission must be rejected, identifying that
+   Environment Template as the cause; otherwise the Service would run in a Session the Environment enters but cannot
+   wrap. The remedy is for the Environment Template to declare `SERVICE` and either define the four hooks or declare
+   `runScope: [TASK]`. This check and the name-collision check above are the only checks that require the combined
+   Job; everything else is checked when each document is validated on its own.
 
 An external Service has the same effect on a Job as a Service the Job Template declared itself: the Job's Tasks are
 not scheduled until it is ready, its host requirements are allocated for the Job's lifetime, and its restart policy
@@ -960,9 +967,10 @@ Where:
    Step that declares it; it is not available to other Steps, including Steps that depend on this one. Available
    only when using the `SERVICE` extension. See: [&lt;Service&gt;](#9-service-extension-service).
     * Constraints:
-        1. No two Services in this list may have the same value for the `name` property.
-        2. The list must not contain more than 10 elements.
-        3. The Services defined in this list must not have the same `name` as a Job Service defined in the same
+        1. Minimum number of elements: If provided, then this list must contain at least one element.
+        2. No two Services in this list may have the same value for the `name` property.
+        3. The list must not contain more than 10 elements.
+        4. The Services defined in this list must not have the same `name` as a Job Service defined in the same
            Job Template.
     * Note: As with Step Environments, the scope of a Step Service's `name` is the Step that defines it. Different
       Steps may each define a Step Service with the same `name`.
@@ -1617,17 +1625,23 @@ The format string scopes available to format strings within an Environment are:
 3. `Env.*` — Scope of the environment entity itself. Values such as the embedded files defined within the Environment
    entity.
 4. Names bound by `let` in the enclosing `<EnvironmentScript>`. Available with the `EXPR` extension.
-5. `WrappedAction.*` — Available within `onWrapEnvEnter`, `onWrapTaskRun`, and `onWrapEnvExit` only. Carries
-   the wrapped `<Action>`'s fields. Available with the `WRAP_ACTIONS` extension.
+5. `Service.<name>.<port>.port` and `Service.<name>.<port>.connectAddress` — Available only in an Environment whose
+   *runScope* is `[TASK]`, for the Services in scope where the Environment is defined (see
+   [Section 9](#9-service-extension-service)). Available with the `SERVICE` extension.
+6. `WrappedAction.*` — Available within the wrap hooks only (`onWrapEnvEnter`, `onWrapTaskRun`, `onWrapEnvExit`, and,
+   with the `SERVICE` extension, `onWrapServiceEnter`, `onWrapServiceRun`, `onWrapServiceReadinessCheck`, and
+   `onWrapServiceExit`). Carries the wrapped `<Action>`'s fields. Available with the `WRAP_ACTIONS` extension.
    See [Wrap hook template variables](#431-wrap-hook-template-variables) for the available fields.
-6. `WrappedEnv.Name` — Available within `onWrapEnvEnter` and `onWrapEnvExit` only. The name of the inner
+7. `WrappedEnv.Name` — Available within `onWrapEnvEnter` and `onWrapEnvExit` only. The name of the inner
    environment whose action is being wrapped. Available with the `WRAP_ACTIONS` extension.
-7. `WrappedStep.Name` — Available within `onWrapTaskRun` only. The name of the step whose task is being
+8. `WrappedStep.Name` — Available within `onWrapTaskRun` only. The name of the step whose task is being
    wrapped. Available with the `WRAP_ACTIONS` extension.
+9. `WrappedService.Name` — Available within the four `onWrapService*` hooks only. The name of the Service whose action
+   is being wrapped. Available with the `WRAP_ACTIONS` and `SERVICE` extensions.
 
-Templates must not reference `WrappedAction.*` outside the three wrap hooks, `WrappedEnv.*` outside
-`onWrapEnvEnter` and `onWrapEnvExit`, or `WrappedStep.*` outside `onWrapTaskRun`. Schedulers must reject
-templates that violate this scope rule.
+Templates must not reference `WrappedAction.*` outside the wrap hooks, `WrappedEnv.*` outside `onWrapEnvEnter` and
+`onWrapEnvExit`, `WrappedStep.*` outside `onWrapTaskRun`, or `WrappedService.*` outside the `onWrapService*` hooks.
+Schedulers must reject templates that violate this scope rule.
 
 Implementations of this specfication must watch STDOUT when running the `onEnter` action for any line matching:
 
@@ -1727,19 +1741,30 @@ Subject to the constraint that at least one of *onEnter* or *onExit* must be pro
 >    `variables:`-only environment) — there is nothing to replace, and the corresponding wrap
 >    hook must not run for that environment. Every `<StepScript>` defines `onRun`, so
 >    `onWrapTaskRun` runs for every task.
-> 6. *Service group* (`SERVICE` extension). A wrapping environment whose `runScope` includes `SERVICE`
->    must also define all four `onWrapService*` hooks; one whose `runScope` is `[TASK]` must not define
->    any of them; and an environment must not define an `onWrapService*` hook without also defining
->    the three hooks above. `onWrapServiceEnter`, `onWrapServiceReadinessCheck`, and `onWrapServiceExit`
+> 6. *Service hooks* (`SERVICE` extension). When `SERVICE` is declared, the hooks a wrapping environment
+>    (one that defines any wrap hook) must define follow from its `runScope`, and rule 1 above is replaced
+>    by this rule. Inner environments are entered in every kind of session, so every wrapping environment
+>    must define `onWrapEnvEnter` and `onWrapEnvExit`. It must define `onWrapTaskRun` if and only if its
+>    `runScope` includes `TASK`, and must define all four `onWrapService*` hooks if and only if its
+>    `runScope` includes `SERVICE`. Schedulers must reject templates that define a hook the `runScope` does
+>    not call for, or omit one it does. `onWrapServiceEnter`, `onWrapServiceReadinessCheck`, and `onWrapServiceExit`
 >    run only for a Service that defines the corresponding action; every Service defines `onRun`, so
 >    `onWrapServiceRun` runs for every wrapped Service. A wrapped Service `onEnter`'s `openjd_env`
 >    messages and a wrapped `onRun`'s `openjd_service_ready` line are recognized on the wrap script's
->    stdout, as for every `openjd_*` message under `WRAP_ACTIONS`.
+>    stdout, as for every `openjd_*` message under `WRAP_ACTIONS`. A failed `onWrapServiceEnter`,
+>    `onWrapServiceRun`, or `onWrapServiceExit` has the effect the wrapped action's failure would have,
+>    and the exit status of an `onWrapServiceReadinessCheck` invocation has the meaning the wrapped
+>    `onReadinessCheck`'s would: 0 means ready, anything else (or exceeding its timeout) means not yet
+>    ready and is never a failure of the Service. A wrapping environment in a document that does
+>    not declare `SERVICE` cannot define the Service hooks and has the default `runScope`; this is valid
+>    for that document on its own, but a submission that combines it with a Job having any Service in
+>    that environment's scope must be rejected, identifying that Environment Template as the cause (see
+>    [Services from Environment Templates](#122-services-from-environment-templates)).
 
 #### 4.3.1. Wrap hook template variables
 
 Each wrap hook receives the wrapped `<Action>`'s fields as read-only template variables supplied by the
-runtime. The variables have identical names and semantics across all three hooks, so helper scripts can
+runtime. The variables have identical names and semantics across all hooks, so helper scripts can
 be reused unchanged.
 
 **Available in `onWrapEnvEnter`, `onWrapTaskRun`, and `onWrapEnvExit`:**
@@ -2139,14 +2164,14 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Task.File.<name>`|The filesystem location to which the Task Embedded File with key `<name>` has been written.| Available within the Step Script Actions and Embedded Files.|
 |`Env.File.<name>`|The filesystem location to which the Environment Attachment with key `<name>` has been written.|Available within the Environment Script Actions and Embedded Files.|
 |`Service.File.<name>`|The filesystem location to which the Service Embedded File with key `<name>` has been written. Requires the `SERVICE` extension.|Available within the Service Script Actions and Embedded Files of the declaring Service.|
-|`Service.<name>.<port>.port`|The TCP port number allocated (or requested) for port `<port>` of Service `<name>`. This is an `int` type with the `EXPR` extension. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope. See [&lt;Service&gt;](#9-service-extension-service) for the scoping rules.|
+|`Service.<name>.<port>.port`|The TCP port number allocated (or requested) for port `<port>` of Service `<name>`. This is an `int` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope. See [&lt;Service&gt;](#9-service-extension-service) for the scoping rules.|
 |`Service.<name>.<port>.bindAddress`|The interface address that the service process must bind to so that entities in the Service's scope can reach it. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service only.|
 |`Service.<name>.<port>.connectAddress`|The hostname or IP address that entities in the Service's scope use to reach port `<port>` of Service `<name>`. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope.|
-|`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
+|`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
 |`Job.Name`|The resolved name of the Job. This is a `string` type. Requires the `EXPR` extension.|Available in every Format String in the Job Template, except the `name` field of the Job Template itself.|
 |`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`.|
-|`Session.HasPathMappingRules`|This value can be used to determine whether path mapping rules are available to the Session. Without the `EXPR` extension, it is string valued, with values "true" or "false". With the `EXPR` extension enabled, it is a `bool` type. "true"/`True` means that the path mapping JSON contains path mapping rules. "false"/`False` means that the contents of the path mapping JSON are the empty object.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
-|`Session.PathMappingRulesFile`|This is a string whose value is the location of a JSON file on the worker node's local disk that contains the path mapping rule substitutions for the Session.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
+|`Session.HasPathMappingRules`|This value can be used to determine whether path mapping rules are available to the Session. Without the `EXPR` extension, it is string valued, with values "true" or "false". With the `EXPR` extension enabled, it is a `bool` type. "true"/`True` means that the path mapping JSON contains path mapping rules. "false"/`False` means that the contents of the path mapping JSON are the empty object.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
+|`Session.PathMappingRulesFile`|This is a string whose value is the location of a JSON file on the worker node's local disk that contains the path mapping rule substitutions for the Session.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
 |`<name>` (let binding)|Names bound by `let` in `<StepTemplate>`, `<StepScript>`, `<SimpleAction>`, or `<EnvironmentScript>`. Names must start with a lowercase letter or underscore (see `<UserIdentifier>`). The type is determined by the expression. Available with the `EXPR` extension.|See [Let Binding Scope Summary](#362-let-binding-scope-summary) for detailed scoping rules.|
 
 ### 7.4. Template Processing Stages
@@ -2459,7 +2484,7 @@ The format string scopes available to format strings within a `<Service>` are:
 3. `Service.File.*` — The filesystem location of embedded files defined within this Service's *script*.
 4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports, and of any Service earlier in the same list
    (for a Step Service, also of any Job Service). See [Value References](#731-value-references).
-5. `Step.Name` — Available in a Step Service only. Requires the `EXPR` extension.
+5. `Job.Name`, and in a Step Service also `Step.Name`. Both require the `EXPR` extension.
 6. Names bound by `let` in the enclosing `<StepTemplate>` (for a Step Service), in the `<Service>`, and in the
    `<ServiceScript>`. Available with the `EXPR` extension.
 
@@ -2505,7 +2530,9 @@ Where:
 1. *name* — The name of the port. It is the second component of `Service.<service>.<port>.*` references. Must not be
    `File`.
 2. *port* — If provided, the Service requires this specific TCP port number on its host. If the scheduler cannot provide
-   that port, the Service fails to start. If not provided, the runtime allocates an available port. Range: 1–65535.
+   that port on the chosen host, that is a start failure (see
+   [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)), and relocation to another host may succeed. If not
+   provided, the runtime allocates an available port. Range: 1–65535.
    Authors should omit this and let the runtime allocate, so that multiple Services and Sessions can share a host.
 
 All ports are TCP, and all of a Service's ports are bound and published on the same host.
@@ -2586,7 +2613,7 @@ Where:
       state that makes prior results unreliable once lost.
     * Default: `RERUN`.
 
-If *maxAttempts* is exhausted, a `onRun` exit fails the scope regardless of *completedTasks*.
+If *maxAttempts* is exhausted, an `onRun` exit fails the scope regardless of *completedTasks*.
 
 ### 9.5. `<ServiceScript>`
 
@@ -2655,12 +2682,14 @@ Implementations of this specification must watch the stdout of *onEnter*, *onRun
 *onReadinessCheck* are not honored.
 
 Implementations must additionally watch the stdout of *onEnter* for `openjd_env`, `openjd_redacted_env`, and
-`openjd_unset_env`, with the same syntax and redaction rules as for an Environment's `onEnter`
-(see [&lt;Environment&gt;](#4-environment)). A variable set this way is set in the process environment of every
-subsequent action of the same Service Session — every instance of *onRun*, *onReadinessCheck*, and *onExit* — and is
-retained across relaunches of *onRun* within the Session. Variables set by *onEnter* take precedence over the Service's
-*variables*. These messages are ignored when emitted by *onRun*, *onReadinessCheck*, or *onExit*, and nothing set within
-a Service is propagated to the entities in the Service's scope.
+`openjd_unset_env`, with the same syntax and redaction rules as for an Environment's `onEnter` (see
+[&lt;Environment&gt;](#4-environment)). A variable set this way is set in the process environment of every subsequent
+action of the same Service Session — every instance of *onRun*, *onReadinessCheck*, and *onExit* — and is retained
+across relaunches of *onRun* within the Session. The process environment of a Service's actions is built in this order,
+later entries taking precedence: the variables of the Environments the Service Session entered (their *variables* and
+their `openjd_env` messages, in entry order, as in any Session), then the Service's own *variables*, then variables set
+by the Service's *onEnter*. These messages are ignored when emitted by *onRun*, *onReadinessCheck*, or *onExit*, and
+nothing set within a Service is propagated to the entities in the Service's scope.
 
 #### 9.6.1. Concurrency of onReadinessCheck with onRun
 
