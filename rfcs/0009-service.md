@@ -362,7 +362,7 @@ This RFC is additive and gated by the `SERVICE` extension name declared under RF
   own. One combination is newly rejected at submission: a wrapping Environment Template (RFC 0008)
   that does not declare `SERVICE`, attached to a Job that declares Services; see
   [Validation](#validation). Queue operators with such a wrapper add `SERVICE` to it and either
-  define the `onWrapService*` hooks or declare `runScope: [TASK]`.
+  define the `onWrapService*` hooks or declare a `runScope` that excludes `SERVICE`.
 - The `$schema` and `extensions` keys added to the Environment Template schema are not gated by
   `SERVICE`. `extensions` has been accepted by implementations on Environment Templates since
   RFC 0002 (RFC 0008's example relies on it); this RFC documents existing behavior. Environment
@@ -545,22 +545,30 @@ The `let` bindings of a `<StepTemplate>` are additionally available in *stepServ
 
 New property:
 
-* *runScope* — The kinds of Session this Environment is entered in. `<RunScopeName>` is one of:
+* *runScope* — The kinds of Session this Environment is entered in. Every Session has exactly one
+  kind, and an Environment is entered in a Session if and only if that Session's kind is in the
+  Environment's *runScope*. `<RunScopeName>` is one of:
     * `TASK` — Sessions that run Tasks. This is the only kind of Session that exists without the
       `SERVICE` extension.
     * `SERVICE` — Service Sessions, in which a Service's actions run (see
       [Services run inside Environments](#services-run-inside-environments)).
 
-  If not provided, the Environment is entered in every kind of Session (`[TASK, SERVICE]`), so
-  existing Environments that provision software apply to Services without modification.
+  If not provided, the Environment is entered in every kind of Session, including kinds that a
+  later extension defines, so existing Environments that provision software apply to Services
+  without modification. An explicit list is exhaustive: the Environment is entered in those kinds
+  and no others. An implementation MUST reject a `<RunScopeName>` it does not recognize. An
+  extension that defines a new kind of Session MUST give it a `<RunScopeName>`, state which
+  `Service.*`-style values (if any) are in scope for Environments entered in it, and, under
+  `WRAP_ACTIONS`, name the wrap hooks a wrapping Environment must define for it.
   Constraints:
     1. Minimum number of elements: 1. Maximum: one of each defined name; no duplicates.
     2. An Environment whose *runScope* includes `SERVICE` MUST NOT reference any `Service.*` value:
        a Service Session may begin before any Service other than its own has an endpoint, and its
-       own endpoint is not meaningful to an Environment that provisions it. Only Environments with
-       `runScope: [TASK]` may reference `Service.*`, and the Environment that configures Tasks to
-       use a Service (see the [queue cache example](#a-queue-supplied-cache-with-client-configuration))
-       is exactly such an Environment.
+       own endpoint is not meaningful to an Environment that provisions it. An Environment that
+       references `Service.*` must therefore have a *runScope* that excludes `SERVICE`, for example
+       `runScope: [TASK]`; the Environment that configures Tasks to use a Service (see the
+       [queue cache example](#a-queue-supplied-cache-with-client-configuration)) is exactly such
+       an Environment.
 
   Future extensions may define additional names; a scheduler MUST reject a name it does not
   recognize.
@@ -594,9 +602,10 @@ RFC 0008's rules extend to the new hooks as follows:
    hook. Inner Environments are entered in every kind of Session, so every wrapping Environment
    MUST define `onWrapEnvEnter` and `onWrapEnvExit`. It MUST define `onWrapTaskRun` if and only if
    its *runScope* includes `TASK`, and MUST define all four `onWrapService*` hooks if and only if
-   its *runScope* includes `SERVICE`. With the default *runScope* this is RFC 0008's three hooks
-   plus the four Service hooks; with `runScope: [TASK]` it is exactly RFC 0008's rule; with
-   `runScope: [SERVICE]` it is `onWrapEnvEnter`, `onWrapEnvExit`, and the four Service hooks. A
+   its *runScope* includes `SERVICE`. With the default *runScope* of every kind of Session, and
+   with `TASK` and `SERVICE` the kinds defined so far, this is RFC 0008's three hooks plus the four
+   Service hooks; with `runScope: [TASK]` it is exactly RFC 0008's rule; with `runScope: [SERVICE]`
+   it is `onWrapEnvEnter`, `onWrapEnvExit`, and the four Service hooks. A
    template that defines a hook its *runScope* does not call for, or omits one it does, MUST be
    rejected at template validation. A wrapping Environment in a document that does not declare
    `SERVICE` cannot define the Service hooks and has the default *runScope* of every kind of
@@ -1011,9 +1020,9 @@ until the scheduler places the Service, and may change if the Service is relocat
    any Step Service in the Job. A Service cannot reference a Service later in its own list, nor a
    Step Service of a different Step; this ordering rule guarantees the referenced Service is READY
    before the referencing one starts.
-3. For a Job Service: every `jobEnvironments` entry whose `runScope` is `[TASK]`, and every
-   Step's `stepEnvironments` with `runScope: [TASK]`, `stepServices`, and `script`.
-4. For a Step Service: that Step's `stepEnvironments` with `runScope: [TASK]`, later
+3. For a Job Service: every `jobEnvironments` entry whose `runScope` excludes `SERVICE`, and every
+   Step's `stepEnvironments` whose `runScope` excludes `SERVICE`, `stepServices`, and `script`.
+4. For a Step Service: that Step's `stepEnvironments` whose `runScope` excludes `SERVICE`, later
    `stepServices`, and `script`.
 
 An Environment whose `runScope` includes `SERVICE` is never in scope for any `Service.*` value; see
@@ -1122,8 +1131,8 @@ A Service Session enters the Environments of the Service's scope whose `runScope
 `SERVICE`, in the same order a Session for a Task in that scope would enter them: a Job Service
 enters the Job's `jobEnvironments` (including any attached from Environment Templates, in the
 scheduler's order); a Step Service enters the Job's `jobEnvironments` followed by its Step's
-`stepEnvironments`. Environments with `runScope: [TASK]` are skipped. The Environments are entered
-before the Service's *onEnter* and exited after its *onExit*. Environment variables set by an
+`stepEnvironments`. The Environments are entered before the Service's *onEnter* and exited after
+its *onExit*. Environment variables set by an
 Environment's `variables` or `openjd_env` apply to every action of the Service, with the Service's
 own *variables* taking precedence over them and variables set by the Service's *onEnter* taking
 precedence over both. This is what lets a Service reuse the same Conda, Rez, or container
@@ -1234,7 +1243,7 @@ together, and are performed at submission:
    If the combined Job has any Service in that Environment's scope, the submission MUST be rejected,
    naming that Environment Template as the cause. Without this check the Service would run in a
    Session the wrapper enters but cannot wrap. The remedy is for the Environment Template to declare
-   `SERVICE` and either define the four hooks or declare `runScope: [TASK]`.
+   `SERVICE` and either define the four hooks or declare a `runScope` that excludes `SERVICE`.
 
 #### Placement
 
@@ -1386,18 +1395,19 @@ an Environment Template written for Tasks works for Services.
 
 ### `runScope` rather than an inferred exclusion rule
 
-Two kinds of Environment exist once Services do: those that provision a process (Conda, a
-container) and belong in every Session, and those that configure Tasks to *use* a Service and
-belong only in Task Sessions. The alternative is to tell them apart by inference — an Environment
-that references a Service is excluded from the Sessions of that Service and of earlier Services —
-but that rule depends on the start order, which for attached templates is the scheduler's
-attachment order and not knowable from the template. `runScope` makes the distinction a
-declaration. The
-default of "every kind of Session" keeps existing Environments working for Services with no
-edits, an Environment that references `Service.*` must say `runScope: [TASK]`, and the check is
-local to the document. It also names the concept that future work needs: the set of Sessions an
-Environment applies to, to which user-defined names can later be added so that Steps opt in and
-out of Environments.
+Two kinds of Environment exist once Services do: those that provision a process (Conda, a container)
+and belong in every Session, and those that configure Tasks to *use* a Service and belong only in
+Task Sessions. The alternative is to tell them apart by inference — an Environment that references a
+Service is excluded from the Sessions of that Service and of earlier Services — but that rule
+depends on the start order, which for attached templates is the scheduler's attachment order and not
+knowable from the template. `runScope` makes the distinction a declaration. The default is every
+kind of Session rather than the list of kinds defined today, so that existing Environments keep
+working for Services with no edits and, when a later extension defines a new kind of Session,
+provisioning Environments apply to it without being rewritten; an Environment that should stay out
+of new kinds says so with an explicit list. An Environment that references `Service.*` must exclude
+`SERVICE` from its `runScope`, and the check is local to the document. It also names the concept
+that future work needs: the set of Sessions an Environment applies to, to which user-defined names
+can later be added so that Steps opt in and out of Environments.
 
 ### `onReadinessCheck` is an action of the Service
 

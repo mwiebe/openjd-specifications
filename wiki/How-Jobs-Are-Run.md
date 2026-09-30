@@ -98,9 +98,10 @@ and it outlives every **Session** that runs Tasks against it. A **Service Sessio
 that a **Session** for a Task in the **Service**'s scope would (the Job's, and for a Step Service also the Step's), in the
 same order, around the **Service**'s own actions, so a **Service** is provisioned by the same Conda, Rez, or container
 **Environments** as the Tasks. Which kinds of **Session** an **Environment** is entered in is declared by its `runScope`:
-by default every kind, so existing **Environments** apply to **Services** unchanged; an **Environment** that configures
-Tasks to use a **Service** (and therefore references `Service.*`) declares `runScope: [TASK]` and is skipped in
-**Service Sessions**. Under the WRAP_ACTIONS extension, a wrapping **Environment** whose `runScope` includes `SERVICE`
+by default every kind, so existing **Environments** apply to **Services** unchanged, and only an **Environment** whose
+`runScope` includes `SERVICE` is entered in a **Service Session**. An **Environment** that configures Tasks to use a
+**Service** (and therefore references `Service.*`) declares a `runScope` that excludes `SERVICE`, such as
+`runScope: [TASK]`. Under the WRAP_ACTIONS extension, a wrapping **Environment** whose `runScope` includes `SERVICE`
 wraps the **Service**'s `onEnter`, `onRun`, `onReadinessCheck`, and `onExit` with its `onWrapServiceEnter`,
 `onWrapServiceRun`, `onWrapServiceReadinessCheck`, and `onWrapServiceExit` hooks, exactly as `onWrapTaskRun` wraps a
 Task's `onRun`, and wraps the inner **Environments** of the **Service Session** with `onWrapEnvEnter` and

@@ -205,8 +205,8 @@ When a submission combines a Job Template with one or more Environment Templates
    combined Job has any Service in that Environment's scope, the submission must be rejected, identifying that
    Environment Template as the cause; otherwise the Service would run in a Session the Environment enters but cannot
    wrap. The remedy is for the Environment Template to declare `SERVICE` and either define the four hooks or declare
-   `runScope: [TASK]`. This check and the name-collision check above are the only checks that require the combined
-   Job; everything else is checked when each document is validated on its own.
+   a `runScope` that excludes `SERVICE`. This check and the name-collision check above are the only checks that require
+   the combined Job; everything else is checked when each document is validated on its own.
 
 An external Service has the same effect on a Job as a Service the Job Template declared itself: the Job's Tasks are
 not scheduled until it is ready, its host requirements are allocated for the Job's lifetime, and its restart policy
@@ -1607,9 +1607,12 @@ Where:
 2. *description* — A description to apply to the environment. It has no functional purpose, but may appear in UI elements.
    See: [&lt;Description&gt;](#72-description).
 3. *runScope* — The kinds of Session this Environment is entered in. Available only when using the `SERVICE` extension.
-   `<RunScopeName>` is one of `TASK` (Sessions that run Tasks) or `SERVICE` (Service Sessions, in which a Service's
-   actions run; see [&lt;Service&gt;](#9-service-extension-service)). If not provided, the Environment is entered in
-   every kind of Session. Constraints:
+   Every Session has exactly one kind, and an Environment is entered in a Session if and only if that Session's kind is
+   in the Environment's *runScope*. `<RunScopeName>` is one of `TASK` (Sessions that run Tasks) or `SERVICE` (Service
+   Sessions, in which a Service's actions run; see [&lt;Service&gt;](#9-service-extension-service)). If not provided,
+   the Environment is entered in every kind of Session, including kinds defined by later extensions. An explicit list is
+   exhaustive. An extension that defines a new kind of Session gives it a `<RunScopeName>` and, under `WRAP_ACTIONS`,
+   names the wrap hooks a wrapping Environment must define for it. Constraints:
       1. Minimum number of elements: 1. No name may appear more than once.
       2. An Environment whose *runScope* includes `SERVICE` must not reference any `Service.*` value.
       3. Implementations must reject a `<RunScopeName>` they do not recognize.
@@ -1628,7 +1631,7 @@ The format string scopes available to format strings within an Environment are:
    entity.
 4. Names bound by `let` in the enclosing `<EnvironmentScript>`. Available with the `EXPR` extension.
 5. `Service.<name>.<port>.port` and `Service.<name>.<port>.connectAddress` — Available only in an Environment whose
-   *runScope* is `[TASK]`, for the Services in scope where the Environment is defined (see
+   *runScope* excludes `SERVICE`, for the Services in scope where the Environment is defined (see
    [Section 9](#9-service-extension-service)). Available with the `SERVICE` extension.
 6. `WrappedAction.*` — Available within the wrap hooks only (`onWrapEnvEnter`, `onWrapTaskRun`, `onWrapEnvExit`, and,
    with the `SERVICE` extension, `onWrapServiceEnter`, `onWrapServiceRun`, `onWrapServiceReadinessCheck`, and
@@ -2498,10 +2501,10 @@ The `Service.<name>.<port>.*` values of a Service `<name>` are in scope in:
 2. Any Service later in the same `jobServices` or `stepServices` list, and, for a Job Service, any Step Service in the
    Job. A Service cannot reference a Service later in its own list, nor a Step Service of a different Step. This
    ordering rule guarantees that a referenced Service is ready before the referencing Service starts.
-3. For a Job Service: every `jobEnvironments` entry whose `runScope` is `[TASK]`, and every Step's `stepEnvironments`
-   with `runScope: [TASK]`, `stepServices`, and `script`.
-4. For a Step Service: the declaring Step's `stepEnvironments` with `runScope: [TASK]`, later `stepServices`, and
-   `script`.
+3. For a Job Service: every `jobEnvironments` entry whose `runScope` excludes `SERVICE`, and every Step's
+   `stepEnvironments` whose `runScope` excludes `SERVICE`, `stepServices`, and `script`.
+4. For a Step Service: the declaring Step's `stepEnvironments` whose `runScope` excludes `SERVICE`, later
+   `stepServices`, and `script`.
 
 An Environment whose `runScope` includes `SERVICE` is never in scope for any `Service.*` value; see
 [&lt;Environment&gt;](#4-environment).
