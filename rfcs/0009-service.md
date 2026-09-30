@@ -52,7 +52,7 @@ Tasks keep their results (`completedTasks: KEEP`).
 
 ```yaml
 specificationVersion: "jobtemplate-2023-09"
-extensions: [SERVICE]
+extensions: [SERVICE, EXPR]
 name: "Frame Processing With Shared Valkey Store"
 parameterDefinitions:
   - name: FrameEnd
@@ -128,7 +128,7 @@ so that a restart of `onRun` does not wipe the schema.
 
 ```yaml
 specificationVersion: "jobtemplate-2023-09"
-extensions: [SERVICE]
+extensions: [SERVICE, EXPR]
 name: "Tiled Render With Per-Step Coordinator"
 
 steps:
@@ -156,9 +156,9 @@ steps:
                 - "--data-dir"
                 - "{{ Session.WorkingDirectory }}/db"
                 - "--listen"
-                - "{{ Service.Coordinator.api.bindAddress }}:{{ Service.Coordinator.api.port }}"
+                - "{{ join_host_port(Service.Coordinator.api.bindAddress, Service.Coordinator.api.port) }}"
                 - "--metrics"
-                - "{{ Service.Coordinator.metrics.bindAddress }}:{{ Service.Coordinator.metrics.port }}"
+                - "{{ join_host_port(Service.Coordinator.metrics.bindAddress, Service.Coordinator.metrics.port) }}"
                 # The coordinator prints "openjd_service_ready: listening" to stdout
                 # once its listeners are accepting connections.
             onExit:
@@ -175,7 +175,7 @@ steps:
           command: render-tile
           args:
             - "--coordinator"
-            - "http://{{ Service.Coordinator.api.connectAddress }}:{{ Service.Coordinator.api.port }}"
+            - "http://{{ join_host_port(Service.Coordinator.api.connectAddress, Service.Coordinator.api.port) }}"
             - "--tile"
             - "{{ Task.Param.Tile }}"
 ```
@@ -191,7 +191,7 @@ Template is new in this RFC.
 
 ```yaml
 specificationVersion: "environment-2023-09"
-extensions: [SERVICE, FEATURE_BUNDLE_1]
+extensions: [SERVICE, EXPR, FEATURE_BUNDLE_1]
 parameterDefinitions:
   - name: CacheMemoryMiB
     type: INT
@@ -367,9 +367,11 @@ This RFC is additive and gated by the `SERVICE` extension name declared under RF
   `SERVICE`. `extensions` has been accepted by implementations on Environment Templates since
   RFC 0002 (RFC 0008's example relies on it); this RFC documents existing behavior. Environment
   Templates that omit both keys are unaffected.
-- `SERVICE` does not require `EXPR`. All new format-string values are plain strings and integers
-  usable with the base format-string grammar. With `EXPR` enabled, the `Service.*` symbols carry
-  the types listed in [The `Service.*` scope](#the-service-scope).
+- `SERVICE` requires `EXPR`, as `WRAP_ACTIONS` does: a template that lists `SERVICE` in
+  `extensions:` MUST also list `EXPR`, and a scheduler MUST reject one that does not. The
+  `Service.*` symbols carry the types listed in [The `Service.*` scope](#the-service-scope), and
+  composing an endpoint into a URL relies on the `join_host_port` function (see
+  [Address forms](#address-forms)).
 
 ## Specification
 
@@ -713,9 +715,9 @@ The format string scopes available to format strings within a `<Service>` are:
 4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports, and of any Service
    earlier in the same list (for a Step Service, also any Job Service). See
    [The `Service.*` scope](#the-service-scope).
-5. `Job.Name`, and in a Step Service also `Step.Name`. Both require the `EXPR` extension.
+5. `Job.Name`, and in a Step Service also `Step.Name`.
 6. Names bound by `let` in the enclosing `<StepTemplate>` (for a Step Service), in the `<Service>`,
-   and in the `<ServiceScript>`. Available with the `EXPR` extension.
+   and in the `<ServiceScript>`.
 
 `Task.*` values are never available within a Service, since a Service is not associated with any
 Task.
@@ -1006,11 +1008,11 @@ entity in the specification whose correctness depends on not being preempted mid
 New value references, all annotated `@fmtstring[host]` because a Service's endpoint is not known
 until the scheduler places the Service, and may change if the Service is relocated:
 
-| Value | Type (with EXPR) | Description | Scope |
+| Value | Type | Description | Scope |
 |---|---|---|---|
 | `Service.<name>.<port>.port` | `int` | The TCP port number allocated (or requested) for port `<port>` of Service `<name>`. The same number is used for binding and for connecting. | Within the declaring Service; within every entity in the Service's scope (see below). |
 | `Service.<name>.<port>.bindAddress` | `string` | The interface address the service process MUST bind to so that entities in the Service's scope can reach it. Typically `0.0.0.0` (or `::`) for a distributed scheduler and `127.0.0.1` for a single-host runner. | Within the declaring Service only. |
-| `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address that entities in the Service's scope use to reach it. | Within every entity in the Service's scope. Also within the declaring Service, for self-reference (e.g. to print its own URL). |
+| `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address that entities in the Service's scope use to reach it. See [Address forms](#address-forms). | Within every entity in the Service's scope. Also within the declaring Service, for self-reference (e.g. to print its own URL). |
 | `Service.File.<name>` | `path` | The filesystem location to which the Service embedded file with key `<name>` has been written. | Within the Service Script actions and embedded files of the declaring Service. |
 
 `Service.<name>.<port>.*` for a Service `<name>` is in scope in:
@@ -1041,17 +1043,60 @@ A template that references a `Service.*` value outside the scopes above, or that
 Service or port name that is not declared, is invalid and MUST be rejected before the Job is
 created.
 
+###### Address forms
+
+`bindAddress` and `connectAddress` are each a hostname, an IPv4 literal, or an IPv6 literal, in the
+bare form that socket APIs, `--host` and `--bind` flags, and environment variables such as
+`VALKEY_HOST` accept; an IPv6 literal is never bracketed. Schedulers SHOULD provide a hostname for
+`connectAddress` when one resolves from every host in the Service's scope. Wherever an address and a
+port are joined into one string — a URL authority, or a `--listen host:port` flag — an IPv6 literal
+must be enclosed in square brackets, so templates MUST compose such strings with `join_host_port`
+(see [Modifications to the Expression Language](#modifications-to-the-expression-language)) rather
+than `{{ addr }}:{{ port }}`. The examples in this RFC do so.
+
 ##### Template processing stages
 
 > A modification to
 > [`7.4. Template Processing Stages`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#74-template-processing-stages)
 
-`Service.*` values are unknown at template validation and at job creation, and known at
-task execution (and at service execution, for the Service's own actions). With the `EXPR`
-extension they type-check as `unresolved[int]`, `unresolved[string]`, and `unresolved[path]`
-at the earlier stages. A `<Service>`'s *let* is evaluated at job creation alongside
-`<StepTemplate>` bindings; a `<ServiceScript>`'s *let* is evaluated at service execution on the
-service host, alongside `<EnvironmentScript>` and `<StepScript>` bindings at task execution.
+`Service.*` values are unknown at template validation and at job creation, and known at task
+execution (and at service execution, for the Service's own actions). They type-check as
+`unresolved[int]`, `unresolved[string]`, and `unresolved[path]` at the earlier stages. A
+`<Service>`'s *let* is evaluated at job creation alongside `<StepTemplate>` bindings; a
+`<ServiceScript>`'s *let* is evaluated at service execution on the service host, alongside
+`<EnvironmentScript>` and `<StepScript>` bindings at task execution.
+
+### Modifications to the Expression Language
+
+> Additions to
+> [Expression Language](https://github.com/OpenJobDescription/openjd-specifications/wiki/2026-02-Expression-Language),
+> §1.2 (job template symbols) and §2.2.4 (string functions)
+
+**Service symbols.** `Service.File.<name>` (`path`) joins the file-location symbols, and a "Service
+Symbols" table lists `Service.<name>.<port>.port` (`int`), `bindAddress` (`string`), and
+`connectAddress` (`string`), all resolved at task or service execution and typed `unresolved[...]`
+at earlier stages, with the scopes in [The `Service.*` scope](#the-service-scope).
+
+**Host and port functions.** Four string functions are added:
+
+| Signature | Description |
+|---|---|
+| `join_host_port(host: string, port: int) -> string` | Join a host and a port as `host:port`, enclosing `host` in square brackets when it is an IPv6 literal (contains a colon and is not already bracketed). Suitable as a URL authority or a `host:port` flag value. |
+| `split_host_port(s: string) -> list[string]?` | The inverse: split `host:port` or `[host]:port` into `[host, port]`, with the brackets removed from an IPv6 literal. Returns `null` when `s` has no port, including an unbracketed IPv6 literal such as `2001:db8::5`. Malformed brackets (`[::1`, `[::1]x:80`) are an evaluation error. The port is a string; convert it with `int()`. |
+| `is_ipv4(s: string) -> bool` | True if `s` is an IPv4 literal. |
+| `is_ipv6(s: string) -> bool` | True if `s` is an IPv6 literal, bracketed or not, with or without a zone identifier (`fe80::1%eth0`). |
+
+`join_host_port("cache.example", 6379)` is `"cache.example:6379"`; `join_host_port("2001:db8::5",
+6379)` is `"[2001:db8::5]:6379"`; `split_host_port("[2001:db8::5]:6379")` is
+`["2001:db8::5", "6379"]`. A zone identifier is carried through verbatim:
+`join_host_port("fe80::1%eth0", 80)` is `"[fe80::1%eth0]:80"`, as Go's `net.JoinHostPort`
+produces. These follow Go's `net.JoinHostPort` and `net.SplitHostPort`, except that a bare IPv6
+literal splits to `null` rather than an error and an already-bracketed host is not bracketed
+again. Under method syntax, `addr.join_host_port(port)`. `join_host_port` is
+the one Services need (see [Address forms](#address-forms)) and is why `SERVICE` requires `EXPR`;
+the others complete the family: `split_host_port` for a job parameter that carries an endpoint a
+tool wants as separate `--host` and `--port` flags, and `is_ipv4`/`is_ipv6` for tools that take an
+address-family flag. None is specific to Services.
 
 ### Modifications to How Jobs Are Run
 
@@ -1348,6 +1393,11 @@ string so they compose with any URL scheme (`http://{{...}}:{{...}}`, `redis://`
 / `--port` pair) without string surgery. `bindAddress` is separate from `connectAddress` because
 they differ in essentially every deployment (a process binds `0.0.0.0`; clients connect to a
 hostname), and conflating them is the most common source of "works on one host, not on two" bugs.
+The one composition that needs logic, joining an address and a port when the address may be an
+IPv6 literal, is the `join_host_port` function rather than a fourth pre-joined value, so a template
+never inspects an address, and the same function serves any host and port pair a template handles.
+This is why `SERVICE` requires `EXPR`: without it a template on an IPv6 network has no correct way
+to write a URL.
 
 ### Ordered lists with forward-only references
 
@@ -1527,7 +1577,8 @@ likely: a monitor failure is an instance failure).
   name-uniqueness validators mirroring the environment ones; a `Service.*` symbol scope with the
   scoping rules in [The `Service.*` scope](#the-service-scope); `Service.File.*` alongside
   `Env.File.*` and `Task.File.*`; `runScope` on `Environment` with the no-`Service.*` check; the
-  four `onWrapService*` hooks and `WrappedService.Name` when `WRAP_ACTIONS` is also enabled; and a
+  four `onWrapService*` hooks and `WrappedService.Name` when `WRAP_ACTIONS` is also enabled; the
+  `EXPR` prerequisite check; the host and port functions in the expression library; and a
   submission-time merge step that orders external Services and checks name collisions. Moderate.
 - **Python (openjd-sessions)**: A Service Session variant of the existing session that enters the
   `SERVICE`-scoped Environments, runs `onEnter`, launches `onRun` without awaiting exit, runs

@@ -2170,8 +2170,8 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Env.File.<name>`|The filesystem location to which the Environment Attachment with key `<name>` has been written.|Available within the Environment Script Actions and Embedded Files.|
 |`Service.File.<name>`|The filesystem location to which the Service Embedded File with key `<name>` has been written. Requires the `SERVICE` extension.|Available within the Service Script Actions and Embedded Files of the declaring Service.|
 |`Service.<name>.<port>.port`|The TCP port number allocated (or requested) for port `<port>` of Service `<name>`. This is an `int` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope. See [&lt;Service&gt;](#9-service-extension-service) for the scoping rules.|
-|`Service.<name>.<port>.bindAddress`|The interface address that the service process must bind to so that entities in the Service's scope can reach it. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service only.|
-|`Service.<name>.<port>.connectAddress`|The hostname or IP address that entities in the Service's scope use to reach port `<port>` of Service `<name>`. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope.|
+|`Service.<name>.<port>.bindAddress`|The interface address that the service process must bind to so that entities in the Service's scope can reach it: a hostname, an IPv4 literal, or an unbracketed IPv6 literal. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service only.|
+|`Service.<name>.<port>.connectAddress`|The hostname or IP address that entities in the Service's scope use to reach port `<port>` of Service `<name>`: a hostname, an IPv4 literal, or an unbracketed IPv6 literal. Join it with a port using `join_host_port` (see [Expression Language](2026-02-Expression-Language#224-string-functions)), which adds the brackets an IPv6 literal needs in a URL. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope.|
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
 |`Job.Name`|The resolved name of the Job. This is a `string` type. Requires the `EXPR` extension.|Available in every Format String in the Job Template, except the `name` field of the Job Template itself.|
 |`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`.|
@@ -2424,7 +2424,9 @@ non-zero exit code indicates failure. A timeout also indicates failure.
 ## 9. `<Service>` `@extension SERVICE`
 
 This object is only available in the extension `SERVICE`, introduced in
-[RFC 0009](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0009-service.md).
+[RFC 0009](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0009-service.md). A template
+that lists `SERVICE` in `extensions:` must also list `EXPR`; schedulers must reject templates that list `SERVICE`
+without `EXPR`.
 
 A Service is a long-lived process that a scheduler starts before scheduling the Tasks in its scope, keeps running
 for the lifetime of its scope, and stops once the scope no longer needs it. The scope of a Service is the Job for a
@@ -2489,9 +2491,9 @@ The format string scopes available to format strings within a `<Service>` are:
 3. `Service.File.*` — The filesystem location of embedded files defined within this Service's *script*.
 4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports, and of any Service earlier in the same list
    (for a Step Service, also of any Job Service). See [Value References](#731-value-references).
-5. `Job.Name`, and in a Step Service also `Step.Name`. Both require the `EXPR` extension.
+5. `Job.Name`, and in a Step Service also `Step.Name`.
 6. Names bound by `let` in the enclosing `<StepTemplate>` (for a Step Service), in the `<Service>`, and in the
-   `<ServiceScript>`. Available with the `EXPR` extension.
+   `<ServiceScript>`.
 
 `Task.*` values are never available within a Service.
 

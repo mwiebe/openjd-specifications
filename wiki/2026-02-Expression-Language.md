@@ -1549,6 +1549,10 @@ Examples:
 | `zfill(s: string, width: int) -> string` | Pad with leading zeros to width; a leading sign (`+`/`-`) is preserved before the padding |
 | `zfill(n: int, width: int) -> string` | Convert int to string, pad with leading zeros; negative integers preserve the sign before padding |
 | `zfill(x: float, width: int) -> string` | Convert float to string, pad with leading zeros; negative floats preserve the sign before padding |
+| `join_host_port(host: string, port: int) -> string` | Join a host and a port as `host:port`, enclosing `host` in square brackets when it is an IPv6 literal (contains a colon and is not already bracketed), as a URL authority or `host:port` flag value requires |
+| `split_host_port(s: string) -> list[string]?` | Split `host:port` or `[host]:port` into `[host, port]`, removing the brackets from an IPv6 literal; `null` when `s` has no port, including an unbracketed IPv6 literal; an error for malformed brackets |
+| `is_ipv4(s: string) -> bool` | True if `s` is an IPv4 literal |
+| `is_ipv6(s: string) -> bool` | True if `s` is an IPv6 literal, bracketed or not, with or without a zone identifier |
 
 Examples:
 - `split("a,b,c", ",")` and `"a,b,c".split(",")` return `["a", "b", "c"]`
@@ -1559,6 +1563,17 @@ Examples:
 - `zfill(3.14, 8)` returns `"00003.14"`
 
 Note: The `sep` argument to `split` and `rsplit` must be non-empty. An empty separator is an error.
+
+`join_host_port("cache.example", 6379)` returns `"cache.example:6379"`, and
+`join_host_port("2001:db8::5", 6379)` returns `"[2001:db8::5]:6379"`, as does
+`join_host_port("[2001:db8::5]", 6379)`. `split_host_port("[2001:db8::5]:6379")` returns
+`["2001:db8::5", "6379"]`, while `split_host_port("cache.example")` and
+`split_host_port("2001:db8::5")` (a bare IPv6 literal, read as having no port) both return `null`;
+the port element is a string, so `int(split_host_port(Param.Endpoint)[1])` gives the port number.
+Malformed brackets such as `"[::1"` or `"[::1]x:80"` are an error. A zone identifier is carried
+through verbatim: `join_host_port("fe80::1%eth0", 80)` returns `"[fe80::1%eth0]:80"`, and
+`split_host_port` returns the host with the zone attached. `is_ipv6("::1")`, `is_ipv6("[::1]")`, and
+`is_ipv6("fe80::1%eth0")` are all `true`; `is_ipv4("10.0.0.1")` is `true`.
 To split a string into individual characters, use `[s[i] for i in range(len(s))]`.
 
 Note: Splitting an empty string returns a list containing one empty string, not an empty list
