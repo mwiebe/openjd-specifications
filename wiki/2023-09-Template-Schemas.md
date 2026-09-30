@@ -200,13 +200,15 @@ When a submission combines a Job Template with one or more Environment Templates
    declared in the Job Template's `jobServices` or in any Step's `stepServices`. The submission must be rejected on a
    collision. Queue operators should give external Services names that Job Template authors are unlikely to choose
    (for example, a studio prefix), since a collision makes an existing Job Template unsubmittable.
-3. A wrapping Environment (one defining the `WRAP_ACTIONS` hooks) from an Environment Template that does not declare
-   `SERVICE` has the default `runScope` of every kind of Session and cannot define the `onWrapService*` hooks. If the
-   combined Job has any Service in that Environment's scope, the submission must be rejected, identifying that
-   Environment Template as the cause; otherwise the Service would run in a Session the Environment enters but cannot
-   wrap. The remedy is for the Environment Template to declare `SERVICE` and either define the four hooks or declare
-   a `runScope` that excludes `SERVICE`. This check and the name-collision check above are the only checks that require
-   the combined Job; everything else is checked when each document is validated on its own.
+3. A wrapping Environment (one defining the `WRAP_ACTIONS` hooks) in a document that does not declare `SERVICE`, whether
+   an attached Environment Template or the Job Template itself, has the default `runScope` of every kind of Session and
+   cannot define the `onWrapService*` hooks. If the combined Job places any Service in that Environment's scope, the
+   submission must be rejected, identifying the document that defines the Environment as the cause; otherwise the
+   Service would run in a Session the Environment enters but cannot wrap. This applies both to a queue's wrapper
+   template attached to a Job Template that declares Services and to a Job Template with a wrapper submitted to a queue
+   that attaches a Service. The remedy is for that document to declare `SERVICE` and either define the four hooks or
+   declare a `runScope` that excludes `SERVICE`. This check and the name-collision check above are the only checks that
+   require the combined Job; everything else is checked when each document is validated on its own.
 
 An external Service has the same effect on a Job as a Service the Job Template declared itself: the Job's Tasks are
 not scheduled until it is ready, its host requirements are allocated for the Job's lifetime, and its restart policy
@@ -1008,13 +1010,14 @@ Where:
 ### 3.3. `<HostRequirements>`
 
 This entity is used by the template author to describe the requirements on Worker host and/or render manager's available
-capabilities that must be satisfied for the Task(s) of the Step to be scheduled to the host.
+capabilities that must be satisfied for the Task(s) of the Step, or the Service (with the `SERVICE` extension), to be
+scheduled to the host.
 
-Each requirement corresponds to an attribute of a host or render manager that must be satisfied to allow the Step to
-be scheduled to the host. Some examples of concrete attributes include processor architecture (x86_64, arm64, etc), the
-number of CPU cores, the amount of system memory, or available floating licenses for an application. We also allow for
-user-defined whose meaning is defined by the customer; a "SoftwareConfig" requirement whose values could be "Option1" or "Option2",
-for example.
+Each requirement corresponds to an attribute of a host or render manager that must be satisfied to allow the Step or
+Service to be scheduled to the host. Some examples of concrete attributes include processor architecture (x86_64, arm64,
+etc), the number of CPU cores, the amount of system memory, or available floating licenses for an application. We also
+allow for user-defined whose meaning is defined by the customer; a "SoftwareConfig" requirement whose values could be
+"Option1" or "Option2", for example.
 
 There are two types of requirements: attribute and amount.
 
@@ -1028,14 +1031,15 @@ attributes: [ <AttributeRequirement>, ... ] # @optional
 Where:
 
 1. *amounts* — Defines a set of quantifiable requirements on the host that must be met and reserved for a Session running
-   Tasks from this Step to be scheduled to the host. See: [&lt;AmountRequirement&gt;](#331-amountrequirement).
-2. *attributes* — Defines a set of attributes that a host must have for a Session running Tasks from this Step to be
-   scheduled to the host. See: [&lt;AttributeRequirement&gt;](#332-attributerequirement).
+   Tasks from this Step, or the Service Session of this Service, to be scheduled to the host.
+   See: [&lt;AmountRequirement&gt;](#331-amountrequirement).
+2. *attributes* — Defines a set of attributes that a host must have for a Session running Tasks from this Step, or the
+   Service Session of this Service, to be scheduled to the host.
+   See: [&lt;AttributeRequirement&gt;](#332-attributerequirement).
 
 With the constraints:
 
-1. If this object is provided in a Job Template, then at least one of the *amounts* or *attributes* properties must be
-   defined.
+1. If this object is provided, then at least one of the *amounts* or *attributes* properties must be defined.
 2. The sum of the lengths of the *amounts* and *attributes* arrays must not exceed 50 elements.
 3. No two elements in the *amounts* array may have the same value for the *name* property, after the *name* format
    strings have been resolved.
@@ -1565,9 +1569,9 @@ and where the bound names are available:
 | Location | Can Reference | Bound Names Available In |
 |----------|---------------|--------------------------|
 | `<StepTemplate>.let` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name`, earlier bindings in same `let` | *stepEnvironments*, *stepServices*, *hostRequirements*, *parameterSpace*, *script* (including nested `<StepScript>.let` or `<SimpleAction>.let`) |
-| `<StepScript>.let` | `Param.*`, `RawParam.*`, `Task.Param.*`, `Task.RawParam.*`, `Session.*`, `Task.File.*`, `Job.Name`, `Step.Name`, step-level bindings, earlier bindings in same `let` | *actions*, *embeddedFiles* |
-| `<SimpleAction>.let` | `Param.*`, `RawParam.*`, `Task.Param.*`, `Task.RawParam.*`, `Session.*`, `Job.Name`, `Step.Name`, step-level bindings, earlier bindings in same `let` | *script*, *args* |
-| `<EnvironmentScript>.let` | `Param.*`, `RawParam.*`, `Session.*`, `Env.File.*`, `Job.Name`, earlier bindings in same `let` | *actions*, *embeddedFiles* |
+| `<StepScript>.let` | `Param.*`, `RawParam.*`, `Task.Param.*`, `Task.RawParam.*`, `Session.*`, `Task.File.*`, `Job.Name`, `Step.Name`, step-level bindings, earlier bindings in same `let`, in-scope `Service.<name>.<port>.*` (`SERVICE` extension) | *actions*, *embeddedFiles* |
+| `<SimpleAction>.let` | `Param.*`, `RawParam.*`, `Task.Param.*`, `Task.RawParam.*`, `Session.*`, `Job.Name`, `Step.Name`, step-level bindings, earlier bindings in same `let`, in-scope `Service.<name>.<port>.*` (`SERVICE` extension) | *script*, *args* |
+| `<EnvironmentScript>.let` | `Param.*`, `RawParam.*`, `Session.*`, `Env.File.*`, `Job.Name`, earlier bindings in same `let`, in-scope `Service.<name>.<port>.*` when the Environment's `runScope` excludes `SERVICE` (`SERVICE` extension) | *actions*, *embeddedFiles* |
 | `<Service>.let` (`SERVICE` extension) | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` (Step Service only), step-level bindings (Step Service only), earlier bindings in same `let` | *hostRequirements*, *variables*, *script* (including nested `<ServiceScript>.let`) |
 | `<ServiceScript>.let` (`SERVICE` extension) | `Param.*`, `RawParam.*`, `Session.*`, `Service.File.*`, in-scope `Service.<name>.<port>.*`, `Job.Name`, `Step.Name` (Step Service only), service-level bindings, earlier bindings in same `let` | *actions*, *embeddedFiles* |
 
@@ -1641,8 +1645,9 @@ The format string scopes available to format strings within an Environment are:
    environment whose action is being wrapped. Available with the `WRAP_ACTIONS` extension.
 8. `WrappedStep.Name` — Available within `onWrapTaskRun` only. The name of the step whose task is being
    wrapped. Available with the `WRAP_ACTIONS` extension.
-9. `WrappedService.Name` — Available within the four `onWrapService*` hooks only. The name of the Service whose action
-   is being wrapped. Available with the `WRAP_ACTIONS` and `SERVICE` extensions.
+9. `WrappedService.*` — Available within the four `onWrapService*` hooks only. The name of the Service whose action is
+   being wrapped and its port names, port numbers, and bind addresses. Available with the `WRAP_ACTIONS` and `SERVICE`
+   extensions. See [Wrap hook template variables](#431-wrap-hook-template-variables).
 
 Templates must not reference `WrappedAction.*` outside the wrap hooks, `WrappedEnv.*` outside `onWrapEnvEnter` and
 `onWrapEnvExit`, `WrappedStep.*` outside `onWrapTaskRun`, or `WrappedService.*` outside the `onWrapService*` hooks.
@@ -1761,9 +1766,10 @@ Subject to the constraint that at least one of *onEnter* or *onExit* must be pro
 >    and the exit status of an `onWrapServiceReadinessCheck` invocation has the meaning the wrapped
 >    `onReadinessCheck`'s would: 0 means ready, anything else (or exceeding its timeout) means not yet
 >    ready and is never a failure of the Service. A wrapping environment in a document that does
->    not declare `SERVICE` cannot define the Service hooks and has the default `runScope`; this is valid
->    for that document on its own, but a submission that combines it with a Job having any Service in
->    that environment's scope must be rejected, identifying that Environment Template as the cause (see
+>    not declare `SERVICE`, whether a Job Template or an Environment Template, cannot define the
+>    Service hooks and has the default `runScope`; this is valid for that document on its own, but a
+>    submission whose combined Job places any Service in that environment's scope must be rejected,
+>    identifying the document that defines the environment as the cause (see
 >    [Services from Environment Templates](#122-services-from-environment-templates)).
 
 #### 4.3.1. Wrap hook template variables
@@ -1797,9 +1803,21 @@ be reused unchanged.
 
 **Additionally available in the four `onWrapService*` hooks** (`SERVICE` extension):
 
-| Variable              | Type     | Description |
-|-----------------------|----------|-------------|
-| `WrappedService.Name` | `string` | The `name` of the Service whose action is being wrapped. |
+| Variable                       | Type           | Description |
+|--------------------------------|----------------|-------------|
+| `WrappedService.Name`          | `string`       | The `name` of the Service whose action is being wrapped. |
+| `WrappedService.PortNames`     | `list[string]` | The `name` of each of the Service's ports, in declaration order. |
+| `WrappedService.Ports`         | `list[int]`    | The allocated port number of each port, in the same order. |
+| `WrappedService.BindAddresses` | `list[string]` | The `bindAddress` of each port, in the same order. |
+
+The three lists are parallel: index *i* of each describes the Service's *i*-th declared port. `bindAddress` and
+`connectAddress` are determined for the service host's network namespace. A wrap script that runs the service process in
+that namespace (a launcher, `ssh`, or a container with host networking) needs no port handling. One that gives the
+process its own network namespace must forward each port in `WrappedService.Ports` so that a connection to
+`connectAddress`:`port` from any host in the scope reaches the process, and must ensure the process can bind
+`bindAddress` inside that namespace; a wildcard `bindAddress` works in either, while a loopback `bindAddress` reaches a
+forwarded port only with host networking. For example, a Docker wrapper without host networking passes
+`{{ flatten([['-p', string(p) + ':' + string(p)] for p in WrappedService.Ports]) }}`.
 
 `WrappedAction.Environment` carries only session-defined variables: variables exported with `openjd_env` —
 including by earlier actions that themselves ran via a wrap hook — and entries of entered environments'
@@ -2162,7 +2180,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 
 |**Value**|**Description**|**Scope**|
 |---|---|---|
-|`Param.<ParamName>`|Values of the Job parameters are available within the `Param` object. This is the same as `RawParam.<ParamName>` for all parameter types except PATH. For PATH type the value is the input value with applicable path mapping rules applied to it. |All types except PATH are available in every Format String in the Job Template. For PATH type parameters, this is only available within format strings that are within an Environment or StepScript context.|
+|`Param.<ParamName>`|Values of the Job parameters are available within the `Param` object. This is the same as `RawParam.<ParamName>` for all parameter types except PATH. For PATH type the value is the input value with applicable path mapping rules applied to it. |All types except PATH are available in every Format String in the Job Template. For PATH type parameters, this is only available within format strings that are within an Environment, StepScript, or (with the `SERVICE` extension) Service *variables* or ServiceScript context.|
 |`RawParam.<ParamName>`|Values of the Job parameters are available within the `RawParam` object. This is always the exact input value of the job parameter.|Available in every Format String in the Job Template.|
 |`Task.Param.<ParamName>`|Values of task parameters are available within the `Task.Param` object. This is the same as `Task.RawParam.<ParamName>` for all parameter types except PATH. For PATH type the value is the input value with applicable path mapping rules applied to it.|Available within the Step Script Actions and Embedded Files.|
 |`Task.RawParam.<ParamName>`|Values of task parameters are available within the `Task.Param` object.|Available within the Step Script Actions and Embedded Files.|
@@ -2174,7 +2192,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Service.<name>.<port>.connectAddress`|The hostname or IP address that entities in the Service's scope use to reach port `<port>` of Service `<name>`: a hostname, an IPv4 literal, or an unbracketed IPv6 literal. Join it with a port using `join_host_port` (see [Expression Language](2026-02-Expression-Language#224-string-functions)), which adds the brackets an IPv6 literal needs in a URL. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope.|
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
 |`Job.Name`|The resolved name of the Job. This is a `string` type. Requires the `EXPR` extension.|Available in every Format String in the Job Template, except the `name` field of the Job Template itself.|
-|`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`.|
+|`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `stepServices` (`SERVICE` extension), `hostRequirements`, `parameterSpace`, and `script`.|
 |`Session.HasPathMappingRules`|This value can be used to determine whether path mapping rules are available to the Session. Without the `EXPR` extension, it is string valued, with values "true" or "false". With the `EXPR` extension enabled, it is a `bool` type. "true"/`True` means that the path mapping JSON contains path mapping rules. "false"/`False` means that the contents of the path mapping JSON are the empty object.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
 |`Session.PathMappingRulesFile`|This is a string whose value is the location of a JSON file on the worker node's local disk that contains the path mapping rule substitutions for the Session.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
 |`<name>` (let binding)|Names bound by `let` in `<StepTemplate>`, `<StepScript>`, `<SimpleAction>`, or `<EnvironmentScript>`. Names must start with a lowercase letter or underscore (see `<UserIdentifier>`). The type is determined by the expression. Available with the `EXPR` extension.|See [Let Binding Scope Summary](#362-let-binding-scope-summary) for detailed scoping rules.|
@@ -2485,9 +2503,13 @@ Where:
 
 The format string scopes available to format strings within a `<Service>` are:
 
-1. `Param.*` and `RawParam.*` — Values of Job Parameters.
+1. `Param.*` and `RawParam.*` — Values of Job Parameters. `PATH`-typed `Param.*` values are available in the Service's
+   *variables* and *script*, with the service host's path mapping applied, and not in `<Service>.let` or
+   *hostRequirements*, which are resolved at job creation.
 2. `Session.*` — Values such as the Service's working directory. `Session.WorkingDirectory` refers to the Service's own
-   Session's working directory on the service host, not to the working directory of any Session running Tasks.
+   Session's working directory on the service host, not to the working directory of any Session running Tasks. A Service
+   Session receives path mapping rules like any Session; `Session.HasPathMappingRules` and
+   `Session.PathMappingRulesFile` describe the rules for the service host.
 3. `Service.File.*` — The filesystem location of embedded files defined within this Service's *script*.
 4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports, and of any Service earlier in the same list
    (for a Step Service, also of any Job Service). See [Value References](#731-value-references).
@@ -2537,10 +2559,13 @@ Where:
 1. *name* — The name of the port. It is the second component of `Service.<service>.<port>.*` references. Must not be
    `File`.
 2. *port* — If provided, the Service requires this specific TCP port number on its host. If the scheduler cannot provide
-   that port on the chosen host, that is a start failure (see
-   [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)), and relocation to another host may succeed. If not
-   provided, the runtime allocates an available port. Range: 1–65535.
-   Authors should omit this and let the runtime allocate, so that multiple Services and Sessions can share a host.
+   that port on the chosen host, that is a start failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-
+   restart)), and relocation to another host may succeed. If not provided, the runtime allocates an available port.
+   Range: 1–65535. Authors should omit this and let the runtime allocate, so that multiple Services and Sessions can
+   share a host. An allocated port is reserved only in the runtime's own bookkeeping; on a host shared with unrelated
+   processes, one of them may bind the port before `onRun` does, in which case `onRun` exits with an error or never
+   becomes ready, either of which is an instance failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-
+   restart)).
 
 All ports are TCP, and all of a Service's ports are bound and published on the same host.
 
@@ -2601,7 +2626,7 @@ Tasks in the scope are scheduled again.
 A `<ServiceRestartPolicy>` is the object:
 
 ```yaml
-maxAttempts: <nonnegativeinteger> # @optional
+maxAttempts: <integer> # @optional
 completedTasks: enum("KEEP", "RERUN") # @optional
 ```
 
@@ -2609,7 +2634,7 @@ Where:
 
 1. *maxAttempts* — The maximum number of times the scheduler will relaunch the Service after an instance failure or a
    start failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)). The initial launch is not
-   counted, so the default of 0 means the Service is launched exactly once and never relaunched.
+   counted, so the default of 0 means the Service is launched exactly once and never relaunched. Must be 0 or greater.
 2. *completedTasks* — What happens, when a new instance is launched, to Tasks in the Service's scope that completed
    successfully against a previous instance. Tasks that were running when the previous instance failed are always
    canceled and requeued, and Tasks not yet started are scheduled once the new instance is ready; only completed Tasks
@@ -2723,6 +2748,28 @@ nothing set within a Service is propagated to the entities in the Service's scop
    result is discarded. An invocation in progress when the Service Session ends is canceled before *onExit* runs.
 6. Under the `WRAP_ACTIONS` extension, `onWrapServiceReadinessCheck` runs while `onWrapServiceRun` is running. Wrap
    scripts used in a Service Session must tolerate concurrent invocation.
+
+### 9.7. Validation
+
+Everything in this section is checkable when a template is validated on its own, with two exceptions. At template
+validation, an implementation must check:
+
+1. Every `Service.*` reference resolves to a Service and port declared in the same document, is used only where the
+   scope rules in [Section 9](#9-service-extension-service) permit, and, for a reference from a Service, refers to that
+   Service or one earlier in the start order.
+2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s `let`, or in an Environment whose
+   `runScope` includes `SERVICE`.
+3. `runScope` contains only recognized names, without duplicates.
+4. `readinessCheck` is consistent with `<ServiceActions>`: `onReadinessCheck` is defined if and only if the type is
+   `COMMAND`, and every port a `TCP_CONNECT` check names is declared.
+5. Service and port names are valid identifiers, not `File`, and unique within their lists.
+6. The wrap hooks an Environment defines are exactly those its `runScope` calls for (see
+   [&lt;EnvironmentActions&gt;](#43-environmentactions)).
+7. A template that lists `SERVICE` also lists `EXPR`.
+
+Two checks relate documents that only the scheduler sees together and are performed at submission: the
+external-Service name collision rule and the wrapping-Environment rule in
+[Services from Environment Templates](#122-services-from-environment-templates).
 
 ## 10. Additional Information
 
