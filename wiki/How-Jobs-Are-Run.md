@@ -95,20 +95,22 @@ format-string scope, so that a Task on any Worker Host knows where to connect.
 Unlike an **Environment**, a **Service** is not tied to the host that runs Tasks. It runs in a **Session** of its own,
 the **Service Session**, on a **Service host** chosen by the scheduler subject to the **Service**'s host requirements,
 and it outlives every **Session** that runs Tasks against it. A **Service Session** enters the same **Environments**
-that a **Session** for a Task in the **Service**'s scope would (the Job's, and for a Step Service also the Step's), in the
-same order, around the **Service**'s own actions, so a **Service** is provisioned by the same Conda, Rez, or container
-**Environments** as the Tasks. Which kinds of **Session** an **Environment** is entered in is declared by its `runScope`:
-by default every kind, so existing **Environments** apply to **Services** unchanged, and only an **Environment** whose
-`runScope` includes `SERVICE` is entered in a **Service Session**. An **Environment** that configures Tasks to use a
-**Service** (and therefore references `Service.*`) declares a `runScope` that excludes `SERVICE`, such as
-`runScope: [TASK]`. Under the WRAP_ACTIONS extension, a wrapping **Environment** whose `runScope` includes `SERVICE`
-wraps the **Service**'s `onEnter`, `onRun`, `onReadinessCheck`, and `onExit` with its `onWrapServiceEnter`,
-`onWrapServiceRun`, `onWrapServiceReadinessCheck`, and `onWrapServiceExit` hooks, exactly as `onWrapTaskRun` wraps a
-Task's `onRun`, and wraps the inner **Environments** of the **Service Session** with `onWrapEnvEnter` and
-`onWrapEnvExit` as in any **Session**. Placement is up to the scheduler: a distributed render
+that a **Session** for a Task in the **Service**'s scope would (the Job's, and for a Step Service also the Step's), in
+the same order, and then the **Service**'s own `serviceEnvironments`, around the **Service**'s own actions, so a
+**Service** is provisioned by the same Conda, Rez, or container **Environments** as the Tasks, plus any it declares for
+itself alone. Later **Environments** take precedence over earlier ones for environment variables, and the **Service**'s
+own `variables` over all of them. Which kinds of **Session** an **Environment** is entered in is declared by its
+`runScope`: by default every kind, so existing **Environments** apply to **Services** unchanged, and only an
+**Environment** whose `runScope` includes `SERVICE` is entered in a **Service Session**. An **Environment** that
+configures Tasks to use a **Service** (and therefore references `Service.*`) declares a `runScope` that excludes
+`SERVICE`, such as `runScope: [TASK]`. Under the WRAP_ACTIONS extension, a wrapping **Environment** whose `runScope`
+includes `SERVICE` wraps the **Service**'s `onEnter`, `onRun`, `onReadinessCheck`, and `onExit` with its
+`onWrapServiceEnter`, `onWrapServiceRun`, `onWrapServiceReadinessCheck`, and `onWrapServiceExit` hooks, exactly as
+`onWrapTaskRun` wraps a Task's `onRun`, and wraps the inner **Environments** of the **Service Session** with
+`onWrapEnvEnter` and `onWrapEnvExit` as in any **Session**. Placement is up to the scheduler: a distributed render
 manager might dedicate a host to a **Service**, while a single-host runner starts it alongside the Tasks on loopback.
-Whatever the placement, the scheduler is responsible for making `connectAddress` and `port`, as seen from any host in the
-scope, reach the service process. A **Service Session** is a **Session** in every other respect too: it has its own
+Whatever the placement, the scheduler is responsible for making `connectAddress` and `port`, as seen from any host in
+the scope, reach the service process. A **Service Session** is a **Session** in every other respect too: it has its own
 working directory, and it receives [Path Mapping Rules](#path-mapping) for the **Service host** the same way a
 **Session** running Tasks does, so `PATH` Job Parameters in a **Service**'s actions are mapped for the host the
 **Service** runs on.

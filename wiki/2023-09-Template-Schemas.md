@@ -1620,7 +1620,9 @@ Where:
    exhaustive. An extension that defines a new kind of Session gives it a `<RunScopeName>` and, under `WRAP_ACTIONS`,
    names the wrap hooks a wrapping Environment must define for it. Constraints:
       1. Minimum number of elements: 1. No name may appear more than once.
-      2. An Environment whose *runScope* includes `SERVICE` must not reference any `Service.*` value.
+2. A Job or Step Environment whose *runScope* includes `SERVICE` must not reference any `Service.*` value. This does not
+         apply to a Service's *serviceEnvironments*, which carry no *runScope* and may reference the declaring Service
+         (see [&lt;Service&gt;](#9-service-extension-service)).
       3. Implementations must reject a `<RunScopeName>` they do not recognize.
 4. *script* — The action that is taken by this Environment when it is run on a Worker host.
 5. *variables* — A set of environment variable name/value pairs, with the values being
@@ -1759,20 +1761,22 @@ Subject to the constraint that at least one of *onEnter* or *onExit* must be pro
 >    must define `onWrapEnvEnter` and `onWrapEnvExit`. It must define `onWrapTaskRun` if and only if its
 >    `runScope` includes `TASK`, and must define all four `onWrapService*` hooks if and only if its
 >    `runScope` includes `SERVICE`. Schedulers must reject templates that define a hook the `runScope` does
->    not call for, or omit one it does. `onWrapServiceEnter`, `onWrapServiceReadinessCheck`, and `onWrapServiceExit`
->    run only for a Service that defines the corresponding action; every Service defines `onRun`, so
->    `onWrapServiceRun` runs for every wrapped Service. A wrapped Service `onEnter`'s `openjd_env`
->    messages and a wrapped `onRun`'s `openjd_service_ready` line are recognized on the wrap script's
->    stdout, as for every `openjd_*` message under `WRAP_ACTIONS`. A failed `onWrapServiceEnter`,
->    `onWrapServiceRun`, or `onWrapServiceExit` has the effect the wrapped action's failure would have,
->    and the exit status of an `onWrapServiceReadinessCheck` invocation has the meaning the wrapped
->    `onReadinessCheck`'s would: 0 means ready, anything else (or exceeding its timeout) means not yet
->    ready and is never a failure of the Service. A wrapping environment in a document that does
->    not declare `SERVICE`, whether a Job Template or an Environment Template, cannot define the
->    Service hooks and has the default `runScope`; this is valid for that document on its own, but a
->    submission whose combined Job places any Service in that environment's scope must be rejected,
->    identifying the document that defines the environment as the cause (see
->    [Services from Environment Templates](#122-services-from-environment-templates)).
+>    not call for, or omit one it does. A Service's *serviceEnvironments* have an effective `runScope` of
+>    `[SERVICE]`: a wrapping Service Environment defines `onWrapEnvEnter`, `onWrapEnvExit`, and the four
+>    `onWrapService*` hooks, and wraps that one Service alone. `onWrapServiceEnter`,
+>    `onWrapServiceReadinessCheck`, and `onWrapServiceExit` run only for a Service that defines the
+>    corresponding action; every Service defines `onRun`, so `onWrapServiceRun` runs for every wrapped
+>    Service. A wrapped Service `onEnter`'s `openjd_env` messages and a wrapped `onRun`'s
+>    `openjd_service_ready` line are recognized on the wrap script's stdout, as for every `openjd_*`
+>    message under `WRAP_ACTIONS`. A failed `onWrapServiceEnter`, `onWrapServiceRun`, or
+>    `onWrapServiceExit` has the effect the wrapped action's failure would have, and the exit status of an
+>    `onWrapServiceReadinessCheck` invocation has the meaning the wrapped `onReadinessCheck`'s would: 0
+>    means ready, anything else (or exceeding its timeout) means not yet ready and is never a failure of
+>    the Service. A wrapping environment in a document that does not declare `SERVICE`, whether a Job
+>    Template or an Environment Template, cannot define the Service hooks and has the default `runScope`;
+>    this is valid for that document on its own, but a submission whose combined Job places any Service in
+>    that environment's scope must be rejected, identifying the document that defines the environment as
+>    the cause (see [Services from Environment Templates](#122-services-from-environment-templates)).
 
 #### 4.3.1. Wrap hook template variables
 
@@ -2465,6 +2469,7 @@ name: <ServiceName>
 description: <Description> # @optional
 let: <LetBindings> # @optional @extension EXPR
 hostRequirements: <HostRequirements> # @optional
+serviceEnvironments: [ <Environment>, ... ] # @optional
 ports: [ <ServicePort>, ... ]
 readinessCheck: <ServiceReadinessCheck> # @optional
 restartPolicy: <ServiceRestartPolicy> # @optional
@@ -2486,22 +2491,34 @@ Where:
    Service to be placed on the host. Amount capabilities are allocated to the Service for its lifetime. This is
    independent of the *hostRequirements* of any Step whose Tasks use the Service.
    See: [&lt;HostRequirements&gt;](#33-hostrequirements).
-5. *ports* — The named TCP ports that the Service exposes. See: [&lt;ServicePort&gt;](#92-serviceport).
+5. *serviceEnvironments* — An ordered list of Environments entered only in this Service's Session, the analogue of a
+   Step's *stepEnvironments*. They are entered, in order, after the Environments of the Service's scope (the Job's, and
+   for a Step Service the Step's) and before the Service's *onEnter*, and exited in reverse order after its *onExit*.
+   Because a Service Environment is entered only in the declaring Service's Session, its format strings have the
+   Service's own scope: they may reference the Service's ports, including `bindAddress`, and the ports of Services
+   earlier in the start order. See: [&lt;Environment&gt;](#4-environment). Constraints:
+1. No two Environments in this list may have the same value for the *name* property, and none may have the *name* of a
+       Job Environment or, for a Step Service, of the declaring Step's Step Environments.
+2. *runScope* must not be provided on a Service Environment; its scope is fixed to the declaring Service's Session. For
+       the wrap-hook rule in [&lt;EnvironmentActions&gt;](#43-environmentactions) it is treated as `runScope:
+       [SERVICE]`.
+6. *ports* — The named TCP ports that the Service exposes. See: [&lt;ServicePort&gt;](#92-serviceport).
     1. Minimum number of elements: 1.
     2. Maximum number of elements: 10.
     3. No two elements may have the same value for the *name* property.
-6. *readinessCheck* — How the scheduler determines that the Service is ready to accept connections. If not provided,
+7. *readinessCheck* — How the scheduler determines that the Service is ready to accept connections. If not provided,
    defaults to `{ type: TCP_CONNECT }` applied to every declared port. See: [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck).
-7. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the scope ends. If not provided,
-   defaults to `{ maxAttempts: 0, completedTasks: RERUN }`. See: [&lt;ServiceRestartPolicy&gt;](#94-servicerestartpolicy).
-8. *variables* — A set of environment variable name/value pairs, with the values being [Format Strings](#73-format-strings)
-   that are resolved when the Service is started, that are set in the process environment of every action of the
-   Service's *script*. This is the declarative way to configure a service process
-   that takes its configuration from environment variables, without wrapping the command in a shell.
-   See: [&lt;EnvironmentVariables&gt;](#44-environmentvariables). A Service's *variables* are not propagated to the
-   entities in its scope; they receive the Service's endpoint through `Service.*` only. Values computed by *onEnter*
-   are passed to *onRun* with `openjd_env` instead (see [&lt;ServiceActions&gt;](#96-serviceactions)).
-9. *script* — The actions that the Service runs on its host. See: [&lt;ServiceScript&gt;](#95-servicescript).
+8. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the scope ends. If not
+   provided, defaults to `{ maxAttempts: 0, completedTasks: RERUN }`. See:
+   [&lt;ServiceRestartPolicy&gt;](#94-servicerestartpolicy).
+9. *variables* — A set of environment variable name/value pairs, with the values being [Format Strings](#73-format-
+   strings) that are resolved when the Service is started, that are set in the process environment of every action of
+   the Service's *script*. This is the declarative way to configure a service process that takes its configuration from
+   environment variables, without wrapping the command in a shell. See:
+   [&lt;EnvironmentVariables&gt;](#44-environmentvariables). A Service's *variables* are not propagated to the entities
+   in its scope; they receive the Service's endpoint through `Service.*` only. Values computed by *onEnter* are passed
+   to *onRun* with `openjd_env` instead (see [&lt;ServiceActions&gt;](#96-serviceactions)).
+10. *script* — The actions that the Service runs on its host. See: [&lt;ServiceScript&gt;](#95-servicescript).
 
 The format string scopes available to format strings within a `<Service>` are:
 
@@ -2523,17 +2540,20 @@ The format string scopes available to format strings within a `<Service>` are:
 
 The `Service.<name>.<port>.*` values of a Service `<name>` are in scope in:
 
-1. The Service `<name>` itself.
+1. The Service `<name>` itself, including its `serviceEnvironments`.
 2. Any Service later in the same `jobServices` or `stepServices` list, and, for a Job Service, any Step Service in the
-   Job. A Service cannot reference a Service later in its own list, nor a Step Service of a different Step. This
-   ordering rule guarantees that a referenced Service is ready before the referencing Service starts.
+   Job, including those Services' `serviceEnvironments` (`port` and `connectAddress` only). A Service cannot reference a
+   Service later in its own list, nor a Step Service of a different Step. This ordering rule guarantees that a
+   referenced Service is ready before the referencing Service starts.
 3. For a Job Service: every `jobEnvironments` entry whose `runScope` excludes `SERVICE`, and every Step's
    `stepEnvironments` whose `runScope` excludes `SERVICE`, `stepServices`, and `script`.
 4. For a Step Service: the declaring Step's `stepEnvironments` whose `runScope` excludes `SERVICE`, later
    `stepServices`, and `script`.
 
-An Environment whose `runScope` includes `SERVICE` is never in scope for any `Service.*` value; see
-[&lt;Environment&gt;](#4-environment).
+A Job or Step Environment whose `runScope` includes `SERVICE` is never in scope for any `Service.*` value; see
+[&lt;Environment&gt;](#4-environment). A Service Environment is the exception: it is entered only in the declaring
+Service's Session, after that Service's ports are allocated and the Services it references are ready, so it has the
+declaring Service's own scope.
 
 `Service.*` is never in scope in a `hostRequirements` object, neither a Step's nor a Service's: host requirements are
 resolved when the scheduler chooses a host, before any Service endpoint is known.
@@ -2770,12 +2790,14 @@ validation, an implementation must check:
 1. Every `Service.*` reference resolves to a Service and port declared in the same document, is used only where the
    scope rules in [Section 9](#9-service-extension-service) permit, and, for a reference from a Service, refers to that
    Service or one earlier in the start order.
-2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s `let`, or in an Environment whose
-   `runScope` includes `SERVICE`.
-3. `runScope` contains only recognized names, without duplicates.
+2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s `let`, or in a Job or Step Environment
+   whose `runScope` includes `SERVICE`.
+3. `runScope` contains only recognized names, without duplicates, and is not provided on a Service Environment.
 4. `readinessCheck` is consistent with `<ServiceActions>`: `onReadinessCheck` is defined if and only if the type is
    `COMMAND`, and every port a `TCP_CONNECT` check names is declared.
-5. Service and port names are valid identifiers, not `File`, and unique within their lists.
+5. Service and port names are valid identifiers, not `File`, and unique within their lists; Service Environment names
+   are unique within their list and distinct from the Job Environments and, for a Step Service, the Step's Step
+   Environments.
 6. The wrap hooks an Environment defines are exactly those its `runScope` calls for (see
    [&lt;EnvironmentActions&gt;](#43-environmentactions)).
 7. A template that lists `SERVICE` also lists `EXPR`.
