@@ -1,0 +1,25 @@
+# Section 9 item 5.1 (RFC 0009): the document's `environment` becomes a Job
+# Environment of every Job it is attached to, so a Service Environment of one
+# of the document's Services may not have its name.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+services:
+- name: Cache
+  serviceEnvironments:
+  - name: CacheClient
+    variables:
+      A: "1"
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+environment:
+  name: CacheClient
+  runScope: [TASK]
+  variables:
+    CACHE_PORT: "{{ Service.Cache.main.port }}"

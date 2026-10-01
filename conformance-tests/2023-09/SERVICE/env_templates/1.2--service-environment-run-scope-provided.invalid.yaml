@@ -1,0 +1,20 @@
+# Section 9 item 5.2 (RFC 0009): `runScope` must not be provided on a Service
+# Environment, in an Environment Template as in a Job Template.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+services:
+- name: Cache
+  serviceEnvironments:
+  - name: Conda
+    runScope: [SERVICE]
+    variables:
+      A: "1"
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

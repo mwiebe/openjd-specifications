@@ -1,0 +1,37 @@
+# Section 9 item 3 (RFC 0009): a `<Service>.let` binding is available in that
+# Service's own `serviceEnvironments`, not in another Service's.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobServices:
+- name: Back
+  let:
+  - threads = 8
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+- name: Front
+  serviceEnvironments:
+  - name: Conda
+    variables:
+      THREADS: "{{ threads }}"
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

@@ -1,0 +1,35 @@
+# Section 9 item 3 / 3.6.2 (RFC 0009): a Service Environment's
+# `<EnvironmentScript>.let` may not shadow a `<Service>.let` binding in scope,
+# as a Step Environment's may not shadow the Step's.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobServices:
+- name: Store
+  let:
+  - threads = 8
+  serviceEnvironments:
+  - name: Conda
+    script:
+      let:
+      - threads = 4
+      actions:
+        onEnter:
+          command: python
+          args: ["-c", "print({{ threads }})"]
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

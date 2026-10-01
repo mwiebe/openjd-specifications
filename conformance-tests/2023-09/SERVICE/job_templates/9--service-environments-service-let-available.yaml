@@ -1,0 +1,68 @@
+# Section 9 item 3 (RFC 0009): the `<Service>.let` bindings are available in
+# `serviceEnvironments`, as a Step's `let` bindings are in its
+# `stepEnvironments` -- in `variables`, actions, the Environment's own `let`,
+# and embedded files. A Step Service's Service Environment sees the Step's
+# `let` too.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+parameterDefinitions:
+- name: Workers
+  type: INT
+  default: 4
+jobServices:
+- name: Store
+  let:
+  - threads = Param.Workers * 2
+  - label = "store-" + string(threads)
+  serviceEnvironments:
+  - name: Conda
+    variables:
+      STORE_THREADS: "{{ threads }}"
+    script:
+      let:
+      - doubled = threads * 2
+      actions:
+        onEnter:
+          command: python
+          args: ["{{ Env.File.Setup }}", "{{ label }}", "{{ doubled }}"]
+      embeddedFiles:
+      - name: Setup
+        type: TEXT
+        data: "{{ label }} {{ Service.Store.main.port }}"
+  ports:
+  - name: main
+  variables:
+    STORE_LABEL: "{{ label }}"
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print({{ threads }})"]
+steps:
+- name: Step1
+  let:
+  - tiles = Param.Workers + 1
+  stepServices:
+  - name: Coordinator
+    let:
+    - coord = "coord-" + string(tiles)
+    serviceEnvironments:
+    - name: Conda
+      variables:
+        COORD_TILES: "{{ tiles }}"
+        COORD_LABEL: "{{ coord }}"
+    ports:
+    - name: api
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["-c", "print()"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

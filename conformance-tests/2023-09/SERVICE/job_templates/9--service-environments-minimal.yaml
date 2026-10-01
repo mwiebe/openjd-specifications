@@ -1,0 +1,35 @@
+# Section 9 item 5 (RFC 0009): a Service's `serviceEnvironments` is an ordered
+# list of <Environment>s entered only in that Service's Session, the analogue
+# of a Step's `stepEnvironments`. Two entries with distinct names, one with
+# `variables` only and one with a script.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobServices:
+- name: Store
+  serviceEnvironments:
+  - name: Tuning
+    variables:
+      STORE_THREADS: "4"
+  - name: Conda
+    script:
+      actions:
+        onEnter:
+          command: python
+          args: ["-c", "print()"]
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

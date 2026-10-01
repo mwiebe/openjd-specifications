@@ -1,0 +1,32 @@
+# Section 9 item 3 (RFC 0009): an external Service's `<Service>.let` bindings
+# are available in its `serviceEnvironments`.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+parameterDefinitions:
+- name: Workers
+  type: INT
+  default: 4
+services:
+- name: Cache
+  let:
+  - threads = Param.Workers * 2
+  serviceEnvironments:
+  - name: Conda
+    variables:
+      THREADS: "{{ threads }}"
+    script:
+      let:
+      - doubled = threads * 2
+      actions:
+        onEnter:
+          command: python
+          args: ["-c", "print({{ doubled }})"]
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

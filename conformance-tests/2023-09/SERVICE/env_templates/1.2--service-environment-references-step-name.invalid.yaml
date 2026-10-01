@@ -1,0 +1,19 @@
+# Section 1.2.2 / 9 item 5 (RFC 0009): an external Service has the Job scope,
+# so its Service Environments see `Job.Name` but not `Step.Name`.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+services:
+- name: Cache
+  serviceEnvironments:
+  - name: Conda
+    variables:
+      STEP: "{{ Step.Name }}"
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
