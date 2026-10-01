@@ -470,6 +470,8 @@ New property:
     3. No two Services in this list may have the same value for the `name` property.
     4. The Services defined in this list must not have the same `name` as a Service defined in any
        Step within the same Job Template.
+    5. A Service in this list may reference, through `Service.*`, only itself and Services earlier
+       in this list.
 
 Extension list addition to item 3 (*extensions*): `SERVICE` (this RFC).
 
@@ -578,9 +580,11 @@ New property:
   [`<Service>`](#service). Constraints: 1. Minimum number of elements: If provided, then this list
   must contain at least one element. 2. Maximum number of elements: 10. 3. No two Services in this
   list may have the same value for the `name` property. 4. The Services defined in this list must
-  not have the same `name` as a Job Service defined in the same Job Template. 5. Note: as with Step
-  Environments, the scope of a Step Service's `name` is the Step that defines it. Different Steps
-  may each define a Step Service with the same `name`.
+  not have the same `name` as a Job Service defined in the same Job Template. 5. A Service in this
+  list may reference, through `Service.*`, only itself, Services earlier in this list, and the Job
+  Services of the Job Template. 6. Note: as with Step Environments, the scope of a Step Service's
+  `name` is the Step that defines it. Different Steps may each define a Step Service with the same
+  `name`.
 
 The `let` bindings of a `<StepTemplate>` are additionally available in *stepServices*.
 

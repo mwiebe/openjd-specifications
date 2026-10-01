@@ -85,6 +85,7 @@ Where:
       3. No two Services in this list may have the same value for the `name` property.
       4. The Services defined in this list must not have the same `name` as a Service defined in any Step within the
          same Job Template.
+      5. A Service in this list may reference, through `Service.*`, only itself and Services earlier in this list.
 9. *steps* — A list of the Steps in the Job. See: [&lt;StepTemplate&gt;](#3-steptemplate).
 
 #### 1.1.1. `<JobName>`
@@ -977,6 +978,8 @@ Where:
         3. The list must not contain more than 10 elements.
         4. The Services defined in this list must not have the same `name` as a Job Service defined in the same
            Job Template.
+        5. A Service in this list may reference, through `Service.*`, only itself, Services earlier in this list, and
+           the Job Services of the Job Template.
     * Note: As with Step Environments, the scope of a Step Service's `name` is the Step that defines it. Different
       Steps may each define a Step Service with the same `name`.
 7. *hostRequirements* — Describes the requirements on Worker host's capabilities that must be satisfied for the Task(s) of
