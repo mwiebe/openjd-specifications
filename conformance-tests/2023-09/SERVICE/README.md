@@ -89,9 +89,15 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   whole-field `null` meaning "not provided".
 - **Expression Language §2.2.4**: `join_host_port`, `split_host_port`,
   `is_ipv4`, `is_ipv6` and their signatures.
-- **Submission-time checks** (§1.2.2 items 2–3): external-Service name
-  collisions, and a wrapping Environment from a document that does not declare
-  `SERVICE` placed in scope of a Service.
+- **Service names are scoped to their document** (§1.2.2 item 2): an external
+  Service may share its name with a Service in the Job Template's `jobServices`
+  or any Step's `stepServices`, or in another attached Environment Template; the
+  submission is not rejected for it, every `Service.*` reference resolves within
+  its own document, and the runner keeps same-named Services from different
+  documents distinct.
+- **Submission-time check** (§1.2.2 item 3): a wrapping Environment from a
+  document that does not declare `SERVICE` placed in scope of a Service — the
+  only check that needs the combined Job.
 - **Lifecycle** (*How Jobs Are Run* § Services): READY before any Task,
   referenced Services READY before the referencing Service's Session starts,
   Service Sessions enter the Environments whose `runScope` includes `SERVICE`,
@@ -371,6 +377,10 @@ SERVICE/
     ├── service-external-task-scoped-client-environment.test.yaml
     ├── service-external-parameter-override.test.yaml
     ├── service-external-services-only-attachment.test.yaml
+    ├── service-external-same-name-as-job-service.test.yaml
+    ├── service-external-same-name-as-step-service.test.yaml
+    ├── service-external-same-name-in-two-attachments.test.yaml
+    ├── service-external-same-name-both-consumed.test.yaml
     │  # Failure and restart
     ├── service-rerun-relaunch.test.yaml
     ├── service-keep-relaunch.test.yaml
@@ -387,9 +397,6 @@ SERVICE/
     ├── service-port-from-param-out-of-range.invalid.test.yaml
     ├── service-port-from-string-param-not-integer.invalid.test.yaml
     ├── service-max-attempts-from-param-negative.invalid.test.yaml
-    ├── service-external-name-collision.invalid.test.yaml
-    ├── service-external-name-collision-step-service.invalid.test.yaml
-    ├── service-external-two-attachments-collision.invalid.test.yaml
     ├── service-wrapper-without-service-declaration.invalid.test.yaml
     └── service-job-wrapper-with-external-service.invalid.test.yaml
 ```
@@ -456,6 +463,17 @@ SERVICE/
   (`service-external-task-scoped-client-environment`,
   `service-external-parameter-override`,
   `service-external-services-only-attachment`).
+- **Service names are scoped to their document** (§1.2.2 item 2): an external
+  Service named like a Job Service, a Step Service, or another attachment's
+  Service is accepted and both start, each resolving its own
+  `Service.<name>.*` (`service-external-same-name-as-job-service`,
+  `service-external-same-name-as-step-service`,
+  `service-external-same-name-in-two-attachments`); with the RFC's Valkey Job
+  Template and queue-cache attachment both declaring `Cache`, the Task's
+  `Service.Cache.*` reaches the Job Template's Cache while the attached client
+  Environment's `VALKEY_HOST` / `VALKEY_PORT` reach the queue's, on different
+  ports, and neither answer leaks to the other consumer
+  (`service-external-same-name-both-consumed`).
 - **Failure and restart**: on an instance failure, `RERUN` cancels the running
   Task without counting a failure, relaunches `onRun` in the same Service
   Session, and reruns completed Tasks against the new instance; `KEEP` lets the
@@ -473,12 +491,10 @@ SERVICE/
   `service-wrap-env-hooks-wrap-inner-environment-in-service-session`,
   `service-wrap-service-hooks-python`). A TASK-scoped wrapper coexists with a
   Service (`service-wrapper-task-scoped-with-service`).
-- **Submission-time checks** (§1.2.2 items 2–3): an external Service colliding
-  with a Job Service, a Step Service, or another attachment's Service is
-  rejected, as is a wrapping Environment from a document without `SERVICE` —
+- **Submission-time check** (§1.2.2 item 3): a wrapping Environment from a
+  document without `SERVICE` is rejected when a Service is in its scope —
   attached to a Job declaring a Service, or in a Job submitted alongside an
-  external Service (`service-external-*collision`,
-  `service-wrapper-without-service-declaration`,
+  external Service (`service-wrapper-without-service-declaration`,
   `service-job-wrapper-with-external-service`).
 
 ## Running the tests
@@ -508,8 +524,12 @@ runner contract. The behavior specific to `SERVICE`:
    the template.
 2. `openjd run` with `--environment` must merge an Environment Template's
    `services` into the Job as external Services ahead of the Job Template's
-   `jobServices`, apply the two submission-time checks of §1.2.2, and treat
-   the attachment's `parameterDefinitions` as Job Parameters.
+   `jobServices`, apply the submission-time wrapper check of §1.2.2 item 3,
+   treat the attachment's `parameterDefinitions` as Job Parameters, and keep
+   a Service of one document distinct from a same-named Service of another
+   (§1.2.2 item 2): every `Service.*` reference — in a Service, an
+   Environment, or a Step — resolves to a Service of the document that made
+   it.
 3. Before any Task of a scope runs, every Service of the scope must be
    started in a Service Session of its own — entering the Environments whose
    `runScope` includes `SERVICE`, allocating its ports, running `onEnter`,
