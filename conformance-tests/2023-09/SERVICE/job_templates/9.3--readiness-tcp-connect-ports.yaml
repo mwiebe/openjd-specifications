@@ -1,0 +1,28 @@
+# Section 9.3: a TCP_CONNECT check may name a subset of the declared ports to
+# probe, with a readiness timeout.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobServices:
+- name: Store
+  ports:
+  - name: main
+  - name: admin
+  readinessCheck:
+    type: TCP_CONNECT
+    ports: [admin]
+    timeoutSeconds: 30
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

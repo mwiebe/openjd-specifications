@@ -1,0 +1,27 @@
+# Section 9 item 6 / Section 9.6 item 3: the default readiness check is
+# TCP_CONNECT, so a Service with no `readinessCheck` must not define
+# onReadinessCheck.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobServices:
+- name: Store
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+      onReadinessCheck:
+        command: python
+        args: ["-c", "print()"]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

@@ -1,0 +1,23 @@
+# Section 3 item 6 (RFC 0009): a minimal Step Service, available to the Tasks
+# of the Step that declares it.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+steps:
+- name: Step1
+  stepServices:
+  - name: Coordinator
+    ports:
+    - name: api
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["-c", "print()"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print({{ Service.Coordinator.api.port }})"]

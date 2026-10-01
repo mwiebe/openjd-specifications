@@ -1,0 +1,28 @@
+# Section 9: `Task.Param.*` is not available within a Step Service either;
+# the Service runs once for every Task of the Step.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+steps:
+- name: Step1
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: "1-3"
+  stepServices:
+  - name: Coordinator
+    ports:
+    - name: main
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["-c", "print()", "{{ Task.Param.Frame }}"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

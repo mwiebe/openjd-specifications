@@ -1,0 +1,15 @@
+# Section 1.2.2 / Section 9: external Services have Job scope, so Step.Name
+# is not available within them (only Job.Name is).
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+services:
+- name: Cache
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Step.Name }}"]

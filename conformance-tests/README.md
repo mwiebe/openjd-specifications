@@ -36,9 +36,17 @@ conformance-tests/
     ├── TASK_CHUNKING/
     │   ├── job_templates/
     │   └── jobs/
-    └── REDACTED_ENV_VARS/
+    ├── REDACTED_ENV_VARS/
+    │   └── jobs/
+    └── SERVICE/
+        ├── job_templates/
+        ├── env_templates/
         └── jobs/
 ```
+
+Each extension directory has its own `README.md` describing the rules its
+fixtures verify (see for example [`2023-09/WRAP_ACTIONS/README.md`](2023-09/WRAP_ACTIONS/README.md)
+and [`2023-09/SERVICE/README.md`](2023-09/SERVICE/README.md)).
 
 ### Naming Convention
 
@@ -73,6 +81,8 @@ Examples:
 - `3.6--let-step-level.yaml` - EXPR: Template Schema §3.6 (LetBindings)
 - `expr1.1--arithmetic-expr.yaml` - EXPR: Expression Language §1.1 (Extended Format String Grammar)
 - `expr2.2.4--upper.test.yaml` - EXPR: Expression Language §2.2.4 (String Functions)
+- `9.3--readiness-command.yaml` - SERVICE: Template Schema §9.3 (ServiceReadinessCheck)
+- `service-rerun-relaunch.test.yaml` - SERVICE extension execution test (in `SERVICE/jobs/`)
 
 ### Extension Tests
 

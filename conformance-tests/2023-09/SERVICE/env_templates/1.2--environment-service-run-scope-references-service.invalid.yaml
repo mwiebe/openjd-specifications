@@ -1,0 +1,20 @@
+# Section 4 item 3 constraint 2 / Section 9.7 item 2: an Environment with
+# `runScope: [SERVICE]` must not reference any Service.* value.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+services:
+- name: Cache
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", ]
+environment:
+  name: ServiceSide
+  runScope: [SERVICE]
+  variables:
+    CACHE_PORT: "{{ Service.Cache.main.port }}"

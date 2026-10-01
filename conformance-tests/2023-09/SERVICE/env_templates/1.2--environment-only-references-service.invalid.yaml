@@ -1,0 +1,11 @@
+# Section 1.2.2: a document with no `services` of its own cannot reference
+# any Service, even one a scheduler may attach from another document.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+environment:
+  name: Client
+  runScope: [TASK]
+  variables:
+    STORE_PORT: "{{ Service.Store.main.port }}"

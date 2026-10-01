@@ -1,0 +1,22 @@
+# Section 9 / Section 9.7 item 7 (RFC 0009): a template that lists SERVICE in
+# `extensions` must also list EXPR. SERVICE alone must be rejected.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+name: TestJob
+jobServices:
+- name: Store
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

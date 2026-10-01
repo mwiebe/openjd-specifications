@@ -1,0 +1,26 @@
+# Section 9.5 item 1: <ServiceScript>.let is evaluated on the service host
+# and may reference Session.*, Service.File.*, and in-scope Service.* values.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobServices:
+- name: Store
+  ports:
+  - name: main
+  script:
+    let:
+    - endpoint = join_host_port(Service.Store.main.bindAddress, Service.Store.main.port)
+    - here = Session.WorkingDirectory
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ endpoint }}", "{{ here }}"]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

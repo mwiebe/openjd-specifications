@@ -1,0 +1,21 @@
+# Section 1.2.2 / Section 9.7 item 1: a Service.* reference in an Environment
+# Template must resolve to a Service in the same document's `services` list.
+# References to Services defined in other documents are not permitted.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+services:
+- name: Cache
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", ]
+environment:
+  name: Client
+  runScope: [TASK]
+  variables:
+    STORE_PORT: "{{ Service.Store.main.port }}"

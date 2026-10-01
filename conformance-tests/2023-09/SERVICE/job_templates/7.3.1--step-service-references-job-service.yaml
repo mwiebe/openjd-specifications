@@ -1,0 +1,40 @@
+# Section 9 scope rule 2: a Step Service may reference any Job Service, and a
+# later Step Service may reference an earlier one in the same Step.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobServices:
+- name: Store
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", ]
+steps:
+- name: Step1
+  stepServices:
+  - name: Back
+    ports:
+    - name: main
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["-c", "print()", "{{ Service.Store.main.port }}"]
+  - name: Front
+    ports:
+    - name: main
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["-c", "print()", "{{ Service.Back.main.port }}", "{{ Service.Store.main.connectAddress }}"]
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Service.Front.main.port }}", "{{ Service.Back.main.port }}", "{{ Service.Store.main.port }}"]
