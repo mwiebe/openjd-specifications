@@ -1088,9 +1088,10 @@ The environment variables that *How Jobs Are Run* defines for every Session, cur
 Session with their usual meanings; the working directory is the Service Session's own.
 
 **Environment variables within a Service.** Implementations MUST additionally watch the stdout of
-*onEnter* for `openjd_env`, `openjd_redacted_env`, and `openjd_unset_env`, with the same syntax
-and redaction rules as for an Environment's `onEnter`. A variable set this way is set in the
-process environment of every subsequent action of the same Service Session — every instance of
+*onEnter* for `openjd_env`, `openjd_redacted_env`, and `openjd_unset_env`, with the same syntax and
+redaction rules as for an Environment's `onEnter`, including that `openjd_redacted_env` is honored
+only when the document declares the `REDACTED_ENV_VARS` extension. A variable set this way is set in
+the process environment of every subsequent action of the same Service Session — every instance of
 *onRun*, *onReadinessCheck*, and *onExit* — and is retained across relaunches of *onRun* within the
 Session. This is how *onEnter* hands values it computes (a generated credential, a discovered
 device, a path it created) to the service process, and it is the reason those values survive a

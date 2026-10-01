@@ -2750,13 +2750,14 @@ Implementations of this specification must watch the stdout of *onEnter*, *onRun
 
 Implementations must additionally watch the stdout of *onEnter* for `openjd_env`, `openjd_redacted_env`, and
 `openjd_unset_env`, with the same syntax and redaction rules as for an Environment's `onEnter` (see
-[&lt;Environment&gt;](#4-environment)). A variable set this way is set in the process environment of every subsequent
-action of the same Service Session — every instance of *onRun*, *onReadinessCheck*, and *onExit* — and is retained
-across relaunches of *onRun* within the Session. The process environment of a Service's actions is built in this order,
-later entries taking precedence: the variables of the Environments the Service Session entered (their *variables* and
-their `openjd_env` messages, in entry order, as in any Session), then the Service's own *variables*, then variables set
-by the Service's *onEnter*. These messages are ignored when emitted by *onRun*, *onReadinessCheck*, or *onExit*, and
-nothing set within a Service is propagated to the entities in the Service's scope.
+[&lt;Environment&gt;](#4-environment)), including that `openjd_redacted_env` is honored only when the document declares
+the `REDACTED_ENV_VARS` extension. A variable set this way is set in the process environment of every subsequent action
+of the same Service Session — every instance of *onRun*, *onReadinessCheck*, and *onExit* — and is retained across
+relaunches of *onRun* within the Session. The process environment of a Service's actions is built in this order, later
+entries taking precedence: the variables of the Environments the Service Session entered (their *variables* and their
+`openjd_env` messages, in entry order, as in any Session), then the Service's own *variables*, then variables set by the
+Service's *onEnter*. These messages are ignored when emitted by *onRun*, *onReadinessCheck*, or *onExit*, and nothing
+set within a Service is propagated to the entities in the Service's scope.
 
 #### 9.6.1. Concurrency of onReadinessCheck with onRun
 
