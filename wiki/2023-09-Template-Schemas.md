@@ -76,8 +76,9 @@ Where:
       2. The Environments defined in this list must not have the same `name` as an Environment
          defined in any Step within the same Job Template.
 8. *jobServices* — An ordered list of the Services required by Tasks in the Jobs created by this Job Template. Each
-   Service is started, in list order, before any Task of the Job is scheduled, and is stopped, in reverse order, once
-   no Task of the Job remains to be run. Available only when using the `SERVICE` extension.
+   Service is started before any Task of the Job is scheduled and after any Service it references is ready, and is
+   stopped once no Task of the Job remains to be run, before any Service it references. Available only when using the
+   `SERVICE` extension.
    See: [&lt;Service&gt;](#9-service-extension-service). Constraints:
       1. Minimum number of elements: If provided, then this list must contain at least one element.
       2. Maximum number of elements: The list must not contain more than 10 elements.
@@ -963,9 +964,10 @@ Where:
     * Note: The scope of a Step Environment's `name` is the Step that defines it. Different Steps may each define a
       Step Environment with the same `name`; a Session only ever contains the Step Environments of a single Step, so
       these names never collide.
-6. *stepServices* — An ordered list of the Services required by the Tasks of this Step. Each Service is started, in
-   list order, after the Step's dependencies are satisfied and before any Task of the Step is scheduled, and is
-   stopped, in reverse order, once no Task of the Step remains to be run. A Step Service is available only to the
+6. *stepServices* — An ordered list of the Services required by the Tasks of this Step. Each Service is started after
+   the Step's dependencies are satisfied, after any Service it references is ready, and before any Task of the Step is
+   scheduled, and is stopped once no Task of the Step remains to be run, before any Service it references. A Step
+   Service is available only to the
    Step that declares it; it is not available to other Steps, including Steps that depend on this one. Available
    only when using the `SERVICE` extension. See: [&lt;Service&gt;](#9-service-extension-service).
     * Constraints:
@@ -2551,7 +2553,7 @@ A `<ServicePort>` is the object:
 
 ```yaml
 name: <Identifier>
-port: <posinteger> # @optional
+port: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 Where:
@@ -2567,6 +2569,13 @@ Where:
    becomes ready, either of which is an instance failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-
    restart)).
 
+Numeric fields marked `@fmtstring` in this section (`<ServicePort>.port`, `<ServiceReadinessCheck>.timeoutSeconds` and
+`intervalSeconds`, and `<ServiceRestartPolicy>.maxAttempts`) may be given as a format string whose result is the
+integer. They are resolved at job creation in the scope of a `<Service>`'s *let* (`Param.*`, `RawParam.*`, `Job.Name`,
+`Step.Name` for a Step Service, and `let` bindings), and must not reference `Session.*` or `Service.*`. When the value
+is a single whole-field expression, its target type is `int?`: a `null` result is treated as if the field were not
+provided, and a non-null result must satisfy the field's range.
+
 All ports are TCP, and all of a Service's ports are bound and published on the same host.
 
 ### 9.3. `<ServiceReadinessCheck>`
@@ -2576,18 +2585,18 @@ A `<ServiceReadinessCheck>` is one of the following objects, discriminated by th
 ```yaml
 type: "TCP_CONNECT"
 ports: [ <Identifier>, ... ] # @optional
-timeoutSeconds: <posinteger> # @optional
+timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "COMMAND"
-intervalSeconds: <posinteger> # @optional
-timeoutSeconds: <posinteger> # @optional
+intervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "STDOUT"
-timeoutSeconds: <posinteger> # @optional
+timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 Where:
@@ -2626,7 +2635,7 @@ Tasks in the scope are scheduled again.
 A `<ServiceRestartPolicy>` is the object:
 
 ```yaml
-maxAttempts: <integer> # @optional
+maxAttempts: <integer> | <intstring> # @optional @fmtstring
 completedTasks: enum("KEEP", "RERUN") # @optional
 ```
 
@@ -2636,14 +2645,18 @@ Where:
    start failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)). The initial launch is not
    counted, so the default of 0 means the Service is launched exactly once and never relaunched. Must be 0 or greater.
 2. *completedTasks* — What happens, when a new instance is launched, to Tasks in the Service's scope that completed
-   successfully against a previous instance. Tasks that were running when the previous instance failed are always
-   canceled and requeued, and Tasks not yet started are scheduled once the new instance is ready; only completed Tasks
-   are a choice.
-    * `KEEP` — Completed Tasks remain complete. Use this when the Service holds no state that Tasks depend on, or holds
-      state that Tasks can regenerate.
-    * `RERUN` — Completed Tasks are returned to the scheduling queue and run again. Use this when the Service holds
-      state that makes prior results unreliable once lost.
+   successfully against a previous instance, and to Tasks that were running at the time. Tasks not yet started are
+   scheduled once the new instance is ready.
+    * `KEEP` — Completed Tasks remain complete, and running Tasks continue, failing and retrying on their own if the
+      outage affects them. Use this when the Service holds no state that Tasks depend on, or holds state that Tasks can
+      regenerate.
+    * `RERUN` — Completed Tasks are returned to the scheduling queue and run again, and running Tasks are canceled and
+      requeued without counting as a Task failure. Use this when the Service holds state that makes prior results
+      unreliable once lost.
     * Default: `RERUN`.
+
+   `KEEP` also declares the Service resumable: a scheduler may suspend it while no Task in its scope can run and start
+   it again later (see [How Jobs Are Run](How-Jobs-Are-Run#service-lifecycle)).
 
 If *maxAttempts* is exhausted, an `onRun` exit fails the scope regardless of *completedTasks*.
 

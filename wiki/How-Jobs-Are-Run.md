@@ -129,15 +129,16 @@ satisfy; how it satisfies them is its own concern.
 1. All of a **Service**'s ports are allocated, and its `bindAddress` and `connectAddress` values determined, before any
    **Action** of its **Service Session** runs.
 2. No **Action** of a **Service Session** (including the `onEnter` of an **Environment** it enters) begins until every
-   **Service** earlier in the same list is **READY**, and, for a Step Service, until every Job Service is **READY**. A
-   referenced **Service** is therefore **READY** before the referencing **Service**'s **Session** starts.
+   **Service** it references through `Service.*` is **READY**. A referenced **Service** is therefore **READY** before
+   the referencing **Service**'s **Session** starts, and **Services** that do not reference one another may start
+   concurrently.
 3. No Task of a Step is scheduled until every Job Service and every Step Service of that Step is **READY**. Once they
    are, Tasks are scheduled exactly as described above, with no change to how **Sessions** are formed; Step Services do
    not affect which Tasks may share a **Session**.
-4. Within one list (the combined `jobServices`, or a Step's `stepServices`), **Services** are stopped in the reverse of
-   the order in which they were started, so a **Service** is stopped before any earlier **Service** it may reference.
-   Step Services of different Steps are stopped independently as their Steps complete, and every Step Service is stopped
-   before any Job Service.
+4. A **Service** is stopped before any **Service** it references, and every Step Service is stopped before any Job
+   Service. Within one list (the combined `jobServices`, or a Step's `stepServices`), stopping in the reverse of list
+   order satisfies this, since references are forward-only; **Services** that do not reference one another may be
+   stopped concurrently. Step Services of different Steps are stopped independently as their Steps complete.
 5. A **Service** has at most one live **Service Session** at a time, and at most one running `onRun` within it. Before
    `onRun` is launched again in the same **Session**, the previous `onRun` process must have exited, on its own or
    because the scheduler canceled it.
@@ -154,7 +155,13 @@ satisfy; how it satisfies them is its own concern.
    selection, new ports, new working directory, **Environments** re-entered, `onEnter` re-run.
 10. A scheduler may start a **Service** at any time consistent with these constraints, including lazily when it is first
     prepared to schedule a Task in the **Service**'s scope, and may decline to start a **Service** whose scope will
-    schedule no Task. Once started, a **Service** is kept **READY** until its scope completes or it fails.
+    schedule no Task. Once started, a **Service** is kept **READY** until its scope completes or it fails, with one
+    exception: a scheduler may **suspend** a **Service** whose `completedTasks` is `KEEP` while no Task in its scope is
+    running or can be scheduled, so that a long pause does not hold a **Service host**. A suspension is not a failure:
+    the **Service Session** ends as constraint 7 requires, the **Service** becomes **UNREADY**, no restart attempt is
+    consumed, completed Tasks keep their results, and the **Service** is started again in a new **Service Session** when
+    the scheduler is next prepared to schedule a Task in its scope. A **Service** whose `completedTasks` is `RERUN` must
+    not be suspended.
 
 ### Service failure and restart
 
@@ -166,8 +173,11 @@ completed is not a failure, whether or not the scheduler's cancelation had yet r
 occurs when a **Service Session** fails before `onRun` is launched: a requested port cannot be allocated on the chosen
 host, an **Environment**'s `onEnter` fails, or the **Service**'s `onEnter` exits non-zero or times out.
 
-On either failure the **Service** becomes **UNREADY**, and the scheduler cancels every Task in the scope that is
-currently running and returns it to the queue; this is not counted as a Task failure. If `onRun` is still running (the
+On either failure the **Service** becomes **UNREADY**. If the **Service**'s `completedTasks` is `RERUN`, the scheduler
+cancels every Task in the scope that is currently running and returns it to the queue, which is not counted as a Task
+failure; if it is `KEEP`, running Tasks continue, and one that needs the **Service** while it is **UNREADY**, or that
+holds the endpoint of a relocated instance, fails on its own and is retried under the ordinary Task retry rules,
+re-resolving `Service.*` when it runs again. If `onRun` is still running (the
 readiness timeout case) the scheduler cancels it and waits for it to exit; constraint 5 above forbids a second `onRun`
 in the **Session** before then. If the **Service**'s restart policy has attempts remaining, the scheduler relaunches the
 **Service**. After an instance failure on a host that is still available it may relaunch `onRun` within the existing

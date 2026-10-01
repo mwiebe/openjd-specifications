@@ -450,8 +450,9 @@ This RFC is additive and gated by the `SERVICE` extension name declared under RF
 New property:
 
 * *jobServices* — An ordered list of the Services required by Tasks in the Jobs created by this
-  Job Template. Each Service is started, in list order, before any Task of the Job is scheduled and
-  is stopped, in reverse order, once no Task of the Job remains to be run. See
+  Job Template. Each Service is started before any Task of the Job is scheduled and after any
+  Service it references is READY, and is stopped once no Task of the Job remains to be run, before
+  any Service it references. See
   [`<Service>`](#service). Constraints:
     1. Minimum number of elements: If provided, then this list must contain at least one element.
     2. Maximum number of elements: 10.
@@ -556,19 +557,17 @@ restarts.
 
 New property:
 
-* *stepServices* — An ordered list of the Services required by the Tasks of this Step. Each
-  Service is started, in list order, after the Step's dependencies are satisfied and before any
-  Task of the Step is scheduled, and is stopped, in reverse order, once no Task of the Step
-  remains to be run. A Step Service is available only to the Step that declares it; it is not
-  available to other Steps, including Steps that depend on this one. See [`<Service>`](#service).
-  Constraints:
-    1. Minimum number of elements: If provided, then this list must contain at least one element.
-    2. Maximum number of elements: 10.
-    3. No two Services in this list may have the same value for the `name` property.
-    4. The Services defined in this list must not have the same `name` as a Job Service defined
-       in the same Job Template.
-    5. Note: as with Step Environments, the scope of a Step Service's `name` is the Step that
-       defines it. Different Steps may each define a Step Service with the same `name`.
+* *stepServices* — An ordered list of the Services required by the Tasks of this Step. Each Service
+  is started after the Step's dependencies are satisfied, after any Service it references is READY,
+  and before any Task of the Step is scheduled, and is stopped once no Task of the Step remains to
+  be run, before any Service it references. A Step Service is available only to the Step that
+  declares it; it is not available to other Steps, including Steps that depend on this one. See
+  [`<Service>`](#service). Constraints: 1. Minimum number of elements: If provided, then this list
+  must contain at least one element. 2. Maximum number of elements: 10. 3. No two Services in this
+  list may have the same value for the `name` property. 4. The Services defined in this list must
+  not have the same `name` as a Job Service defined in the same Job Template. 5. Note: as with Step
+  Environments, the scope of a Step Service's `name` is the Step that defines it. Different Steps
+  may each define a Step Service with the same `name`.
 
 The `let` bindings of a `<StepTemplate>` are additionally available in *stepServices*.
 
@@ -806,7 +805,7 @@ A `<ServicePort>` is the object:
 
 ```yaml
 name: <Identifier>
-port: <posinteger> # @optional
+port: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 Where:
@@ -824,6 +823,15 @@ Where:
    instance failure, and the restart decision applies (see
    [Failure and restart](#failure-and-restart)).
 
+Numeric fields marked `@fmtstring` — `<ServicePort>.port`, `<ServiceReadinessCheck>.timeoutSeconds`
+and `intervalSeconds`, and `<ServiceRestartPolicy>.maxAttempts` — may be given as a format string
+whose result is the integer, so that a Job Parameter or a `<Service>.let` binding can supply them.
+They are resolved at job creation, in the scope of a `<Service>`'s *let*: `Param.*`, `RawParam.*`,
+`Job.Name`, `Step.Name` (Step Service), and `let` bindings, and never `Session.*` or `Service.*`.
+When the value is a single whole-field expression (`"{{ ... }}"` with no surrounding text) its
+target type is `int?`: a `null` result is treated as if the field were not provided, and a non-null
+result MUST satisfy the field's range.
+
 All ports are TCP. Every port is bound and published on the same service host. UDP ports and
 Unix domain sockets are out of scope for this RFC (see [Future Work](#future-work)).
 
@@ -834,18 +842,18 @@ A `<ServiceReadinessCheck>` is one of the following objects, discriminated by *t
 ```yaml
 type: "TCP_CONNECT"
 ports: [ <Identifier>, ... ] # @optional
-timeoutSeconds: <posinteger> # @optional
+timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "COMMAND"
-intervalSeconds: <posinteger> # @optional
-timeoutSeconds: <posinteger> # @optional
+intervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "STDOUT"
-timeoutSeconds: <posinteger> # @optional
+timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 Where:
@@ -891,7 +899,7 @@ before Tasks in the scope are (re)scheduled.
 A `<ServiceRestartPolicy>` is the object:
 
 ```yaml
-maxAttempts: <integer> # @optional
+maxAttempts: <integer> | <intstring> # @optional @fmtstring
 completedTasks: enum("KEEP", "RERUN") # @optional
 ```
 
@@ -902,14 +910,18 @@ Where:
    initial launch is not counted, so the default of 0 means the Service is launched exactly once
    and never relaunched. Must be 0 or greater.
 2. *completedTasks* — What happens, when a new instance is launched, to Tasks in the Service's
-   scope that completed successfully against a previous instance. (Tasks that were running when
-   the previous instance failed are always canceled and requeued; Tasks not yet started are simply
-   scheduled once the new instance is READY. Only completed Tasks are a choice.)
-    * `KEEP` — Completed Tasks remain complete. Use this when the Service holds no state that
-      Tasks depend on, or state that Tasks can regenerate (a cache).
-    * `RERUN` — Completed Tasks are returned to the scheduling queue and run again. Use this when
-      the Service holds state that makes prior results unreliable once lost (a coordinator).
+   scope that completed successfully against a previous instance, and to Tasks that were running
+   at the time. (Tasks not yet started are simply scheduled once the new instance is READY.)
+    * `KEEP` — Completed Tasks remain complete, and running Tasks continue, failing and retrying
+      on their own if the outage affects them. Use this when the Service holds no state that Tasks
+      depend on, or state that Tasks can regenerate (a cache).
+    * `RERUN` — Completed Tasks are returned to the scheduling queue and run again, and running
+      Tasks are canceled and requeued without counting as a Task failure. Use this when the Service
+      holds state that makes prior results unreliable once lost (a coordinator).
     * Default: `RERUN`. This is the safe default: an author must opt in to keeping results.
+
+   `KEEP` also declares the Service *resumable*: a scheduler may suspend it while no Task in its
+   scope can run and start it again later (timing constraint 10).
 
 If *maxAttempts* is exhausted, an `onRun` exit fails the scope regardless of *completedTasks*.
 
@@ -1205,16 +1217,20 @@ constraints a scheduler MUST satisfy; how it satisfies them is its own concern.
    before any action of its Service Session runs. The Service's own `Service.<name>.*` values are
    therefore resolvable throughout its Session.
 2. No action of a Service Session (including the `onEnter` of an Environment it enters) begins
-   until every Service earlier in the same list is READY, and, for a Step Service, until every Job
-   Service is READY. This is what makes forward-only references sound: a referenced Service is
-   READY before the referencing Service's Session starts.
+   until every Service it references through `Service.*` is READY. This is what makes forward-only
+   references sound: a referenced Service is READY before the referencing Service's Session starts.
+   Services that do not reference one another MAY start concurrently, so several Services with
+   expensive Environments need not wait for one another. A Service that must start after another
+   it does not otherwise use can reference that Service's endpoint anywhere in its *variables* or
+   *script* to express the dependency.
 3. No Task of a Step is scheduled until every Job Service and every Step Service of that Step is
    READY. Once they are, Tasks are scheduled exactly as today, with no change to how Sessions are
    formed; in particular Step Services do not affect which Tasks may share a Session.
-4. Within one list — the combined `jobServices`, or a Step's `stepServices` — Services are
-   *stopped* in the reverse of the order in which they were started, so a Service is stopped before
-   any earlier Service it may reference. Step Services of different Steps are stopped independently,
-   as their Steps complete, and every Step Service is stopped before any Job Service.
+4. A Service is *stopped* before any Service it references is stopped, and every Step Service is
+   stopped before any Job Service. Within one list — the combined `jobServices`, or a Step's
+   `stepServices` — stopping in the reverse of list order satisfies this, since references are
+   forward-only; Services that do not reference one another MAY be stopped concurrently. Step
+   Services of different Steps are stopped independently, as their Steps complete.
 
 **Sessions.**
 
@@ -1243,7 +1259,14 @@ constraints a scheduler MUST satisfy; how it satisfies them is its own concern.
     lazily, when it is first prepared to schedule a Task in the Service's scope. It MAY decline to
     start a Service whose scope will schedule no Task (for example, a Job canceled before any Task
     could be scheduled). Once started, a Service is kept READY until its scope completes or it
-    fails.
+    fails, with one exception: a scheduler MAY **suspend** a Service whose `completedTasks` is
+    `KEEP` while no Task in its scope is running or can be scheduled (a paused Job, or a Job
+    waiting on a resource), so that a long pause does not hold a service host. A suspension is not
+    a failure: the Service Session ends as constraint 7 requires and the Service becomes UNREADY,
+    no restart attempt is consumed, completed Tasks keep their results, and when the scheduler is
+    next prepared to schedule a Task in the scope it starts the Service again in a new Service
+    Session (constraint 9). A Service whose `completedTasks` is `RERUN` MUST NOT be suspended, since
+    the scheduler would be discarding completed work of its own accord.
 
 #### Services run inside Environments
 
@@ -1290,9 +1313,13 @@ Two kinds of failure lead to the restart decision:
 
 On either failure the Service becomes UNREADY and the scheduler:
 
-1. Cancels every Task in the Service's scope that is currently running. Each such Task is
-   returned to the queue and will run again once the Service is READY; this is not counted as a
-   Task failure.
+1. If `restartPolicy.completedTasks` is `RERUN`, cancels every Task in the Service's scope that is
+   currently running. Each such Task is returned to the queue and will run again once the Service
+   is READY; this is not counted as a Task failure. If it is `KEEP`, running Tasks continue: a Task
+   that needs the Service while it is UNREADY, or that holds the endpoint of an instance that has
+   been relocated, fails on its own and is retried under the scheduler's ordinary Task retry rules,
+   re-resolving `Service.*` when it runs again; a Task that no longer needs the Service completes
+   normally.
 2. Cancels *onRun* if it is still running (the readiness timeout case) and waits for it to exit;
    constraint 5 forbids a second *onRun* in the Session before then.
 3. If the number of relaunches so far is less than `restartPolicy.maxAttempts`:
@@ -1313,7 +1340,8 @@ On either failure the Service becomes UNREADY and the scheduler:
 one relaunch, is governed by `restartPolicy` including `completedTasks`, and changes every
 `Service.<name>.*` value. Because entities in the scope resolve `Service.*` at task execution time
 on the worker host, a Task scheduled after relocation sees the new endpoint automatically; a Task
-that was running during the relocation was canceled in step 1 and re-resolves when it runs again.
+that was running during the relocation either was canceled in step 1 (`RERUN`) or fails on its own
+against the old endpoint (`KEEP`), and re-resolves when it runs again.
 When relocating away from a host that is still available, constraint 7 applies to the old Session
 in full.
 
@@ -1437,6 +1465,16 @@ scheduler's cancelation because there is a window between the scheduler deciding
 complete and its cancelation reaching the process; a service that notices its clients are gone and
 exits in that window must not fail a Job whose work has all succeeded.
 
+### Suspension is allowed only for `KEEP` Services
+
+A Job can sit for days paused, throttled, or waiting on a dependency, and a Service kept READY the
+whole time holds a host for nothing. Letting the scheduler suspend the Service fixes that, but only
+when doing so costs the Job nothing: with `completedTasks: KEEP` the completed Tasks stand and the
+Service starts fresh when work resumes, whereas with `RERUN` a suspension would throw away every
+completed Task, which is the author's call, not the scheduler's. `completedTasks` already carries
+exactly this information — whether the Service's state matters to completed work — so no new field
+is needed. A suspension consumes no restart attempt because nothing went wrong.
+
 ### Readiness is declared, not inferred
 
 A scheduler cannot know when an arbitrary process is ready. The three probe types cover the three
@@ -1453,6 +1491,14 @@ it. No single behavior is correct, so the policy is per-Service. `RERUN` is the 
 is the conservative choice: it can only cost time, whereas `KEEP` applied to a stateful service can
 produce silently incorrect output. Templates that know their service is stateless opt in to
 `KEEP`.
+
+The same distinction decides what happens to Tasks running at the moment of failure. Under `RERUN`
+their partial work depends on the lost state as much as completed work does, so they are canceled
+and requeued at no cost to their retry budget. Under `KEEP` canceling them would be heavy-handed: a
+brief restart of a cache would cancel every in-flight frame, most of which would have finished
+without ever noticing. So they continue, and one that does need the Service during the outage fails
+and retries under the ordinary Task retry rules. That consumes a Task retry, which an author who
+chooses `KEEP` for a Service with frequent restarts should budget for.
 
 ### `variables` and `openjd_env` both, within a Service
 
@@ -1488,9 +1534,11 @@ to write a URL.
 
 ### Ordered lists with forward-only references
 
-Requiring that a Service reference only Services *earlier* in its list makes the start order the
-dependency order with no additional syntax and no possibility of a cycle. This mirrors the
-existing ordered-entry semantics of `jobEnvironments`.
+Requiring that a Service reference only Services *earlier* in its list expresses the dependency
+order with no additional syntax and no possibility of a cycle, mirroring the ordered-entry semantics
+of `jobEnvironments`. Starting is gated by the references themselves rather than by list position,
+so Services that are independent start concurrently; the list order is what makes the reference
+rule checkable and gives implementations a total order that always satisfies the stop constraint.
 
 ### `attr.worker.preemptible` in this RFC
 
@@ -1735,11 +1783,17 @@ catch a typo and hide the dependency from readers.
 
 ## Future Work
 
-* **User-defined run scopes.** `runScope` names the kinds of Session an Environment applies to.
-  Letting a Step or Service declare additional scope names for its Sessions, and an Environment
-  list them in `runScope`, would let Steps opt in to or out of specific Environments — the
-  generalization this RFC deliberately stops short of. The grammar here (a list of names, unknown
-  names rejected) is chosen so that extension is additive.
+* **Custom named scopes, for Environments and Services alike.** This RFC gives a Service two
+  scopes, the Job and a single Step, which are the two scopes Environments have. Use case 2 (a
+  coordinator shared by a scatter Step and its gather Step) wants a middle scope: a Service that
+  outlives one Step but not the Job, started when the first of a set of Steps becomes schedulable
+  and stopped when the last completes. Environments have the same gap; a Step cannot opt in to or
+  out of a specific Job Environment. One extension can close both: a Job Template declares named
+  scopes, each Step lists the scopes it belongs to, and an Environment or Service is attached to a
+  scope rather than to the Job or a Step, with its lifetime running from the first Step in the
+  scope to the last. `runScope` on `<Environment>` is the first appearance of scope names in the
+  schema, and its grammar (a list of names, unknown names rejected) is chosen so that user-defined
+  names can be added without changing it.
 * **UDP ports and Unix domain sockets.** A `protocol:` field on `<ServicePort>` is the natural
   extension.
 * **Co-scheduled Steps, for systems like MPI and Dask.** With this RFC, an MPI or Dask workload is a
