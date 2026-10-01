@@ -754,7 +754,8 @@ Where:
    `<StepTemplate>`'s *let*. Bindings may reference `Param.*`, `RawParam.*`, `Job.Name`, and (for a
    Step Service) `Step.Name` and the Step's bindings, but not `Session.*` or `Service.*`, which are
    not known until the Service is placed. Bound names are available in *hostRequirements*,
-   *variables*, and *script*. Available with the `EXPR` extension.
+   *serviceEnvironments*, *variables*, and *script*, as a Step's bindings are in its
+   `stepEnvironments`. Available with the `EXPR` extension.
 4. *hostRequirements* — Requirements on the Worker Host's capabilities that must be satisfied for
    the Service to be placed on the host. Amount capabilities are allocated to the Service Session
    for the lifetime of the Service. This is independent of the *hostRequirements* of any Step

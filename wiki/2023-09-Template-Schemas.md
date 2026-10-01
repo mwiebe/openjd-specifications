@@ -1574,7 +1574,7 @@ and where the bound names are available:
 | `<StepScript>.let` | `Param.*`, `RawParam.*`, `Task.Param.*`, `Task.RawParam.*`, `Session.*`, `Task.File.*`, `Job.Name`, `Step.Name`, step-level bindings, earlier bindings in same `let`, in-scope `Service.<name>.<port>.*` (`SERVICE` extension) | *actions*, *embeddedFiles* |
 | `<SimpleAction>.let` | `Param.*`, `RawParam.*`, `Task.Param.*`, `Task.RawParam.*`, `Session.*`, `Job.Name`, `Step.Name`, step-level bindings, earlier bindings in same `let`, in-scope `Service.<name>.<port>.*` (`SERVICE` extension) | *script*, *args* |
 | `<EnvironmentScript>.let` | `Param.*`, `RawParam.*`, `Session.*`, `Env.File.*`, `Job.Name`, earlier bindings in same `let`, in-scope `Service.<name>.<port>.*` when the Environment's `runScope` excludes `SERVICE` (`SERVICE` extension) | *actions*, *embeddedFiles* |
-| `<Service>.let` (`SERVICE` extension) | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` (Step Service only), step-level bindings (Step Service only), earlier bindings in same `let` | *hostRequirements*, *variables*, *script* (including nested `<ServiceScript>.let`) |
+| `<Service>.let` (`SERVICE` extension) | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` (Step Service only), step-level bindings (Step Service only), earlier bindings in same `let` | *hostRequirements*, *serviceEnvironments*, *variables*, *script* (including nested `<ServiceScript>.let`) |
 | `<ServiceScript>.let` (`SERVICE` extension) | `Param.*`, `RawParam.*`, `Session.*`, `Service.File.*`, in-scope `Service.<name>.<port>.*`, `Job.Name`, `Step.Name` (Step Service only), service-level bindings, earlier bindings in same `let` | *actions*, *embeddedFiles* |
 
 Note: `Task.Param.*` and `Task.RawParam.*` are only available in `<StepScript>` and `<SimpleAction>` contexts because task parameter
@@ -2486,7 +2486,8 @@ Where:
    See: [&lt;Description&gt;](#72-description).
 3. *let* — An ordered list of expression bindings evaluated once, at job creation, like a `<StepTemplate>`'s *let*.
    Bindings may not reference `Session.*` or `Service.*`, which are not known until the Service is placed. Bound names
-   are available in *hostRequirements*, *variables*, and *script*. See: [&lt;LetBindings&gt;](#36-letbindings).
+   are available in *hostRequirements*, *serviceEnvironments*, *variables*, and *script*, as a Step's bindings are in
+   its *stepEnvironments*. See: [&lt;LetBindings&gt;](#36-letbindings).
 4. *hostRequirements* — Describes the requirements on the Worker Host's capabilities that must be satisfied for the
    Service to be placed on the host. Amount capabilities are allocated to the Service for its lifetime. This is
    independent of the *hostRequirements* of any Step whose Tasks use the Service.
