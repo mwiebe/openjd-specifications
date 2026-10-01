@@ -539,11 +539,13 @@ When a submission combines a Job Template with one or more Environment Templates
    `jobServices` list is started and stopped as a single list. The limit of 10 Services applies to
    each document's list, not to the combined list; how many Environment Templates are attached is
    the scheduler's decision, and it bounds the combined list.
-2. The `name` of an external Service MUST NOT equal the `name` of any other external Service, nor
-   of any Service in the Job Template's `jobServices` or any Step's `stepServices`. The submission
-   MUST be rejected on a collision. Queue operators SHOULD give external Services names that Job
-   Template authors are unlikely to choose (for example, a studio prefix), since a collision makes
-   an existing Job Template unsubmittable.
+2. Service names are scoped to the document that declares them. An external Service MAY have the
+   same `name` as a Service in another attached Environment Template or in the Job Template, and
+   the submission is not rejected for it: every `Service.*` reference resolves within its own
+   document, so no name is ever looked up across documents, and a scheduler MUST keep same-named
+   Services from different documents distinct (for example, by qualifying each with its document).
+   Nothing a queue operator attaches can therefore make an existing Job Template unsubmittable
+   because of a name.
 
 An external Service has the same effect on a Job as a Service the Job Template declared itself: the
 Job's Tasks are not scheduled until it is READY, its host requirements are allocated for the Job's
@@ -1427,12 +1429,10 @@ exceptions. At template validation, an implementation MUST check:
    [`<Environment>`](#environment).
 7. A template that lists `SERVICE` also lists `EXPR`.
 
-These checks appear in the wiki as §9.7. Two checks require the combined Job, because they relate
-documents that only the scheduler sees together, and are performed at submission:
+These checks appear in the wiki as §9.7. One check requires the combined Job, because it relates
+documents that only the scheduler sees together, and is performed at submission:
 
-1. The external-Service name collision rule in
-   [Environment Template](#environment-template).
-2. A wrapping Environment defined in a document that does not declare `SERVICE` — an attached
+1. A wrapping Environment defined in a document that does not declare `SERVICE` — an attached
    Environment Template, or the Job Template itself — has the default `runScope` (every kind of
    Session) and cannot define the `onWrapService*` hooks. If the combined Job places any Service in
    that Environment's scope, the submission MUST be rejected, naming the document that defines the
@@ -1595,6 +1595,16 @@ submission. Expressing a Service as a variant of that same document means Servic
 Environment Templates do with no new integration; a second root element would require every
 implementation to add a second attachment type, UI, and API, and a rule for interleaving the two
 lists, before anyone could use the feature.
+
+### Service names are scoped to their document
+
+A rule requiring an external Service's name to differ from every Service in the Job Template would
+let a queue operator's choice of name break a Job Template that worked everywhere else, which is the
+portability failure the same-document reference rule exists to prevent. Because no `Service.*`
+reference crosses a document boundary, global uniqueness buys nothing: a scheduler that qualifies
+each Service by its document can run two Services named `Cache` side by side, each reached only by
+the entities in its own document. Names are therefore unique within a list, as Environment names
+are, and nothing more.
 
 ### One document may define Services and an Environment together
 
@@ -1768,7 +1778,8 @@ likely: a monitor failure is an instance failure).
   four `onWrapService*` hooks and the `WrappedService.*` variables when `WRAP_ACTIONS` is also
   enabled; the
   `EXPR` prerequisite check; the host and port functions in the expression library; and a
-  submission-time merge step that orders external Services and checks name collisions. Moderate.
+  submission-time merge step that orders external Services and performs the wrapper composition
+  check. Moderate.
 - **Python (openjd-sessions)**: A Service Session variant of the existing session that enters the
   `SERVICE`-scoped Environments, runs `onEnter`, launches `onRun` without awaiting exit, runs
   `onReadinessCheck` on an interval, exposes an "instance exited" callback, and runs `onExit`
@@ -1826,13 +1837,13 @@ Rejected in favor of a `services:` property on the existing Environment Template
 
 A Job Template could declare a requirement on a queue-supplied Service — a stub in `jobServices`
 naming the Service and its ports — so that it could use `Service.<name>.*` with static validation,
-and a submission would be rejected if the queue did not supply a match. This is rejected because
-the Environment defined alongside an external Service can publish the endpoint to Tasks by the
-same means queue Environments already use, so no declaration is needed; no other queue-provided
-entity requires one; and the stub would add a discriminated union to `jobServices`, a merge rule,
-and exceptions to the name-collision and forward-reference rules. Unchecked `Service.*` references
-resolved at submission time are rejected as well, because they would make `openjd check` unable to
-catch a typo and hide the dependency from readers.
+and a submission would be rejected if the queue did not supply a match. This is rejected because the
+Environment defined alongside an external Service can publish the endpoint to Tasks by the same
+means queue Environments already use, so no declaration is needed; no other queue-provided entity
+requires one; and the stub would add a discriminated union to `jobServices`, a merge rule, a cross-
+document name requirement, and an exception to the forward-reference rule. Unchecked `Service.*`
+references resolved at submission time are rejected as well, because they would make `openjd check`
+unable to catch a typo and hide the dependency from readers.
 
 ## Future Work
 

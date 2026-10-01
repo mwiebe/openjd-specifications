@@ -197,10 +197,11 @@ When a submission combines a Job Template with one or more Environment Templates
    are placed in `jobEnvironments` as today. The combined `jobServices` list is started and stopped as a single list
    (see [How Jobs Are Run](How-Jobs-Are-Run#services)). The limit of 10 Services applies to each document's list, not to
    the combined list; the number of Environment Templates attached is the scheduler's decision and bounds it.
-2. The `name` of an external Service must not equal the `name` of any other external Service, nor of any Service
-   declared in the Job Template's `jobServices` or in any Step's `stepServices`. The submission must be rejected on a
-   collision. Queue operators should give external Services names that Job Template authors are unlikely to choose
-   (for example, a studio prefix), since a collision makes an existing Job Template unsubmittable.
+2. Service names are scoped to the document that declares them. An external Service may have the same `name` as a
+   Service in another attached Environment Template or in the Job Template, and the submission is not rejected for it:
+   every `Service.*` reference resolves within its own document, so no name is ever looked up across documents, and a
+   scheduler must keep same-named Services from different documents distinct (for example, by qualifying each with its
+   document). Nothing a queue operator attaches can make an existing Job Template unsubmittable because of a name.
 3. A wrapping Environment (one defining the `WRAP_ACTIONS` hooks) in a document that does not declare `SERVICE`, whether
    an attached Environment Template or the Job Template itself, has the default `runScope` of every kind of Session and
    cannot define the `onWrapService*` hooks. If the combined Job places any Service in that Environment's scope, the
@@ -208,8 +209,8 @@ When a submission combines a Job Template with one or more Environment Templates
    Service would run in a Session the Environment enters but cannot wrap. This applies both to a queue's wrapper
    template attached to a Job Template that declares Services and to a Job Template with a wrapper submitted to a queue
    that attaches a Service. The remedy is for that document to declare `SERVICE` and either define the four hooks or
-   declare a `runScope` that excludes `SERVICE`. This check and the name-collision check above are the only checks that
-   require the combined Job; everything else is checked when each document is validated on its own.
+   declare a `runScope` that excludes `SERVICE`. This is the only check that requires the combined Job; everything else
+   is checked when each document is validated on its own.
 
 An external Service has the same effect on a Job as a Service the Job Template declared itself: the Job's Tasks are
 not scheduled until it is ready, its host requirements are allocated for the Job's lifetime, and its restart policy
@@ -2803,9 +2804,8 @@ validation, an implementation must check:
    [&lt;EnvironmentActions&gt;](#43-environmentactions)).
 7. A template that lists `SERVICE` also lists `EXPR`.
 
-Two checks relate documents that only the scheduler sees together and are performed at submission: the
-external-Service name collision rule and the wrapping-Environment rule in
-[Services from Environment Templates](#122-services-from-environment-templates).
+One check relates documents that only the scheduler sees together and is performed at submission: the
+wrapping-Environment rule in [Services from Environment Templates](#122-services-from-environment-templates).
 
 ## 10. Additional Information
 
