@@ -18,9 +18,10 @@ lifetime of its scope (the whole Job, or a single Step), and stops once the scop
 it. A Job Template declares Services in two new lists, `jobServices` and `stepServices`, alongside
 its Environments. The template names the ports; the scheduler chooses the port numbers and addresses
 when it places the Service, which may be on a different host than the Tasks that use it. Every
-entity in the scope reads them through a new `Service.*` format-string scope. A readiness check
-gates Task scheduling in the scope, and a restart policy says what happens when the service process
-dies, including whether Tasks that completed against the old instance keep their results. Services
+entity in the scope reads them through a new `Service.*` format-string scope. A health check gates
+Task scheduling in the scope until the service is ready and detects an instance that has hung, and a
+restart policy says what happens when the service process dies or hangs, including whether Tasks
+that completed against the old instance keep their results. Services
 run inside the Environments of their scope, so the same Conda, Rez, or container Environments
 provision them and the Tasks. A queue can supply Services to every Job submitted through it by
 defining them in an Environment Template.
@@ -30,9 +31,9 @@ defining them in an Environment Template.
 The `SERVICE` extension adds the following, each specified in the sections named:
 
 * **The `<Service>` entity** and the `jobServices` and `stepServices` lists that hold it. A
-  Service has named ports, a readiness check, a restart policy, host requirements, and the same
+  Service has named ports, a health check, a restart policy, host requirements, and the same
   `variables`, `let`, embedded files, and `<Action>` model as an Environment, with actions
-  `onEnter`, `onRun`, `onReadinessCheck`, and `onExit`. See [`<Service>`](#service).
+  `onEnter`, `onRun`, `onHealthCheck`, and `onExit`. See [`<Service>`](#service).
 * **The `Service.*` format-string scope**, through which the service process learns what to bind
   and every entity in the scope learns where to connect: `Service.<name>.<port>.port`,
   `bindAddress`, and `connectAddress`, plus `Service.File.*` for the Service's embedded files.
@@ -69,11 +70,14 @@ template declares one named port, `main`, but no port number: the scheduler pick
 whatever host it places the Service on, and hands the number to both sides. The service process
 reads it as `Service.Cache.main.port` and binds `Service.Cache.main.bindAddress`; Tasks, which may
 be on other hosts, read the same `Service.Cache.main.port` and connect to
-`Service.Cache.main.connectAddress`. If the service process dies the scheduler relaunches it, and
-because a cache can be repopulated, completed Tasks keep their results (`completedTasks: KEEP`). The
-Valkey binary comes from a Conda environment the Tasks do not need, so the Service creates it in its
-own *onEnter*, which runs once per Service Session before *onRun*, and puts it on `PATH` with an
-`openjd_env` message.
+`Service.Cache.main.connectAddress`. If the service process dies, or stops accepting connections,
+the scheduler relaunches it, and because a cache can be repopulated, completed Tasks keep their
+results (`completedTasks: KEEP`). After the store is READY the same TCP probe that proved it ready
+runs every 10 seconds, and three consecutive refused connections mark the instance UNHEALTHY, so a
+Valkey that has hung without exiting is replaced as a crashed one would be. The Valkey binary comes
+from a Conda environment the Tasks do not need, so the Service creates it in its own *onEnter*,
+which runs once per Service Session before *onRun*, and puts it on `PATH` with an `openjd_env`
+message.
 
 ```yaml
 specificationVersion: "jobtemplate-2023-09"
@@ -97,9 +101,11 @@ jobServices:
           min: 8192
     ports:
       - name: main
-    readinessCheck:
+    healthCheck:
       type: TCP_CONNECT
-      timeoutSeconds: 60
+      readyTimeoutSeconds: 60
+      healthIntervalSeconds: 10
+      failureThreshold: 3
     restartPolicy:
       maxAttempts: 3
       completedTasks: KEEP
@@ -167,9 +173,9 @@ steps:
         ports:
           - name: api
           - name: metrics
-        readinessCheck:
+        healthCheck:
           type: STDOUT
-          timeoutSeconds: 120
+          readyTimeoutSeconds: 120
         restartPolicy:
           maxAttempts: 1
           completedTasks: RERUN
@@ -296,9 +302,9 @@ steps:
 This Job collects per-frame timings in a StatsD-style metrics sink that every Task reports to over
 UDP, and exposes the aggregated results through a TCP HTTP API that the final Step reads. The
 `ingest` port declares `protocol: UDP`, so a scheduler that publishes or forwards ports between
-hosts forwards it as UDP; the `api` port is TCP by default. The Service gives no `readinessCheck`,
-so the default `TCP_CONNECT` probes its TCP ports only: once `api` accepts a connection the sink is
-up and `ingest` is bound with it. The UDP port carries the same three values as a TCP port, and the
+hosts forwards it as UDP; the `api` port is TCP by default. The Service gives no `healthCheck`, so
+the default `TCP_CONNECT` probes its TCP ports only: once `api` accepts a connection the sink is up
+and `ingest` is bound with it. The UDP port carries the same three values as a TCP port, and the
 Tasks use `connectAddress` and `port` without caring which it is.
 
 ```yaml
@@ -367,7 +373,7 @@ Service host                   Worker host A            Worker host B
 E.onEnter
   S.onEnter
   S.onRun (starts)
-  S readiness probe -> READY
+  S health probe -> READY
                                E.onEnter                E.onEnter
                                  T1.onRun                 T3.onRun
                                  T2.onRun                 T4.onRun
@@ -405,11 +411,11 @@ An `<Environment>` almost fits but differs in four ways that a schema needs to m
 3. **Endpoint publication.** A Service exposes one or more ports. The runtime allocates a concrete
    address and port and makes them discoverable, on any host, both to the service process (so it
    knows what to bind) and to every entity in its scope (so they know where to connect).
-4. **Readiness and failure.** A scheduler must know when the service is accepting connections
-   before it schedules the Tasks in the Service's scope, and must react when the service dies:
-   relaunch it, or fail the scope. Because a service can hold state that Tasks depend on, a
-   service author must be able to say whether Tasks that completed against the old instance are
-   still valid.
+4. **Readiness, health, and failure.** A scheduler must know when the service is accepting
+   connections before it schedules the Tasks in the Service's scope, must notice when a running
+   service stops answering, and must react when it dies or hangs: relaunch it, or fail the scope.
+   Because a service can hold state that Tasks depend on, a service author must be able to say
+   whether Tasks that completed against the old instance are still valid.
 
 A Service borrows the rest of its shape from existing entities: `description`, `variables`, `let`,
 embedded files, and the `<Action>` model with its cancelation methods from `<Environment>`, and
@@ -489,7 +495,7 @@ This RFC is additive and gated by the `SERVICE` extension name declared under RF
 | **Scope** | The Job, for a Service in `jobServices`; the Step that declares it, for a Service in `stepServices`. |
 | **Service Session** | The Session on the service host in which a Service's actions run: a working directory, the Environments of the Service's scope entered around the Service's actions, and the Service's actions themselves. It is a Session as described in *How Jobs Are Run*, containing one Service instead of Tasks. |
 | **Service host** | The Worker Host the scheduler places a Service on. It may or may not be a host that also runs Tasks. |
-| **READY / UNREADY / FAILED** | The three Service states the scheduler tracks. See [Service lifecycle](#service-lifecycle). |
+| **UNREADY / READY / UNHEALTHY / FAILED** | The four Service states the scheduler tracks. See [Service lifecycle](#service-lifecycle). |
 | **Instance** | One launch of a Service's `onRun` action. A Service has one instance at a time; a restart creates a new instance. |
 | **External Service** | A Service supplied to a Job by the scheduler from an Environment Template, rather than declared in the Job Template. |
 
@@ -672,18 +678,18 @@ New property:
   onWrapEnvEnter: <Action>    # @optional @extension WRAP_ACTIONS
   onWrapTaskRun: <Action>     # @optional @extension WRAP_ACTIONS
   onWrapEnvExit: <Action>     # @optional @extension WRAP_ACTIONS
-+ onWrapServiceEnter: <Action>          # @optional @extension WRAP_ACTIONS SERVICE
-+ onWrapServiceRun: <Action>            # @optional @extension WRAP_ACTIONS SERVICE
-+ onWrapServiceReadinessCheck: <Action> # @optional @extension WRAP_ACTIONS SERVICE
-+ onWrapServiceExit: <Action>           # @optional @extension WRAP_ACTIONS SERVICE
++ onWrapServiceEnter: <Action>       # @optional @extension WRAP_ACTIONS SERVICE
++ onWrapServiceRun: <Action>         # @optional @extension WRAP_ACTIONS SERVICE
++ onWrapServiceHealthCheck: <Action> # @optional @extension WRAP_ACTIONS SERVICE
++ onWrapServiceExit: <Action>        # @optional @extension WRAP_ACTIONS SERVICE
   onExit: <Action> # @optional
 ```
 
 New properties, available only when both `WRAP_ACTIONS` (RFC 0008) and `SERVICE` are in use:
 
-* *onWrapServiceEnter*, *onWrapServiceRun*, *onWrapServiceReadinessCheck*, *onWrapServiceExit* — When
+* *onWrapServiceEnter*, *onWrapServiceRun*, *onWrapServiceHealthCheck*, *onWrapServiceExit* — When
   this Environment is a wrapping Environment in a Service Session, these run instead of the
-  Service's *onEnter*, *onRun*, *onReadinessCheck*, and *onExit* respectively, exactly as
+  Service's *onEnter*, *onRun*, *onHealthCheck*, and *onExit* respectively, exactly as
   `onWrapTaskRun` runs instead of a Task's `onRun`. Each receives the wrapped action's fields
   through the same `WrappedAction.*` variables RFC 0008 defines, plus a `WrappedService.*` group
   (the analogue of `WrappedEnv.Name` and `WrappedStep.Name`):
@@ -713,7 +719,7 @@ RFC 0008's rules extend to the new hooks as follows:
    or omits one it does, MUST be rejected at template validation. For a wrapping Environment in a
    document that does not declare `SERVICE`, see the submission-time check in
    [Validation](#validation).
-2. *Nothing to replace.* `onWrapServiceEnter`, `onWrapServiceReadinessCheck`, and
+2. *Nothing to replace.* `onWrapServiceEnter`, `onWrapServiceHealthCheck`, and
    `onWrapServiceExit` run only for a Service that defines the corresponding action. Every Service
    defines *onRun*, so `onWrapServiceRun` runs for every wrapped Service.
 3. *Single layer.* A Service Session contains at most one wrapping Environment, as any Session
@@ -721,13 +727,15 @@ RFC 0008's rules extend to the new hooks as follows:
 4. *Stdout.* As in RFC 0008, the runtime scans the wrap script's stdout, not the wrapped
    process's. A wrapped *onEnter*'s `openjd_env` messages and a wrapped *onRun*'s
    `openjd_service_ready` message are therefore honored when the wrap script forwards the wrapped
-   process's stdout verbatim, which RFC 0008 already requires. `onWrapServiceReadinessCheck` runs
+   process's stdout verbatim, which RFC 0008 already requires. `onWrapServiceHealthCheck` runs
    concurrently with `onWrapServiceRun`; wrap scripts MUST tolerate this, and the output of both
    wrap scripts is subject to the log attribution rule (see
    [Concurrency with `onRun`](#concurrency-with-onrun)).
 5. *Failure.* A failed `onWrapServiceRun` is an instance failure, a failed `onWrapServiceEnter` is a
    start failure, and a failed `onWrapServiceExit` is an *onExit* failure, exactly as the wrapped
-   action's failure would be.
+   action's failure would be. The exit status of an `onWrapServiceHealthCheck` invocation is one
+   probe result, as the wrapped *onHealthCheck*'s would be: 0 is a successful probe, anything else
+   (or exceeding its timeout) a failed one, and never by itself a failure of the Service.
 
 6. *Networking.* `bindAddress` and `connectAddress` are determined for the service host's network
    namespace. A wrapper that runs the service process in that namespace (a launcher, `ssh`, or a
@@ -763,7 +771,7 @@ description: <Description> # @optional
 let: <LetBindings> # @optional @extension EXPR
 hostRequirements: <HostRequirements> # @optional
 ports: [ <ServicePort>, ... ]
-readinessCheck: <ServiceReadinessCheck> # @optional
+healthCheck: <ServiceHealthCheck> # @optional
 restartPolicy: <ServiceRestartPolicy> # @optional
 variables: <EnvironmentVariables> # @optional
 script: <ServiceScript>
@@ -795,18 +803,18 @@ Where:
        number gives that number explicitly on both ports. Ports whose `port` is not provided are
        allocated independently, each in its own protocol's space, and may or may not coincide
        across protocols.
-6. *readinessCheck* — How the scheduler determines that the Service is ready to accept traffic. If
-   not provided, defaults to `{ type: TCP_CONNECT }` applied to every TCP port. A Service none of
-   whose ports is TCP MUST provide a *readinessCheck* of type `STDOUT` or `COMMAND`; a `TCP_CONNECT`
-   check, given or defaulted, would have no port to probe. See
-   [`<ServiceReadinessCheck>`](#servicereadinesscheck).
+6. *healthCheck* — The probe by which the scheduler determines that an instance of the Service is
+   ready to accept traffic and, once it is, that it remains healthy. If not provided, defaults to
+   `{ type: TCP_CONNECT }` applied to every TCP port. A Service none of whose ports is TCP MUST
+   provide a *healthCheck* of type `STDOUT` or `COMMAND`; a `TCP_CONNECT` check, given or
+   defaulted, would have no port to probe. See [`<ServiceHealthCheck>`](#servicehealthcheck).
 7. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the
    scope ends. If not provided, defaults to `{ maxAttempts: 0, completedTasks: RERUN }`: the
    Service is never relaunched, and its exit fails the scope. See
    [`<ServiceRestartPolicy>`](#servicerestartpolicy).
 8. *variables* — A set of environment variable name/value pairs, with the values being Format
    Strings resolved when the Service is started, that are set in the process environment of every
-   action of the Service's *script*, including *onReadinessCheck*. It has the same schema as the
+   action of the Service's *script*, including *onHealthCheck*. It has the same schema as the
    *variables* property of
    [`<Environment>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#4-environment).
    A Service's *variables* are **not** propagated to the entities in its scope; they receive the
@@ -877,9 +885,10 @@ Where:
    scheduler uses for any publishing or forwarding it performs to make the port reachable (a
    container port mapping, a firewall rule, a NAT entry). One of `TCP` or `UDP`. Default: `TCP`.
 
-Numeric fields marked `@fmtstring` — `<ServicePort>.port`, `<ServiceReadinessCheck>.timeoutSeconds`
-and `intervalSeconds`, and `<ServiceRestartPolicy>.maxAttempts` — may be given as a format string
-whose result is the integer, so that a Job Parameter or a `<Service>.let` binding can supply them.
+Numeric fields marked `@fmtstring` — `<ServicePort>.port`; the `<ServiceHealthCheck>` fields
+`readinessIntervalSeconds`, `readyTimeoutSeconds`, `healthIntervalSeconds`, and `failureThreshold`;
+and `<ServiceRestartPolicy>.maxAttempts` — may be given as a format string whose result is the
+integer, so that a Job Parameter or a `<Service>.let` binding can supply them.
 They are resolved at job creation, with the scope of the `<Service>`'s *let* (item 3). When the
 value is a single whole-field expression (`"{{ ... }}"` with no surrounding text) its target type is
 `int?`: a `null` result is treated as if the field were not provided, and a non-null result MUST
@@ -888,64 +897,88 @@ satisfy the field's range.
 Every port, TCP or UDP, is bound and published on the same service host. Unix domain sockets are
 out of scope for this RFC (see [Future Work](#future-work)).
 
-##### `<ServiceReadinessCheck>`
+##### `<ServiceHealthCheck>`
 
-A `<ServiceReadinessCheck>` is one of the following objects, discriminated by *type*:
+A `<ServiceHealthCheck>` is one of the following objects, discriminated by *type*:
 
 ```yaml
 type: "TCP_CONNECT"
 ports: [ <Identifier>, ... ] # @optional
-timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "COMMAND"
-intervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
-timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "STDOUT"
-timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
+
+A health check is one probe mechanism applied in two phases. Before the instance is READY the probe
+decides readiness: the first probe runs as soon as `onRun` is launched, a probe runs every
+*readinessIntervalSeconds* after it, and the first success makes the instance READY. After the
+instance is READY the probe decides health: a probe runs every *healthIntervalSeconds*, and
+*failureThreshold* consecutive failures make the instance UNHEALTHY, which is an instance failure
+(see [Failure and restart](#failure-and-restart)). A single successful probe resets the count. While
+the count is below the threshold the instance stays READY and nothing changes. In both phases an
+interval is measured from the end of the previous probe.
 
 Where:
 
 1. *type* — The probe mechanism:
-    * `TCP_CONNECT` — The Service is READY once a TCP connection to each of the listed ports (by
+    * `TCP_CONNECT` — A probe succeeds when a TCP connection to each of the listed ports (by
       default, every TCP port the Service declares) succeeds. The connection is made from the
       service host to the allocated `port` on the loopback interface, or on `bindAddress` when it
       is not a wildcard address (`0.0.0.0` or `::`, which cannot be connected to on every operating
-      system), and is closed immediately. The scheduler retries at an implementation-defined
-      interval (recommended: 1 second) until success or timeout. This type is usable only on a
-      Service with at least one TCP port; see *readinessCheck* in [`<Service>`](#service).
-    * `COMMAND` — The Service is READY once the Service's *onReadinessCheck* action (see
-      [`<ServiceActions>`](#serviceactions)) exits with status 0 while `onRun` is still running.
-      The Service MUST define *onReadinessCheck* when this type is used. The action is run in the
-      Service Session like every other Service action, concurrently with `onRun`; see
-      [Concurrency with `onRun`](#concurrency-with-onrun). Invocations are sequential: the first
-      begins once `onRun` has been launched, and each subsequent one begins *intervalSeconds*
-      (default: 5) after the previous one ends. Invocations continue until one succeeds, the
-      readiness timeout elapses, or `onRun` exits. The action's own `timeout` (default: 30
-      seconds) bounds one invocation; an invocation that exceeds it is canceled and counts as
-      "not yet ready", as does any exit status other than 0. Neither is ever a failure of the
-      Service. Once the instance is READY the action is not run again; readiness is not a
-      liveness check (see [Open Questions](#health-monitoring-after-ready)).
-    * `STDOUT` — The Service is READY once its `onRun` action writes a line of the form
-      `openjd_service_ready: <message>` to stdout, with the same syntax as the other `openjd_*`
-      messages. The message has no functional purpose but MAY be surfaced in UIs.
+      system), and is closed immediately. This type is usable only on a Service with at least one
+      TCP port; see *healthCheck* in [`<Service>`](#service).
+    * `COMMAND` — A probe is one invocation of the Service's *onHealthCheck* action (see
+      [`<ServiceActions>`](#serviceactions)), and succeeds when the invocation exits with status 0
+      while `onRun` is still running. The Service MUST define *onHealthCheck* when this type is
+      used. The action is run in the Service Session like every other Service action, concurrently
+      with `onRun`; see [Concurrency with `onRun`](#concurrency-with-onrun). Invocations are
+      sequential. The action's own `timeout` (default: 30 seconds) bounds one invocation; an
+      invocation that exceeds it is canceled and is one failed probe, as is any exit status other
+      than 0. Neither is by itself a failure of the Service.
+    * `STDOUT` — A probe is a line of the form `openjd_service_ready: <message>` written to stdout
+      by the `onRun` action, with the same syntax as the other `openjd_*` messages. The first such
+      line makes the instance READY; `<message>` has no functional purpose but MAY be surfaced in
+      UIs. After READY, when *healthIntervalSeconds* is given the line is a heartbeat: each
+      interval in which no such line arrives is one failed probe. When it is omitted, the health of
+      a `STDOUT` instance is that its `onRun` process is still running, and further lines have no
+      effect. *readinessIntervalSeconds* does not apply to this type: the ready line arrives when
+      it arrives.
 2. *ports* (`TCP_CONNECT` only) — The names of the ports to probe. Each must be declared in the
    Service's *ports* and have `protocol: TCP`; naming a UDP port is a validation error, since a
    UDP port cannot accept a connection. Defaults to every TCP port the Service declares.
-3. *intervalSeconds* (`COMMAND` only) — Seconds to wait between the end of one *onReadinessCheck*
-   invocation and the start of the next. Default: 5.
-4. *timeoutSeconds* — The maximum time, measured from the start of the `onRun` action, that the
-   scheduler waits for the Service to become READY. It runs continuously, including while an
-   *onReadinessCheck* invocation is in progress. If exceeded, the instance is treated as failed
-   (see [Failure and restart](#failure-and-restart)). Default: 300 seconds.
+3. *readinessIntervalSeconds* (`TCP_CONNECT` and `COMMAND` only) — Seconds between probes before
+   the instance is READY. Default: 1 for `TCP_CONNECT`, 5 for `COMMAND`. A `STDOUT` check that
+   gives this field MUST be rejected at template validation.
+4. *readyTimeoutSeconds* — The maximum time, measured from the launch of the `onRun` action, that
+   the scheduler waits for the instance to become READY. It runs continuously, including while a
+   probe is in progress. If exceeded, the instance has failed (see
+   [Failure and restart](#failure-and-restart)). Default: 300.
+5. *healthIntervalSeconds* — Seconds between probes after the instance is READY. Default: 30 for
+   `TCP_CONNECT` and `COMMAND`. For `STDOUT` there is no default: when given, it is the heartbeat
+   interval described under *type*; when omitted, no heartbeat is expected.
+6. *failureThreshold* — The number of consecutive failed probes after READY (for a `STDOUT`
+   heartbeat, consecutive intervals without a line) that make the instance UNHEALTHY. Default: 3.
+   A `STDOUT` check that gives this field without *healthIntervalSeconds* MUST be rejected at
+   template validation, since there is no probe for it to count.
 
-Readiness applies to every instance: after a restart, the new `onRun` must pass the readiness check
-before Tasks in the scope are (re)scheduled.
+The health check applies to every instance: after a restart, the new `onRun` must pass a probe
+before Tasks in the scope are (re)scheduled, and is monitored in the same way once it has.
 
 ##### `<ServiceRestartPolicy>`
 
@@ -1001,7 +1034,7 @@ A `<ServiceActions>` is the object:
 ```yaml
 onEnter: <Action> # @optional
 onRun: <Action>
-onReadinessCheck: <Action> # @optional
+onHealthCheck: <Action> # @optional
 onExit: <Action> # @optional
 ```
 
@@ -1013,17 +1046,18 @@ Where:
    for any `<Action>`. A non-zero exit or a timeout is a start failure (see [Failure and
    restart](#failure-and-restart)). Use *onEnter* for setup that must survive a relaunch of *onRun*
    (for example, initializing an on-disk database in the Service Session's working directory).
-2. *onRun* — The long-lived action whose process *is* the service. The scheduler starts it, watches
-   it for readiness, and expects it to run until canceled. If *onRun* exits for any reason — zero or
-   non-zero exit status — before the scheduler cancels it, the Service instance has failed; see
-   [Failure and restart](#failure-and-restart). The scheduler stops the Service by canceling *onRun*
-   according to its `cancelation` method.
-3. *onReadinessCheck* — A short action the scheduler runs repeatedly, while *onRun* is running, to
-   decide whether the Service is READY, when the Service's `readinessCheck` has type `COMMAND`.
-   Exit status 0 means ready; any other status means not yet. MUST be defined when the readiness
-   check type is `COMMAND`, and MUST NOT be defined otherwise. It SHOULD be read-only with respect
-   to the Service Session's working directory, which it shares with *onRun*. See
-   [`<ServiceReadinessCheck>`](#servicereadinesscheck) and
+2. *onRun* — The long-lived action whose process *is* the service. The scheduler starts it, probes
+   it for readiness and then for health, and expects it to run until canceled. If *onRun* exits for
+   any reason — zero or non-zero exit status — before the scheduler cancels it, the Service
+   instance has failed; see [Failure and restart](#failure-and-restart). The scheduler stops the
+   Service by canceling *onRun* according to its `cancelation` method.
+3. *onHealthCheck* — A short action the scheduler runs repeatedly, while *onRun* is running, as the
+   probe of a `healthCheck` of type `COMMAND`: before the instance is READY, to decide whether it
+   is; afterwards, to decide whether it still is. Exit status 0 is a successful probe; any other
+   status, or exceeding its `timeout`, is a failed probe. MUST be defined when the health check
+   type is `COMMAND`, and MUST NOT be defined otherwise. It SHOULD be read-only with respect to the
+   Service Session's working directory, which it shares with *onRun*. See
+   [`<ServiceHealthCheck>`](#servicehealthcheck) and
    [Concurrency with `onRun`](#concurrency-with-onrun).
 4. *onExit* — A cleanup action run after the Service's other actions have stopped for the last
    time in a Service Session, whether the Service stopped normally, failed, or was canceled, and
@@ -1032,7 +1066,7 @@ Where:
 
 ###### Concurrency with `onRun`
 
-*onReadinessCheck* is the only action in the specification that runs while another action of the
+*onHealthCheck* is the only action in the specification that runs while another action of the
 same Session, *onRun*, is running. Several existing rules silently assume one action at a time; the
 following rules say where that assumption holds and where it does not:
 
@@ -1041,27 +1075,29 @@ following rules say where that assumption holds and where it does not:
    invocation's files to a distinct location (`Service.File.<name>` may resolve to a different path
    in each action), or not rewrite a file whose content is unchanged, which it always is because a
    Service Session's format-string values are constant for its lifetime.
-2. **Stdout.** The stdout of *onReadinessCheck* is captured to the log but no `openjd_*` message on
+2. **Stdout.** The stdout of *onHealthCheck* is captured to the log but no `openjd_*` message on
    it is honored: its result is its exit status. The `openjd_status`, `openjd_progress`, and
    `openjd_fail` messages of the Service come from *onEnter*, *onRun*, and *onExit* only.
 3. **Log attribution.** Every line of stdout or stderr captured in a Service Session MUST be
    attributable to the action that produced it. How attribution is recorded is
    implementation-defined: a structured log may carry the action name as a field, and an
-   implementation producing a single plain-text log SHOULD tag each *onReadinessCheck* line with the
-   action name (for example, `[onReadinessCheck] connection refused`) while leaving *onRun*'s lines
+   implementation producing a single plain-text log SHOULD tag each *onHealthCheck* line with the
+   action name (for example, `[onHealthCheck] connection refused`) while leaving *onRun*'s lines
    untagged. The same applies under `WRAP_ACTIONS`, where the wrap script's own output is also part
    of each stream. The runtime adds the tag; a Service's processes need not prefix their own output.
    An implementation MAY suppress or collapse the output of invocations that succeed, provided the
    full output of every invocation that fails or is canceled for exceeding its `timeout` is
    retained.
-4. **At most one invocation at a time.** *onReadinessCheck* invocations never overlap one another,
-   never run while *onEnter* or *onExit* is running, and never run after the instance is READY.
+4. **At most one invocation at a time.** *onHealthCheck* invocations never overlap one another and
+   never run while *onEnter* or *onExit* is running. They continue for as long as *onRun* runs:
+   every *readinessIntervalSeconds* before the instance is READY and every *healthIntervalSeconds*
+   after.
 5. **`onRun` exit wins.** An instance is READY only if *onRun* is still running when the scheduler
    observes a successful invocation. If *onRun* exits while an invocation is in progress, the
-   invocation is canceled with its `cancelation` method and its result is discarded; the instance
-   has failed. Likewise, an invocation in progress when the Service Session ends is canceled before
-   *onExit* runs.
-6. **Wrap hooks.** Under `WRAP_ACTIONS`, `onWrapServiceReadinessCheck` runs while `onWrapServiceRun`
+   invocation is canceled with its `cancelation` method and its result is discarded (lifecycle
+   constraint 11); the instance has failed. Likewise, an invocation in progress when the Service
+   Session ends is canceled before *onExit* runs.
+6. **Wrap hooks.** Under `WRAP_ACTIONS`, `onWrapServiceHealthCheck` runs while `onWrapServiceRun`
    is running. Wrap scripts used in a Service Session MUST tolerate concurrent invocation. Wrappers
    that execute into an existing context (`docker exec`, `ssh`) do; a wrapper that creates a
    per-invocation exclusive resource does not.
@@ -1072,13 +1108,13 @@ Default timeouts for these actions (extending the table in `<Action>`):
 |---|---|---|
 | `<ServiceActions>` | `onEnter` | *no timeout* |
 | `<ServiceActions>` | `onRun` | *no timeout* (a timeout, if given, is measured from launch and its expiry is an instance failure) |
-| `<ServiceActions>` | `onReadinessCheck` | 30 seconds |
+| `<ServiceActions>` | `onHealthCheck` | 30 seconds |
 | `<ServiceActions>` | `onExit` | 300 seconds (five minutes) |
 
 Implementations MUST watch the stdout of *onEnter*, *onRun*, and *onExit* for the standard
 `openjd_status`, `openjd_progress`, and `openjd_fail` messages, and the stdout of *onRun* for
-`openjd_service_ready` when the readiness check's *type* is `STDOUT`. Messages on the stdout of
-*onReadinessCheck* are not honored (see [Concurrency with `onRun`](#concurrency-with-onrun)).
+`openjd_service_ready` when the health check's *type* is `STDOUT`. Messages on the stdout of
+*onHealthCheck* are not honored (see [Concurrency with `onRun`](#concurrency-with-onrun)).
 `openjd_fail` has the meaning it has in a Task's *onRun*: it supplies the human-readable reason
 reported when the action fails, and does not itself decide success or failure, which the exit status
 does. The message accompanies the start failure, instance failure, or *onExit* failure (see [Failure
@@ -1093,10 +1129,10 @@ Session with their usual meanings; the working directory is the Service Session'
 redaction rules as for an Environment's `onEnter`, including that `openjd_redacted_env` sets the
 variable only when the document declares the `REDACTED_ENV_VARS` extension, while its value is
 redacted from the log regardless. A variable set this way is set in the process environment of every
-subsequent action of the same Service Session — every instance of *onRun*, *onReadinessCheck*, and
+subsequent action of the same Service Session — every instance of *onRun*, *onHealthCheck*, and
 *onExit* — and is retained across relaunches of *onRun* within the Session. Variables set by
 *onEnter* take precedence over the Service's declarative *variables*. These messages are ignored
-when emitted by *onRun*, *onReadinessCheck*, or *onExit*, and nothing set within a Service is ever
+when emitted by *onRun*, *onHealthCheck*, or *onExit*, and nothing set within a Service is ever
 propagated to the entities in the Service's scope.
 
 #### Host requirements
@@ -1207,19 +1243,21 @@ than an error and an already-bracketed host is not bracketed again. Under method
 
 #### Service lifecycle
 
-A Service is in exactly one of three states, tracked by the scheduler:
+A Service is in exactly one of four states, tracked by the scheduler:
 
 | State | Meaning |
 |---|---|
-| **UNREADY** | No instance is READY. Either no instance has been launched yet, an instance is launched but has not passed its readiness check, or the previous instance failed and a relaunch is pending or in progress. |
-| **READY** | The current instance has passed its readiness check and has not exited. |
+| **UNREADY** | No instance is READY. Either no instance has been launched yet, an instance is launched but has not yet passed a health-check probe, or the previous instance failed and a relaunch is pending or in progress. |
+| **READY** | The current instance has passed a health-check probe, has not since failed `failureThreshold` consecutive probes, and has not exited. |
+| **UNHEALTHY** | The current instance has failed `failureThreshold` consecutive health-check probes and is being stopped: the scheduler has canceled *onRun* and is waiting for it to exit, after which the restart decision applies. A transient state; for every other purpose, including Task scheduling, the Service is not READY. |
 | **FAILED** | The Service will not be relaunched. Its scope has failed. |
 
 A Job Service is UNREADY from Job creation. A Step Service is UNREADY from the time its Step's
 dependencies are satisfied. A Service's actions run in a **Service Session** on a service host.
 Starting a Service means opening a Service Session and, within it, entering the Environments of the
 Service's scope whose `runScope` includes `SERVICE` in order, running *onEnter* if defined,
-launching *onRun*, and applying the readiness check. When the check passes the Service is READY.
+launching *onRun*, and probing it with its health check. When a probe succeeds the Service is READY,
+and the health check keeps probing it for as long as *onRun* runs.
 
 A Service Session is always a Session of its own, never one that also runs Tasks.
 
@@ -1252,8 +1290,8 @@ A scheduler MUST satisfy the following constraints; how it satisfies them is its
 6. A Service Session ends when the Service's scope completes (the Job or Step has no Task that
    could still run, whether because every Task completed or because the scope failed or was
    canceled), when the Service is relocated, or when the Session fails to start (see below). A
-   Service whose scope completes MUST have its Session ended whatever its state, including UNREADY
-   and FAILED, so that partial state is cleaned up.
+   Service whose scope completes MUST have its Session ended whatever its state, including UNREADY,
+   UNHEALTHY, and FAILED, so that partial state is cleaned up.
 7. Before a Service Session ends: any running action is canceled with its own `cancelation`
    method; *onExit* runs if it is defined and any action of the Service has run; and every
    Environment entered is exited in reverse order, as at the end of any Session. Then the working
@@ -1278,6 +1316,15 @@ A scheduler MUST satisfy the following constraints; how it satisfies them is its
     their results, and the Service is started again in a new Service Session (constraint 9) when the
     scheduler is next prepared to schedule a Task in the scope. A Service whose `completedTasks` is
     `RERUN` MUST NOT be suspended.
+
+**Health.**
+
+11. A health-check probe in flight when *onRun* exits is canceled, with its `cancelation` method
+    when it is an action, and its result is discarded, whether the instance was READY or not. No
+    probe result observed after *onRun* has exited makes an instance READY or keeps it READY; the
+    instance has failed (see [Failure and restart](#failure-and-restart)). An instance that becomes
+    UNHEALTHY is stopped the same way an instance is stopped at scope end: *onRun* is canceled with
+    its `cancelation` method, and constraint 5 holds, so no relaunch begins until it has exited.
 
 #### Services run inside Environments
 
@@ -1306,24 +1353,27 @@ Two kinds of failure lead to the restart decision:
 
 * An **instance failure** occurs when *onRun* exits (with any status) while the Service's scope
   still has work — a Task that has not completed, or that could still run — other than because the
-  scheduler canceled it; when the readiness check times out; or when the scheduler loses the
-  service host. An exit observed after the scope has completed is not a failure, whether or not the
-  scheduler's cancelation had yet reached the process; the Service Session simply ends.
+  scheduler canceled it; when `readyTimeoutSeconds` elapses before the instance is READY; when the
+  instance becomes UNHEALTHY, having failed `failureThreshold` consecutive health-check probes
+  after READY; or when the scheduler loses the service host. An exit observed after the scope has
+  completed is not a failure, whether or not the scheduler's cancelation had yet reached the
+  process; the Service Session simply ends.
 * A **start failure** occurs when a Service Session fails before *onRun* is launched: a requested
   *port* cannot be allocated on the chosen host, an Environment's `onEnter` fails, or the Service's
   *onEnter* exits non-zero or times out. The Session ends (constraint 7 applies: *onExit* runs if
   *onEnter* ran, Environments are exited).
 
-On either failure the Service becomes UNREADY and the scheduler:
+On either failure the Service becomes UNREADY (an UNHEALTHY instance, once its *onRun* has exited)
+and the scheduler:
 
 1. If `restartPolicy.completedTasks` is `RERUN`, cancels every running Task in the Service's scope;
    each is returned to the queue to run again once the Service is READY, and this is not counted as
    a Task failure. If it is `KEEP`, running Tasks continue. A Task that needs the Service while it
-   is UNREADY, or that holds the endpoint of a relocated instance, fails on its own and is retried
+   is not READY, or that holds the endpoint of a relocated instance, fails on its own and is retried
    under the scheduler's ordinary Task retry rules, re-resolving `Service.*` when it runs again; a
    Task that no longer needs the Service completes normally.
-2. Cancels *onRun* if it is still running (the readiness timeout case) and waits for it to exit;
-   constraint 5 forbids a second *onRun* in the Session before then.
+2. Cancels *onRun* if it is still running (the readiness-timeout and UNHEALTHY cases) and waits
+   for it to exit; constraint 5 forbids a second *onRun* in the Session before then.
 3. If the number of relaunches so far is less than `restartPolicy.maxAttempts`:
     1. If `restartPolicy.completedTasks` is `RERUN`, returns every successfully completed Task in
        the scope to the queue.
@@ -1361,8 +1411,8 @@ schedulable. Steps whose Tasks were running are handled by step 1 above.
 
 **Interaction with Task failures.** A Task failure never fails a Service. A Task that fails
 because it could not reach a Service that the scheduler still considers READY is an ordinary
-Task failure. Authors SHOULD prefer the `COMMAND` or `STDOUT` readiness check when a plain TCP
-connect is not a sufficient indicator that the service can do useful work.
+Task failure. Authors SHOULD prefer a `COMMAND` or `STDOUT` health check when a plain TCP connect
+is not a sufficient indicator that the service can do useful work.
 
 #### Validation
 
@@ -1376,10 +1426,12 @@ that needs the combined Job (below). At template validation, an implementation M
 2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s `let`, or in a Job
    or Step Environment whose `runScope` includes `SERVICE`.
 3. `runScope` contains only recognized names, without duplicates.
-4. `readinessCheck` is consistent with `<ServiceActions>` and with `ports`: `onReadinessCheck` is
-   defined if and only if the type is `COMMAND`; every port a `TCP_CONNECT` check names is declared
-   and has `protocol: TCP`; and a Service none of whose ports is TCP has a `readinessCheck` of type
-   `STDOUT` or `COMMAND`.
+4. `healthCheck` is consistent with `<ServiceActions>`, with `ports`, and with its own `type`:
+   `onHealthCheck` is defined if and only if the type is `COMMAND`; every port a `TCP_CONNECT`
+   check names is declared and has `protocol: TCP`; a Service none of whose ports is TCP has a
+   `healthCheck` of type `STDOUT` or `COMMAND`; and a `STDOUT` check gives no
+   `readinessIntervalSeconds`, and gives `failureThreshold` only together with
+   `healthIntervalSeconds`.
 5. Service and port names are valid `<Identifier>`s, not `File`, and unique within their lists.
 6. The wrap hooks an Environment defines are exactly those its `runScope` calls for, per
    [`<Environment>`](#environment).
@@ -1413,9 +1465,10 @@ overlay, port forwarding, a proxy) is not visible in the template.
 > Addition to the list in *Stdout/Stderr Messages*
 
 * `openjd_service_ready: <message>` where `<message>` is any string — Interpreted only when emitted
-  by the `onRun` action of a Service whose readiness check *type* is `STDOUT`, where it indicates
-  that the service is accepting traffic on all of its declared ports. Emitting it more than once has
-  no additional effect.
+  by the `onRun` action of a Service whose health check *type* is `STDOUT`. Before the instance is
+  READY it indicates that the service is accepting traffic on all of its declared ports, and makes
+  the instance READY. After READY it is a heartbeat when the health check gives
+  `healthIntervalSeconds`, and has no additional effect otherwise.
 
 ## Design Choice Rationale
 
@@ -1423,7 +1476,7 @@ overlay, port forwarding, a proxy) is not visible in the template.
 
 An Environment is defined by *where* it runs: on the host of the Session, entered and exited around
 that Session's Tasks. Every one of the four differences in [Motivation](#motivation) — cross-host
-placement, scope-long lifetime, endpoint publication, readiness — contradicts that model. Adding
+placement, scope-long lifetime, endpoint publication, health — contradicts that model. Adding
 `ports:` and a long-lived `onRun:` to `<Environment>` would produce an entity whose lifecycle
 depends on which optional fields are present, which is hard to read and harder to implement. A
 distinct `<Service>` that *reuses* Environment's sub-schemas (`variables`, `let`, embedded files,
@@ -1461,12 +1514,31 @@ away every completed Task, a choice that is the author's, not the scheduler's. `
 already carries exactly this information — whether the Service's state matters to completed work —
 so no new field is needed.
 
-### Readiness is declared, not inferred
+### Health is declared, not inferred
 
-A scheduler cannot know when an arbitrary process is ready. The three probe types cover the three
-places readiness is observable: the network (`TCP_CONNECT`, the zero-configuration default), an
-external check (`COMMAND`, for protocol-level health such as a `PING` or an HTTP `/healthz`), and
-the process itself (`STDOUT`, for services whose authors can add one print statement).
+A scheduler cannot know when an arbitrary process is ready, nor whether a process that still holds
+its port is answering. The three probe types cover the three places either is observable: the
+network (`TCP_CONNECT`, the zero-configuration default), an external check (`COMMAND`, for
+protocol-level health such as a `PING` or an HTTP `/healthz`), and the process itself (`STDOUT`, for
+services whose authors can add one print statement).
+
+One mechanism serves both phases because a probe that proves readiness is exactly the probe that
+proves continued health; two mechanisms would double the schema for no new information. The two
+phases get separate intervals because they trade probe cost against different things. Before READY
+the cost is startup latency: a TCP connect is free, so it is retried every second, while a `COMMAND`
+launches a process, so every five. After READY the cost is hang-detection latency, where three
+failures thirty seconds apart is ample. A threshold rather than a single failed probe because one
+failure is often a blip (a garbage-collection pause, a saturated accept queue) and a false restart
+under `RERUN` is expensive. The `STDOUT` heartbeat is opt-in because the common `STDOUT` case is a
+third-party binary wrapped with a one-line ready echo that has no way to repeat it, and *onRun*
+exiting already covers its crash case. UNHEALTHY is an instance failure rather than a policy of its
+own because a hung process is indistinguishable in effect from a crashed one, and `restartPolicy`
+already encodes what the author wants done about either.
+
+`healthCheck` is the Service-specific form of the monitoring that
+[Issue #133](https://github.com/OpenJobDescription/openjd-specifications/issues/133) proposes for
+Environment actions in general. #133 should adopt the same `healthIntervalSeconds` and
+`failureThreshold` vocabulary so that the two do not diverge.
 
 ### Why the protocol is declared on the port
 
@@ -1574,19 +1646,19 @@ from the Sessions of that Service and of earlier Services. But that rule depends
 which for attached templates is the scheduler's attachment order, unknowable from the template.
 `runScope` makes the distinction a declaration.
 
-### `onReadinessCheck` is an action of the Service
+### `onHealthCheck` is an action of the Service
 
-The alternative is an `<Action>` inside `readinessCheck`. That leaves it outside `script:`, with no
+The alternative is an `<Action>` inside `healthCheck`. That leaves it outside `script:`, with no
 principled claim on `let` bindings, embedded files, or the same format-string scopes as the other
 actions. Making it a fourth `<ServiceActions>` entry gives every action of a Service one scope rule
-and lets check scripts use embedded files. The `readinessCheck` object keeps the policy (type,
-interval, timeout); the action keeps the command.
+and lets check scripts use embedded files. The `healthCheck` object keeps the policy (type,
+intervals, timeout, threshold); the action keeps the command.
 
 The check runs while *onRun* is running, which no other action in the specification does. The
 alternative, dropping `COMMAND` and having authors wrap their binary in a script that starts it in
-the background, polls it, prints `openjd_service_ready`, and waits, pushes onto every third-party
-binary the boilerplate OpenJD exists to remove, hides the readiness policy in a shell script, and
-does not work for a bare-binary *onRun* without a shell. The rules in [Concurrency with
+the background, polls it, prints `openjd_service_ready`, and keeps polling to repeat it, pushes onto
+every third-party binary the boilerplate OpenJD exists to remove, hides the health policy in a shell
+script, and does not work for a bare-binary *onRun* without a shell. The rules in [Concurrency with
 `onRun`](#concurrency-with-onrun) are the cost of keeping it.
 
 ### Four `onWrapService*` hooks
@@ -1608,7 +1680,7 @@ begins a new Service Session only because the failed one never reached a usable 
 
 An Environment Template has always carried one Environment, which suffices because two Environments
 merge into one: their `onEnter` scripts concatenate. Services cannot merge: each is a separate
-process with its own ports, readiness check, restart policy, and host requirements, and may need a
+process with its own ports, health check, restart policy, and host requirements, and may need a
 different host. A queue capability that needs two processes (a data store and a coordinator)
 therefore needs a list, and under same-document resolution the list is also the only way for an
 external Service, or the client Environment, to reference more than one of them. `environment` stays
@@ -1624,27 +1696,18 @@ A shared instance would outlive any Job, so `restartPolicy.completedTasks`, the 
 host-requirement allocation, and "stop when the scope completes" would each need a new definition;
 Job-scoped, every rule in this RFC applies unchanged.
 
-## Open Questions
-
-### Health monitoring after READY
-
-This RFC detects an instance failure only when `onRun` exits; a hung process that still holds its
-port is invisible to it.
-[Issue #133](https://github.com/OpenJobDescription/openjd-specifications/issues/133) proposes a
-general monitoring mechanism for Actions, of which a Service's `onRun` is an obvious consumer, so
-this RFC adds no Service-specific probe that could diverge from it. If #133 lands first, this RFC
-should say how its monitor applies to `onRun` (most likely: a monitor failure is an instance
-failure).
-
 ## Prior Art
 
-* **Kubernetes** — `Service` + `Deployment` with `readinessProbe` (`tcpSocket`, `exec`,
-  `httpGet`) and `restartPolicy`. Our three readiness types map directly onto `tcpSocket`,
-  `exec`, and a stdout signal in place of `httpGet` (which would require HTTP semantics in the
-  specification). Kubernetes services are not scoped to a batch of work, which is the gap this RFC
-  fills.
-* **Docker Compose** — `depends_on: { condition: service_healthy }` plus `healthcheck`. The
-  ordered-start-until-healthy behavior is the model for our list ordering.
+* **Kubernetes** — `Service` + `Deployment` with `readinessProbe` and `livenessProbe`
+  (`tcpSocket`, `exec`, `httpGet`; `periodSeconds`, `failureThreshold`) and `restartPolicy`. Our
+  three probe types map directly onto `tcpSocket`, `exec`, and a stdout signal in place of `httpGet`
+  (which would require HTTP semantics in the specification); one `healthCheck` with two intervals
+  does the work of Kubernetes' two probes. Kubernetes services are not scoped to a batch of work,
+  which is the gap this RFC fills.
+* **Docker Compose** — `depends_on: { condition: service_healthy }` plus `healthcheck` with
+  `interval`, `retries`, and `start_period`, which `healthIntervalSeconds`, `failureThreshold`, and
+  `readyTimeoutSeconds` correspond to. The ordered-start-until-healthy behavior is the model for our
+  list ordering.
 * **GitHub Actions service containers** — `services:` in a job, started before steps and stopped
   after, with ports published to the runner. Scoped to one job on one host; the closest
   batch-oriented precedent for `stepServices`.
@@ -1662,20 +1725,23 @@ failure).
 
 - **Rust (openjd-rs)**: A prototype on the [`service-extension`
   branch](https://github.com/mwiebe/openjd-rs/tree/service-extension) of the `mwiebe/openjd-rs` fork
-  passes the `SERVICE` conformance suite that accompanies this RFC and the rest of the 2023-09
-  suite. It implements the schema, validation, and job-creation rules in `openjd-model`, the host
-  and port functions in `openjd-expr`, the Service Session in `openjd-sessions`, and a single-host
-  scheduler for `openjd run` in `openjd-cli`. The prototype's largest single piece was the Service
-  Session: the existing Session held one current action, one log stream, and one cancellation
-  target, and running `onReadinessCheck` alongside `onRun` needed a second action slot with its own
-  cancellation and per-action attribution on captured output.
+  is developed against the `SERVICE` conformance suite that accompanies this RFC and the rest of
+  the 2023-09 suite. It implements the schema, validation, and job-creation rules in
+  `openjd-model`, the host and port functions in `openjd-expr`, the Service Session in
+  `openjd-sessions`, and a single-host scheduler for `openjd run` in `openjd-cli`. The prototype's
+  largest single piece was the Service Session: the existing Session held one current action, one
+  log stream, and one cancellation target, and running `onHealthCheck` alongside `onRun` needed a
+  second action slot with its own cancellation and per-action attribution on captured output. The
+  health phase adds a probe loop that outlives readiness, counts consecutive failures, and turns
+  the threshold into a cancellation of `onRun`.
 - **Python (openjd-model, openjd-sessions)**: The Python packages are intended to become bindings
   over openjd-rs. The `v0` releases of `openjd-model-for-python` and `openjd-sessions-for-python`
   would therefore not gain this extension; a `v1` built on the bindings would inherit it, exposing
   the new models, the Service Session, and the `Service.*` scope.
 - **Schedulers**: This is where most of the work lives. A scheduler must place Services, allocate
   ports, guarantee cross-host reachability over each port's protocol, gate Task scheduling on
-  readiness, track instance failures, implement `KEEP`/`RERUN`, and stop Services at scope end. A
+  readiness, keep probing after READY, track instance failures, implement `KEEP`/`RERUN`, and stop
+  Services at scope end. A
   single-host runner can implement all of this with loopback addresses and a process table, as the
   prototype does; a distributed scheduler needs a networking answer.
 

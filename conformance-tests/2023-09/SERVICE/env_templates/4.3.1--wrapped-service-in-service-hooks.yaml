@@ -22,7 +22,7 @@ environment:
       onWrapServiceRun:
         command: python
         args: ["-c", "print()", "{{ WrappedService.Name }} {{ WrappedService.Ports[0] }}"]
-      onWrapServiceReadinessCheck:
+      onWrapServiceHealthCheck:
         command: python
         args: ["-c", "print()", "{{ WrappedService.Name }} {{ WrappedService.Ports[0] }}"]
       onWrapServiceExit:

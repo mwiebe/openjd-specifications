@@ -5,8 +5,8 @@
 # wrapped action through WrappedAction.* and the Service's identity and ports
 # through WrappedService.* (three parallel lists), and forwards the wrapped
 # process's stdout verbatim -- which is how the wrapped onRun's
-# `openjd_service_ready` and the readiness check's exit status are honored.
-# onWrapServiceReadinessCheck runs concurrently with onWrapServiceRun. The
+# `openjd_service_ready` and the health check's exit status are honored.
+# onWrapServiceHealthCheck runs concurrently with onWrapServiceRun. The
 # wrapping Environment is not entered for the Task.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -17,10 +17,10 @@ template:
     ports:
     - name: main
     - name: admin
-    readinessCheck:
+    healthCheck:
       type: COMMAND
-      intervalSeconds: 1
-      timeoutSeconds: 60
+      readinessIntervalSeconds: 1
+      readyTimeoutSeconds: 60
     script:
       actions:
         onEnter:
@@ -31,7 +31,7 @@ template:
           args: ["{{ Service.File.Serve }}", "{{ Service.Store.main.bindAddress }}", "{{ Service.Store.main.port }}"]
           cancelation:
             mode: TERMINATE
-        onReadinessCheck:
+        onHealthCheck:
           command: python
           args: ["-c", "import socket,sys; socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=1).close(); print('CHECK_ORIGINAL_OK')", "{{ Service.Store.main.connectAddress }}", "{{ Service.Store.main.port }}"]
         onExit:
@@ -83,7 +83,7 @@ environments:
           # The three lists are parallel: index i of each describes port i.
           # WrappedService.Ports is list[int], so convert before quoting.
           - "echo WRAP_SERVICE_RUN_PORTNAMES={{ repr_sh(WrappedService.PortNames) }}; echo WRAP_SERVICE_RUN_PORTCOUNT={{ len(WrappedService.Ports) }}; echo WRAP_SERVICE_RUN_MAIN={{ join_host_port(WrappedService.BindAddresses[0], WrappedService.Ports[0]) }}; echo WRAP_SERVICE_RUN_FORWARD={{ repr_sh(flatten([['-p', string(p) + ':' + string(p)] for p in WrappedService.Ports])) }}; exec {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"
-        onWrapServiceReadinessCheck:
+        onWrapServiceHealthCheck:
           command: bash
           args: ["-c", "echo WRAP_SERVICE_CHECK={{ WrappedService.Name }}; exec {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"]
         onWrapServiceExit:

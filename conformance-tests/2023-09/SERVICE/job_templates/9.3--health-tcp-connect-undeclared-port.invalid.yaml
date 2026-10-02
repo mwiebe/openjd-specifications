@@ -1,4 +1,5 @@
-# Section 9.3 item 2: `ports` belongs to the TCP_CONNECT form only.
+# Section 9.3 item 2 / Section 9.7 item 4: every port a TCP_CONNECT check
+# names must be declared in the Service's `ports`.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -9,9 +10,9 @@ jobServices:
   ports:
   - name: main
   - name: admin
-  readinessCheck:
-    type: STDOUT
-    ports: [main]
+  healthCheck:
+    type: TCP_CONNECT
+    ports: [main, metrics]
   script:
     actions:
       onRun:

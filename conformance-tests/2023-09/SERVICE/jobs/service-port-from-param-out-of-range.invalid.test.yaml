@@ -15,7 +15,7 @@ template:
     ports:
     - name: main
       port: "{{ Param.Port }}"
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     script:
       actions:

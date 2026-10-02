@@ -27,7 +27,7 @@ jobEnvironments:
       onWrapServiceRun:
         command: python
         args: ["-c", "print()"]
-      onWrapServiceReadinessCheck:
+      onWrapServiceHealthCheck:
         command: python
         args: ["-c", "print()"]
       onWrapServiceExit:

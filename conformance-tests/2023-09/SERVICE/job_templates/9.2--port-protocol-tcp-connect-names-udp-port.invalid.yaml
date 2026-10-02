@@ -11,7 +11,7 @@ jobServices:
   - name: ingest
     protocol: UDP
   - name: api
-  readinessCheck:
+  healthCheck:
     type: TCP_CONNECT
     ports: [api, ingest]
   script:

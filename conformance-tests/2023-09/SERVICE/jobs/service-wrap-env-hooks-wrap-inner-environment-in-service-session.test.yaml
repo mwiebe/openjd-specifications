@@ -21,7 +21,7 @@ template:
   - name: Store
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     script:
       actions:
@@ -58,7 +58,7 @@ environments:
         onWrapServiceRun:
           command: bash
           args: ["-c", "echo WRAP_SERVICE_RUN={{ WrappedService.Name }}; exec {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"]
-        onWrapServiceReadinessCheck:
+        onWrapServiceHealthCheck:
           command: bash
           args: ["-c", "exec {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"]
         onWrapServiceExit:

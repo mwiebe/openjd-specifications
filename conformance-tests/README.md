@@ -81,7 +81,7 @@ Examples:
 - `3.6--let-step-level.yaml` - EXPR: Template Schema §3.6 (LetBindings)
 - `expr1.1--arithmetic-expr.yaml` - EXPR: Expression Language §1.1 (Extended Format String Grammar)
 - `expr2.2.4--upper.test.yaml` - EXPR: Expression Language §2.2.4 (String Functions)
-- `9.3--readiness-command.yaml` - SERVICE: Template Schema §9.3 (ServiceReadinessCheck)
+- `9.3--health-command.yaml` - SERVICE: Template Schema §9.3 (ServiceHealthCheck)
 - `service-rerun-relaunch.test.yaml` - SERVICE extension execution test (in `SERVICE/jobs/`)
 
 ### Extension Tests

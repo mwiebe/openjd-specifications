@@ -1,6 +1,6 @@
 # Section 9 item 6 constraint 4: two ports may give the same `port` number
 # when their `protocol` differs, for a service that speaks TCP and UDP on one
-# number (DNS-style). The default readiness check probes the TCP port.
+# number (DNS-style). The default health check probes the TCP port.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE

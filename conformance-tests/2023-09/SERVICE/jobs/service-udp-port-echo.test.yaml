@@ -1,6 +1,6 @@
 # RFC 0009 / Template Schemas §9.2 item 3, §9 item 7: a Job Service whose only
 # port is `protocol: UDP` (a python datagram echo listener). It cannot be
-# probed by TCP_CONNECT, so it declares a STDOUT readiness check and prints
+# probed by TCP_CONNECT, so it declares a STDOUT health check and prints
 # `openjd_service_ready` once bound. The UDP port carries the same `port`,
 # `bindAddress`, and `connectAddress` values as a TCP port; the Task sends a
 # datagram to connectAddress:port and prints the echo.
@@ -13,9 +13,9 @@ template:
     ports:
     - name: dgram
       protocol: UDP
-    readinessCheck:
+    healthCheck:
       type: STDOUT
-      timeoutSeconds: 60
+      readyTimeoutSeconds: 60
     script:
       actions:
         onRun:

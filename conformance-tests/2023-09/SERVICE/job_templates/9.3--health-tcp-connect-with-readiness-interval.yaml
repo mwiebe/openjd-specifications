@@ -1,4 +1,5 @@
-# Section 9.3 item 1: `type` is one of TCP_CONNECT, COMMAND, or STDOUT.
+# Section 9.3 item 3: `readinessIntervalSeconds` is accepted on a TCP_CONNECT
+# check (default 1) as well as on COMMAND; only STDOUT rejects it.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -9,9 +10,9 @@ jobServices:
   ports:
   - name: main
   - name: admin
-  readinessCheck:
-    type: HTTP
-    timeoutSeconds: 60
+  healthCheck:
+    type: TCP_CONNECT
+    readinessIntervalSeconds: 5
   script:
     actions:
       onRun:

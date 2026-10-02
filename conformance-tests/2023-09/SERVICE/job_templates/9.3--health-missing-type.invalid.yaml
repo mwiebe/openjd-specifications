@@ -1,5 +1,4 @@
-# Section 9.3 item 2: without `ports`, a TCP_CONNECT check probes every port
-# the Service declares.
+# Section 9.3: `type` is the required discriminator of a <ServiceHealthCheck>.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -10,8 +9,8 @@ jobServices:
   ports:
   - name: main
   - name: admin
-  readinessCheck:
-    type: TCP_CONNECT
+  healthCheck:
+    readyTimeoutSeconds: 60
   script:
     actions:
       onRun:

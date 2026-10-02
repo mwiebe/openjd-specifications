@@ -32,7 +32,7 @@ template:
   - name: Store
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     variables:
       OVERRIDDEN: by-service

@@ -1,6 +1,4 @@
-# Section 9 item 6 / Section 9.6 item 3: the default readiness check is
-# TCP_CONNECT, so a Service with no `readinessCheck` must not define
-# onReadinessCheck.
+# Section 9.3 item 2: `ports` belongs to the TCP_CONNECT form only.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -10,12 +8,13 @@ jobServices:
 - name: Store
   ports:
   - name: main
+  - name: admin
+  healthCheck:
+    type: STDOUT
+    ports: [main]
   script:
     actions:
       onRun:
-        command: python
-        args: ["-c", "print()"]
-      onReadinessCheck:
         command: python
         args: ["-c", "print()"]
 steps:

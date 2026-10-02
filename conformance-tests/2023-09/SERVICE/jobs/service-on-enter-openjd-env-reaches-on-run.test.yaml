@@ -12,7 +12,7 @@ template:
   - name: Store
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     variables:
       STORE_TOKEN: from-variables

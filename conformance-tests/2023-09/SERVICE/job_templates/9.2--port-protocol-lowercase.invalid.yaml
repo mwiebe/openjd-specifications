@@ -9,7 +9,7 @@ jobServices:
   ports:
   - name: ingest
     protocol: udp
-  readinessCheck:
+  healthCheck:
     type: STDOUT
   script:
     actions:

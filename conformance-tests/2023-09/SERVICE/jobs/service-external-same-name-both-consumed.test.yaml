@@ -16,7 +16,7 @@ template:
   - name: Cache
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: TCP_CONNECT
     restartPolicy:
       maxAttempts: 3
@@ -41,7 +41,7 @@ template:
           print("JOB_CACHE_LISTENING", flush=True)
           while True:
               c, _ = s.accept()
-              if c.recv(64):  # a TCP_CONNECT readiness probe sends nothing
+              if c.recv(64):  # a TCP_CONNECT health-check probe sends nothing
                   c.sendall(payload.encode())
               c.close()
   steps:

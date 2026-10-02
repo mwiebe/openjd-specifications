@@ -14,7 +14,7 @@ jobServices:
   - name: trace
     port: 8125
     protocol: UDP
-  readinessCheck:
+  healthCheck:
     type: STDOUT
   script:
     actions:

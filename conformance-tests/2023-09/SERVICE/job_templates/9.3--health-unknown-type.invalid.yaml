@@ -1,16 +1,17 @@
-# Section 9 item 7 / Section 9.7 item 4: a Service none of whose ports is TCP
-# must provide a STDOUT or COMMAND readiness check; the default TCP_CONNECT
-# has no port to probe and could never pass.
+# Section 9.3 item 1: `type` is one of TCP_CONNECT, COMMAND, or STDOUT.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
 jobServices:
-- name: Telemetry
+- name: Store
   ports:
-  - name: ingest
-    protocol: UDP
+  - name: main
+  - name: admin
+  healthCheck:
+    type: HTTP
+    readyTimeoutSeconds: 60
   script:
     actions:
       onRun:

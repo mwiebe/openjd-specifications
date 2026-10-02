@@ -25,7 +25,7 @@ environment:
         command: python
         args: ["-c", "print()"]
         timeout: "{{ 60 if WrappedStep.Name == 'Render' else 30 }}"
-      onWrapServiceReadinessCheck:
+      onWrapServiceHealthCheck:
         command: python
         args: ["-c", "print()"]
       onWrapServiceExit:

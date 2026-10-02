@@ -10,7 +10,7 @@ template:
   - name: Store
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     script:
       actions:
@@ -53,7 +53,7 @@ environments:
         onWrapServiceRun:
           command: python
           args: ["{{ Env.File.Launch }}", "WRAP_SERVICE_RUN={{ WrappedService.Name }} ports={{ repr_py(WrappedService.PortNames) }} count={{ len(WrappedService.Ports) }}", "{{ WrappedAction.Command }}", "{{ repr_py(WrappedAction.Args) }}"]
-        onWrapServiceReadinessCheck:
+        onWrapServiceHealthCheck:
           command: python
           args: ["{{ Env.File.Launch }}", "WRAP_SERVICE_CHECK", "{{ WrappedAction.Command }}", "{{ repr_py(WrappedAction.Args) }}"]
         onWrapServiceExit:

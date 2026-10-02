@@ -1,19 +1,19 @@
 # Template Schemas §9.3 COMMAND / §9.6.1: onRun starts listening only after a
-# delay, and the Service's onReadinessCheck, run concurrently with onRun every
-# intervalSeconds, exits 0 once a TCP connection succeeds. The Task is not
-# scheduled until then, so it never sees a refused connection.
+# delay, and the Service's onHealthCheck, run concurrently with onRun every
+# readinessIntervalSeconds, exits 0 once a TCP connection succeeds. The Task
+# is not scheduled until then, so it never sees a refused connection.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
-  name: CommandReadiness
+  name: CommandHealthCheck
   jobServices:
   - name: Slow
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: COMMAND
-      intervalSeconds: 1
-      timeoutSeconds: 60
+      readinessIntervalSeconds: 1
+      readyTimeoutSeconds: 60
     script:
       actions:
         onRun:
@@ -21,7 +21,7 @@ template:
           args: ["{{ Service.File.Serve }}", "{{ Service.Slow.main.bindAddress }}", "{{ Service.Slow.main.port }}"]
           cancelation:
             mode: TERMINATE
-        onReadinessCheck:
+        onHealthCheck:
           command: python
           args: ["-c", "import socket,sys; socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=1).close(); print('CHECK_OK')", "{{ Service.Slow.main.connectAddress }}", "{{ Service.Slow.main.port }}"]
       embeddedFiles:
@@ -39,7 +39,7 @@ template:
           print("SLOW_LISTENING", flush=True)
           while True:
               c, _ = s.accept()
-              # The onReadinessCheck probe connects and closes without
+              # The onHealthCheck probe connects and closes without
               # sending; recv may return b"" or raise on an abortive close.
               try:
                   data = c.recv(64)

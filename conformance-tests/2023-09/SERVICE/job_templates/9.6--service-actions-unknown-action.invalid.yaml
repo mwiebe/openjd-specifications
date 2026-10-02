@@ -1,5 +1,5 @@
 # Section 9.6: <ServiceActions> defines exactly onEnter, onRun,
-# onReadinessCheck, and onExit; an unknown action must be rejected.
+# onHealthCheck, and onExit; an unknown action must be rejected.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE

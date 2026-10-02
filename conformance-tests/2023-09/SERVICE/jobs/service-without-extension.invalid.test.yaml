@@ -8,7 +8,7 @@ template:
   - name: Store
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     script:
       actions:

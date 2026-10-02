@@ -21,7 +21,7 @@ template:
       - label = Job.Name + "/" + Step.Name + "/" + string(threads)
       ports:
       - name: api
-      readinessCheck:
+      healthCheck:
         type: STDOUT
       variables:
         COORD_LABEL: "{{ label }}"

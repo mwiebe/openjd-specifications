@@ -1,4 +1,5 @@
-# Section 9.3 item 3: `intervalSeconds` is a <posinteger>; 0 must be rejected.
+# Section 9.3: a STDOUT check waits for the onRun action to print an
+# `openjd_service_ready: <message>` line.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -9,15 +10,12 @@ jobServices:
   ports:
   - name: main
   - name: admin
-  readinessCheck:
-    type: COMMAND
-    intervalSeconds: 0
+  healthCheck:
+    type: STDOUT
+    readyTimeoutSeconds: 600
   script:
     actions:
       onRun:
-        command: python
-        args: ["-c", "print()"]
-      onReadinessCheck:
         command: python
         args: ["-c", "print()"]
 steps:

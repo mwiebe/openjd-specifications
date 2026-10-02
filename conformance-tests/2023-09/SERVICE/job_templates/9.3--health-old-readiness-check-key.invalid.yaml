@@ -1,17 +1,16 @@
-# Section 9 item 7 / Section 9.3 item 2: a Service with a TCP port and a UDP
-# port may omit readinessCheck; the default TCP_CONNECT probes the TCP port
-# only, so the UDP port does not make the default unsatisfiable.
+# Section 9: `readinessCheck` is not a property of <Service>; the probe is
+# declared under `healthCheck`. An unknown property must be rejected.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
 jobServices:
-- name: Metrics
+- name: Store
   ports:
-  - name: ingest
-    protocol: UDP
-  - name: api
+  - name: main
+  readinessCheck:
+    type: TCP_CONNECT
   script:
     actions:
       onRun:

@@ -9,9 +9,9 @@ jobServices:
 - name: Store
   ports:
   - name: main
-  readinessCheck:
+  healthCheck:
     type: TCP_CONNECT
-    timeoutSeconds: "{{ Service.Store.main.port }}"
+    readyTimeoutSeconds: "{{ Service.Store.main.port }}"
   script:
     actions:
       onRun:

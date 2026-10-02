@@ -11,7 +11,7 @@ template:
   - name: Back
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     script:
       actions:
@@ -38,7 +38,7 @@ template:
   - name: Front
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     script:
       actions:

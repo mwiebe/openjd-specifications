@@ -13,9 +13,9 @@ template:
   - name: Back
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
-      timeoutSeconds: 60
+      readyTimeoutSeconds: 60
     script:
       actions:
         onRun:
@@ -41,9 +41,9 @@ template:
   - name: Front
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
-      timeoutSeconds: 60
+      readyTimeoutSeconds: 60
     variables:
       UPSTREAM: "{{ join_host_port(Service.Back.main.connectAddress, Service.Back.main.port) }}"
     script:

@@ -1,6 +1,6 @@
 # Section 4.3 WRAP_ACTIONS constraint 6: the four onWrapService* hooks are
 # all-or-nothing within a runScope that includes SERVICE. Omitting
-# onWrapServiceReadinessCheck must be rejected even though the Service uses
+# onWrapServiceHealthCheck must be rejected even though the Service uses
 # TCP_CONNECT and the hook would never run.
 specificationVersion: jobtemplate-2023-09
 extensions:

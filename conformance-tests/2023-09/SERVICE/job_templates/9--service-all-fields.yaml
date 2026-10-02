@@ -1,6 +1,6 @@
 # Section 9 (RFC 0009): a Service using every property -- description, let,
 # hostRequirements (including the attr.worker.preemptible attribute this RFC
-# introduces), ports with an explicit port, readinessCheck, restartPolicy,
+# introduces), ports with an explicit port, healthCheck, restartPolicy,
 # variables, and a script with let, all four actions, and embedded files.
 specificationVersion: jobtemplate-2023-09
 extensions:
@@ -27,10 +27,10 @@ jobServices:
   - name: main
   - name: admin
     port: 16379
-  readinessCheck:
+  healthCheck:
     type: TCP_CONNECT
     ports: [main]
-    timeoutSeconds: 120
+    readyTimeoutSeconds: 120
   restartPolicy:
     maxAttempts: 2
     completedTasks: KEEP

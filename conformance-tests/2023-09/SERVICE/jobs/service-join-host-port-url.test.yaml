@@ -10,9 +10,9 @@ template:
   - name: Web
     ports:
     - name: http
-    readinessCheck:
+    healthCheck:
       type: TCP_CONNECT
-      timeoutSeconds: 60
+      readyTimeoutSeconds: 60
     script:
       actions:
         onRun:

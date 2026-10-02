@@ -1,7 +1,7 @@
 # Template Schemas §1.2 / §1.2.2: an Environment Template with `services` and
 # no `environment` supplies an external Service to a Job that neither
 # declares SERVICE nor references the Service. The external Service is
-# started before the Job's Tasks (they are gated on its readiness), and its
+# started before the Job's Tasks (they are gated on it being READY), and its
 # Session is ended -- onExit runs -- once the Job's Tasks are done.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -21,7 +21,7 @@ environments:
   - name: Telemetry
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: STDOUT
     script:
       actions:

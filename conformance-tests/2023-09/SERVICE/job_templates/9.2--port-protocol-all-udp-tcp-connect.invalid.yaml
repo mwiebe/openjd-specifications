@@ -13,9 +13,9 @@ jobServices:
     protocol: UDP
   - name: discovery
     protocol: UDP
-  readinessCheck:
+  healthCheck:
     type: TCP_CONNECT
-    timeoutSeconds: 30
+    readyTimeoutSeconds: 30
   script:
     actions:
       onRun:

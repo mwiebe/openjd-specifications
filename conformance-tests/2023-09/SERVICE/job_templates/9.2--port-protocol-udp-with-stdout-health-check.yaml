@@ -1,5 +1,5 @@
 # Section 9.2 item 3: a port may declare `protocol: UDP`. Section 9 item 7: a
-# Service none of whose ports is TCP must give a STDOUT or COMMAND readiness
+# Service none of whose ports is TCP must give a STDOUT or COMMAND health
 # check, since the default TCP_CONNECT could never pass.
 specificationVersion: jobtemplate-2023-09
 extensions:
@@ -11,9 +11,9 @@ jobServices:
   ports:
   - name: ingest
     protocol: UDP
-  readinessCheck:
+  healthCheck:
     type: STDOUT
-    timeoutSeconds: 60
+    readyTimeoutSeconds: 60
   script:
     actions:
       onRun:

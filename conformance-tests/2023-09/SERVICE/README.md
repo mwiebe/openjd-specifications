@@ -21,7 +21,7 @@ stepServices: [ <Service>, ... ]     # NEW — Step scope
 # <Environment> (§4)
 runScope: [ TASK | SERVICE, ... ]    # NEW — which kinds of Session enter it
 # <EnvironmentActions> (§4.3), with WRAP_ACTIONS
-onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServiceExit
+onWrapServiceEnter / onWrapServiceRun / onWrapServiceHealthCheck / onWrapServiceExit
 ```
 
 ```yaml
@@ -31,12 +31,14 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   let: <LetBindings>                          # optional (job creation)
   hostRequirements: <HostRequirements>        # optional
   ports: [ <ServicePort>, ... ]               # 1–10, unique names; { name, port?, protocol?: TCP | UDP }
-  readinessCheck: <ServiceReadinessCheck>     # TCP_CONNECT (default, TCP ports only) | COMMAND | STDOUT
+  healthCheck: <ServiceHealthCheck>           # TCP_CONNECT (default, TCP ports only) | COMMAND | STDOUT
+                                              #   readinessIntervalSeconds, readyTimeoutSeconds,
+                                              #   healthIntervalSeconds, failureThreshold
   restartPolicy: <ServiceRestartPolicy>       # maxAttempts (0), completedTasks (RERUN | KEEP)
   variables: <EnvironmentVariables>           # optional
   script:
     let: <LetBindings>                        # optional (service execution)
-    actions: { onEnter?, onRun, onReadinessCheck?, onExit? }
+    actions: { onEnter?, onRun, onHealthCheck?, onExit? }
     embeddedFiles: [ <EmbeddedFile>, ... ]    # optional, Service.File.<name>
 ```
 
@@ -80,16 +82,21 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   `protocol` is `TCP` (default) or `UDP`, a case-sensitive literal that is not
   `@fmtstring`; two ports may share a `port` number only when their `protocol`
   differs.
-- **Readiness and restart** (§9 item 6, §9.3, §9.4, §9.7 item 4):
-  `onReadinessCheck` defined iff the type is `COMMAND`; every `TCP_CONNECT`
-  port declared and TCP, defaulting to every TCP port; a Service none of whose
+- **Health check and restart** (§9 item 6, §9.3, §9.4, §9.7 item 4):
+  `onHealthCheck` defined iff the type is `COMMAND`; every `TCP_CONNECT` port
+  declared and TCP, defaulting to every TCP port; a Service none of whose
   ports is TCP must give a `STDOUT` or `COMMAND` check, so omitting
-  `readinessCheck` or giving `TCP_CONNECT` on it is rejected; ranges of
-  `port`, `timeoutSeconds`, `intervalSeconds`, `maxAttempts`; `@fmtstring`
-  numeric fields resolved at job creation in the `<Service>.let` scope with a
-  whole-field `null` meaning "not provided"; `completedTasks` is a literal
-  enum, not `@fmtstring`, so a format string over a parameter is rejected at
-  validation.
+  `healthCheck` or giving `TCP_CONNECT` on it is rejected; a `STDOUT` check
+  rejects `readinessIntervalSeconds`, and accepts `failureThreshold` only with
+  `healthIntervalSeconds`; `readinessIntervalSeconds` is accepted on
+  `TCP_CONNECT` as well as `COMMAND`; the keys `readinessCheck` and
+  `timeoutSeconds` are unknown and rejected; ranges of `port`,
+  `readinessIntervalSeconds`, `readyTimeoutSeconds`, `healthIntervalSeconds`,
+  `failureThreshold`, `maxAttempts`; `@fmtstring` numeric fields (all four
+  health-check fields included) resolved at job creation in the
+  `<Service>.let` scope with a whole-field `null` meaning "not provided";
+  `completedTasks` is a literal enum, not `@fmtstring`, so a format string
+  over a parameter is rejected at validation.
 - **Extensions are per document** (§1.2 item 3): an Environment Template's
   `extensions` apply to that document only, so an attachment that declares
   `SERVICE` and `EXPR` may use `services`, `runScope`, and the §2.2.4 host/port
@@ -111,11 +118,16 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   the Job while a Step Service's ends when its Step completes, Service Sessions
   enter the Environments whose `runScope` includes `SERVICE`, `onEnter` once
   per Session, `openjd_env` and `openjd_redacted_env` from `onEnter` reach
-  `onRun`, `onReadinessCheck`, and `onExit` (the latter setting the variable
+  `onRun`, `onHealthCheck`, and `onExit` (the latter setting the variable
   only with `REDACTED_ENV_VARS`, masked in the log regardless),
   `openjd_service_ready` honored only from `onRun`, `completedTasks: RERUN` vs
-  `KEEP` on an instance failure, a readiness timeout is an instance failure
-  that cancels an in-flight `onReadinessCheck`, a start failure consumes an
+  `KEEP` on an instance failure, a ready timeout is an instance failure that
+  cancels an in-flight `onHealthCheck`, the health check keeps probing after
+  READY and `failureThreshold` consecutive failures (a `COMMAND` exiting
+  non-zero, a `TCP_CONNECT` refused, a `STDOUT` heartbeat missed) make the
+  instance UNHEALTHY, which is an instance failure taking the ordinary restart
+  decision, while fewer failures change nothing and a `STDOUT` check without
+  `healthIntervalSeconds` expects no heartbeat, a start failure consumes an
   attempt and relaunches in a new Service Session, `maxAttempts` exhaustion
   fails the scope whether before or after the first Task, a FAILED or
   failed-scope Service still runs `onExit` if any of its actions ran and not
@@ -129,9 +141,13 @@ those is needed to *test* the mechanism. The execution tests use small python
 TCP listeners (`socket`, `http.server`), and one UDP datagram echo, standing in
 for a service process,
 Tasks that connect to them and print what they received, and sentinel markers
-on stdout. Listeners probed by `TCP_CONNECT` or by an `onReadinessCheck`
+on stdout. Listeners probed by `TCP_CONNECT` or by an `onHealthCheck`
 tolerate a connection that sends nothing and may close abortively, replying
-only to a client that sent a request. The few fixtures that need state to
+only to a client that sent a request. The health-phase fixtures make a probe
+start failing, or a heartbeat stop, from a Task or from the service itself
+once Task 1 has been answered, and keep Task 1 running long enough for
+`failureThreshold` probes at `healthIntervalSeconds: 1` to elapse before
+Task 2 could be scheduled. The few fixtures that need state to
 survive a Service Session, or to pass between Steps, use a file in the host's
 temp directory (`tempfile.gettempdir()`) keyed by `Job.Name`, deleted by the
 Service's `onExit` or by the consuming Task, and written so that a stale file
@@ -276,33 +292,39 @@ SERVICE/
 │   ├── 9.2--port-arithmetic-on-literals-out-of-range.invalid.yaml
 │   ├── 9.2--port-let-bound-out-of-range.invalid.yaml
 │   ├── 9.2--port-protocol-tcp-explicit.yaml
-│   ├── 9.2--port-protocol-udp-with-stdout-readiness.yaml
-│   ├── 9.2--port-protocol-mixed-default-readiness.yaml
+│   ├── 9.2--port-protocol-udp-with-stdout-health-check.yaml
+│   ├── 9.2--port-protocol-mixed-default-health-check.yaml
 │   ├── 9.2--port-protocol-mixed-tcp-connect-names-tcp-port.yaml
 │   ├── 9.2--port-protocol-same-number-tcp-and-udp.yaml
 │   ├── 9.2--port-protocol-tcp-connect-names-udp-port.invalid.yaml
-│   ├── 9.2--port-protocol-all-udp-default-readiness.invalid.yaml
+│   ├── 9.2--port-protocol-all-udp-default-health-check.invalid.yaml
 │   ├── 9.2--port-protocol-all-udp-tcp-connect.invalid.yaml
 │   ├── 9.2--port-protocol-same-number-same-protocol.invalid.yaml
 │   ├── 9.2--port-protocol-same-number-udp-twice.invalid.yaml
 │   ├── 9.2--port-protocol-unknown-value.invalid.yaml
 │   ├── 9.2--port-protocol-lowercase.invalid.yaml
 │   ├── 9.2--port-protocol-not-string.invalid.yaml
-│   ├── 9.3--readiness-tcp-connect-ports.yaml
-│   ├── 9.3--readiness-tcp-connect-default-ports.yaml
-│   ├── 9.3--readiness-command.yaml
-│   ├── 9.3--readiness-stdout.yaml
-│   ├── 9.3--readiness-tcp-connect-undeclared-port.invalid.yaml
-│   ├── 9.3--readiness-tcp-connect-empty-ports.invalid.yaml
-│   ├── 9.3--readiness-tcp-connect-with-interval.invalid.yaml
-│   ├── 9.3--readiness-command-without-on-readiness-check.invalid.yaml
-│   ├── 9.3--readiness-command-interval-zero.invalid.yaml
-│   ├── 9.3--readiness-stdout-with-on-readiness-check.invalid.yaml
-│   ├── 9.3--readiness-stdout-with-ports.invalid.yaml
-│   ├── 9.3--readiness-default-with-on-readiness-check.invalid.yaml
-│   ├── 9.3--readiness-timeout-zero.invalid.yaml
-│   ├── 9.3--readiness-unknown-type.invalid.yaml
-│   ├── 9.3--readiness-missing-type.invalid.yaml
+│   ├── 9.3--health-tcp-connect-ports.yaml
+│   ├── 9.3--health-tcp-connect-default-ports.yaml
+│   ├── 9.3--health-tcp-connect-with-readiness-interval.yaml
+│   ├── 9.3--health-command.yaml
+│   ├── 9.3--health-stdout.yaml
+│   ├── 9.3--health-stdout-heartbeat-interval.yaml
+│   ├── 9.3--health-numeric-fields-from-param.yaml
+│   ├── 9.3--health-tcp-connect-undeclared-port.invalid.yaml
+│   ├── 9.3--health-tcp-connect-empty-ports.invalid.yaml
+│   ├── 9.3--health-command-without-on-health-check.invalid.yaml
+│   ├── 9.3--health-command-readiness-interval-zero.invalid.yaml
+│   ├── 9.3--health-stdout-with-on-health-check.invalid.yaml
+│   ├── 9.3--health-stdout-with-ports.invalid.yaml
+│   ├── 9.3--health-stdout-readiness-interval.invalid.yaml
+│   ├── 9.3--health-stdout-failure-threshold-without-interval.invalid.yaml
+│   ├── 9.3--health-default-with-on-health-check.invalid.yaml
+│   ├── 9.3--health-ready-timeout-zero.invalid.yaml
+│   ├── 9.3--health-old-readiness-check-key.invalid.yaml
+│   ├── 9.3--health-old-timeout-seconds-key.invalid.yaml
+│   ├── 9.3--health-unknown-type.invalid.yaml
+│   ├── 9.3--health-missing-type.invalid.yaml
 │   ├── 9.4--restart-policy-keep.yaml
 │   ├── 9.4--restart-policy-rerun-explicit-defaults.yaml
 │   ├── 9.4--max-attempts-negative.invalid.yaml
@@ -368,10 +390,10 @@ SERVICE/
 │   │  # Expression Language §2.2.4 host/port functions gated on SERVICE
 │   └── expr2.2.4--join-host-port-requires-service-extension.invalid.yaml
 └── jobs/                           # End-to-end execution tests
-    │  # Readiness checks and the Service.* scope
+    │  # Health checks before READY and the Service.* scope
     ├── service-job-tcp-connect.test.yaml
-    ├── service-step-stdout-readiness.test.yaml
-    ├── service-command-readiness.test.yaml
+    ├── service-step-stdout-health-check.test.yaml
+    ├── service-command-health-check.test.yaml
     ├── service-udp-port-echo.test.yaml
     ├── service-ready-message-only-from-on-run.test.yaml
     ├── service-reference-chain.test.yaml
@@ -384,7 +406,7 @@ SERVICE/
     ├── service-session-is-its-own-session.test.yaml
     ├── service-environments-follow-run-scope.test.yaml
     ├── service-on-enter-openjd-env-reaches-on-run.test.yaml
-    ├── service-on-enter-openjd-env-reaches-readiness-check.test.yaml
+    ├── service-on-enter-openjd-env-reaches-health-check.test.yaml
     ├── service-on-enter-openjd-redacted-env-with-extension.test.yaml
     ├── service-on-enter-openjd-redacted-env-without-extension.test.yaml
     ├── service-on-exit-runs-after-task-failure.test.yaml
@@ -406,9 +428,15 @@ SERVICE/
     ├── service-keep-relaunch.test.yaml
     ├── service-keep-max-attempts-exhausted-mid-scope.test.yaml
     ├── service-max-attempts-exhausted-task-never-runs.test.yaml
-    ├── service-readiness-timeout-fails-scope.test.yaml
+    ├── service-ready-timeout-fails-scope.test.yaml
     ├── service-start-failure-relaunches-in-new-session.test.yaml
     ├── service-start-failure-no-attempts-on-exit-not-run.test.yaml
+    │  # Health checks after READY
+    ├── service-health-command-fails-after-ready-relaunches.test.yaml
+    ├── service-health-threshold-tolerates-blips.test.yaml
+    ├── service-health-tcp-port-closed-while-process-hangs.test.yaml
+    ├── service-health-stdout-heartbeat-missed.test.yaml
+    ├── service-health-stdout-no-heartbeat-configured.test.yaml
     │  # WRAP_ACTIONS composition
     ├── service-wrap-service-scoped-hooks.test.yaml
     ├── service-wrap-env-hooks-wrap-inner-environment-in-service-session.test.yaml
@@ -430,8 +458,8 @@ SERVICE/
 - **Readiness gating** (*How Jobs Are Run* constraint 3): no Task runs before
   every Job Service and Step Service of its Step is READY, under each of the
   three checks — `TCP_CONNECT` (`service-job-tcp-connect`), `STDOUT`
-  (`service-step-stdout-readiness`), and `COMMAND` with `onReadinessCheck`
-  running concurrently with `onRun` (`service-command-readiness`).
+  (`service-step-stdout-health-check`), and `COMMAND` with `onHealthCheck`
+  running concurrently with `onRun` (`service-command-health-check`).
   `openjd_service_ready` is honored only from `onRun`
   (`service-ready-message-only-from-on-run`). A `protocol: UDP` port is bound
   by a datagram listener that signals readiness through `STDOUT`, and the Task
@@ -474,8 +502,8 @@ SERVICE/
 - **`openjd_env` within a Service** (§9.6): variables set by `onEnter` reach
   `onRun` and `onExit`, override declarative `variables`, and never propagate to
   Tasks (`service-on-enter-openjd-env-reaches-on-run`); they reach every
-  `onReadinessCheck` invocation of a `COMMAND` check too
-  (`service-on-enter-openjd-env-reaches-readiness-check`).
+  `onHealthCheck` invocation of a `COMMAND` check too
+  (`service-on-enter-openjd-env-reaches-health-check`).
   `openjd_redacted_env` from `onEnter` sets the variable for `onRun` and
   `onExit` only when the document declares `REDACTED_ENV_VARS`, and its value
   is masked in the log either way
@@ -517,17 +545,33 @@ SERVICE/
   `maxAttempts` makes the Service FAILED and fails its scope, whether before
   any Task runs (`service-max-attempts-exhausted*`) or after some Tasks have
   completed, in which case the remaining Tasks never start and `onExit` runs
-  (`service-keep-max-attempts-exhausted-mid-scope`). A readiness timeout is an
-  instance failure: the in-flight `onReadinessCheck` is canceled, no Task runs,
-  and `onExit` runs (`service-readiness-timeout-fails-scope`). A start failure
+  (`service-keep-max-attempts-exhausted-mid-scope`). A ready timeout is an
+  instance failure: the in-flight `onHealthCheck` is canceled, no Task runs,
+  and `onExit` runs (`service-ready-timeout-fails-scope`). A start failure
   — a SERVICE-scoped Environment's `onEnter` exiting non-zero — consumes an
   attempt and the relaunch begins a new Service Session with a new working
   directory, re-entering the Environments and re-running `onEnter`
   (`service-start-failure-relaunches-in-new-session`).
+- **Health after READY** (§9.3, *How Jobs Are Run* constraint 11): the probe
+  that proved readiness keeps running every `healthIntervalSeconds`, and
+  `failureThreshold` consecutive failures make the instance UNHEALTHY, an
+  instance failure that takes the ordinary restart decision. A `COMMAND` probe
+  that starts exiting non-zero after Task 1 gets instance 1 canceled and, under
+  `maxAttempts: 1` and `KEEP`, a second instance that serves the remaining Tasks
+  (`service-health-command-fails-after-ready-relaunches`); a probe that fails
+  twice and recovers under `failureThreshold: 3` changes nothing
+  (`service-health-threshold-tolerates-blips`); a `TCP_CONNECT` probe refused
+  by a process that closed its listener but is still running makes the
+  instance UNHEALTHY, and with no attempts left the Job fails and `onExit` runs
+  (`service-health-tcp-port-closed-while-process-hangs`); a `STDOUT` check with
+  `healthIntervalSeconds` treats `openjd_service_ready` as a heartbeat and
+  fails the instance when it stops (`service-health-stdout-heartbeat-missed`),
+  while one without expects no heartbeat and a single ready line serves the
+  whole Job (`service-health-stdout-no-heartbeat-configured`).
 - **Wrap hooks** (§4.3 constraint 6, §4.3.1): a SERVICE-scoped wrapping
   Environment's four `onWrapService*` hooks run in place of the Service's
   actions with `WrappedAction.*` and the parallel `WrappedService.*` lists; the
-  wrapped `onRun`'s `openjd_service_ready` and the readiness check's exit status
+  wrapped `onRun`'s `openjd_service_ready` and the health check's exit status
   are recognized through the wrap script; `onWrapEnvEnter`/`onWrapEnvExit` wrap
   the inner Environments the Service Session enters; the wrapper is not entered
   for the Task (`service-wrap-service-scoped-hooks`,
@@ -576,20 +620,27 @@ runner contract. The behavior specific to `SERVICE`:
 3. Before any Task of a scope runs, every Service of the scope must be
    started in a Service Session of its own — entering the Environments whose
    `runScope` includes `SERVICE`, allocating its ports in each port's own
-   `protocol` space, running `onEnter`,
-   launching `onRun`, and applying the readiness check — and be READY.
+   `protocol` space, running `onEnter`, launching `onRun`, and probing it with
+   its health check every `readinessIntervalSeconds` — and be READY.
    `Service.<name>.<port>.port` and `.connectAddress` must resolve in the
    Task's actions to an endpoint that reaches the process.
-4. An `onRun` exit while the scope has work, or a readiness timeout, is an
-   instance failure governed by `restartPolicy`: relaunch up to `maxAttempts`
-   times, applying `completedTasks`; otherwise fail the scope. A failure before
-   `onRun` is launched (an Environment's or the Service's `onEnter` exiting
-   non-zero) is a start failure that consumes an attempt and must be relaunched
-   in a new Service Session. In every case the Service Session must be ended
-   (`onRun` and any in-flight `onReadinessCheck` canceled, `onExit` run if any
-   action of the Service ran, Environments exited) when the scope completes or
-   fails, a Service being stopped before any Service it references.
-5. Under `WRAP_ACTIONS`, a wrapping Environment whose `runScope` includes
+4. Once READY, the runner must keep probing every `healthIntervalSeconds`
+   (`TCP_CONNECT` and `COMMAND`; `STDOUT` only when the field is given, as a
+   heartbeat deadline for `openjd_service_ready`), count consecutive failures,
+   reset the count on a success, and on `failureThreshold` failures mark the
+   instance UNHEALTHY, cancel `onRun` by its cancelation method, wait for it to
+   exit, and take the restart decision below.
+5. An `onRun` exit while the scope has work, a ready timeout, or an UNHEALTHY
+   instance is an instance failure governed by `restartPolicy`: relaunch up to
+   `maxAttempts` times, applying `completedTasks`; otherwise fail the scope. A
+   failure before `onRun` is launched (an Environment's or the Service's
+   `onEnter` exiting non-zero) is a start failure that consumes an attempt and
+   must be relaunched in a new Service Session. In every case the Service
+   Session must be ended (`onRun` and any in-flight `onHealthCheck` canceled,
+   `onExit` run if any action of the Service ran, Environments exited) when the
+   scope completes or fails, a Service being stopped before any Service it
+   references.
+6. Under `WRAP_ACTIONS`, a wrapping Environment whose `runScope` includes
    `SERVICE` must run its `onWrapService*` hooks in place of the Service's
    actions with `WrappedAction.*` and `WrappedService.*` populated, scanning
    the wrap script's stdout for `openjd_*` messages.

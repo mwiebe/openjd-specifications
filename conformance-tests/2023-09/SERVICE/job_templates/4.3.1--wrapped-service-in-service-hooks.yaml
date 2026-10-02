@@ -23,7 +23,7 @@ jobEnvironments:
       onWrapServiceRun:
         command: python
         args: ["-c", "print()", "{{ WrappedService.Name }} {{ WrappedService.PortNames[0] }} {{ WrappedService.Ports[0] }} {{ WrappedService.BindAddresses[0] }}"]
-      onWrapServiceReadinessCheck:
+      onWrapServiceHealthCheck:
         command: python
         args: ["-c", "print()", "{{ WrappedService.Name }} {{ WrappedService.PortNames[0] }} {{ WrappedService.Ports[0] }} {{ WrappedService.BindAddresses[0] }}"]
       onWrapServiceExit:

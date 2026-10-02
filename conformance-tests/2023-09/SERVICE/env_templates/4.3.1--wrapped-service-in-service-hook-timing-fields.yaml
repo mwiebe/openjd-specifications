@@ -30,7 +30,7 @@ environment:
         cancelation:
           mode: NOTIFY_THEN_TERMINATE
           notifyPeriodInSeconds: "{{ 30 + len(WrappedService.Ports) }}"
-      onWrapServiceReadinessCheck:
+      onWrapServiceHealthCheck:
         command: python
         args: ["-c", "print()"]
       onWrapServiceExit:

@@ -1,19 +1,16 @@
-# Section 9.3: a TCP_CONNECT check may name a subset of the declared ports to
-# probe, with a readiness timeout.
+# Section 9 item 7 / Section 9.7 item 4: a Service none of whose ports is TCP
+# must provide a STDOUT or COMMAND health check; the default TCP_CONNECT
+# has no port to probe and could never pass.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
 jobServices:
-- name: Store
+- name: Telemetry
   ports:
-  - name: main
-  - name: admin
-  readinessCheck:
-    type: TCP_CONNECT
-    ports: [admin]
-    timeoutSeconds: 30
+  - name: ingest
+    protocol: UDP
   script:
     actions:
       onRun:

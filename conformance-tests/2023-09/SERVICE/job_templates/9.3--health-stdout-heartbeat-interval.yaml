@@ -1,4 +1,6 @@
-# Section 9.3: `type` is the required discriminator of a <ServiceReadinessCheck>.
+# Section 9.3 items 5-6: a STDOUT check with `healthIntervalSeconds` expects an
+# `openjd_service_ready` heartbeat at least once per interval after READY, and
+# `failureThreshold` missed intervals make the instance UNHEALTHY.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -8,9 +10,11 @@ jobServices:
 - name: Store
   ports:
   - name: main
-  - name: admin
-  readinessCheck:
-    timeoutSeconds: 60
+  healthCheck:
+    type: STDOUT
+    readyTimeoutSeconds: 120
+    healthIntervalSeconds: 15
+    failureThreshold: 2
   script:
     actions:
       onRun:

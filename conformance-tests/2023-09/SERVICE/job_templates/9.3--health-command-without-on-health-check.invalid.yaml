@@ -1,5 +1,5 @@
 # Section 9.3 item 1 / Section 9.6 item 3 / Section 9.7 item 4: a Service
-# whose readiness check type is COMMAND must define onReadinessCheck.
+# whose health check type is COMMAND must define onHealthCheck.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -10,7 +10,7 @@ jobServices:
   ports:
   - name: main
   - name: admin
-  readinessCheck:
+  healthCheck:
     type: COMMAND
   script:
     actions:

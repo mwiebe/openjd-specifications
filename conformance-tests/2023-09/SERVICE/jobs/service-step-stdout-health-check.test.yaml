@@ -13,9 +13,9 @@ template:
     - name: Coordinator
       ports:
       - name: api
-      readinessCheck:
+      healthCheck:
         type: STDOUT
-        timeoutSeconds: 60
+        readyTimeoutSeconds: 60
       script:
         actions:
           onEnter:

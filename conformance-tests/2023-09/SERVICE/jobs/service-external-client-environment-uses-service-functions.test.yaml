@@ -45,9 +45,9 @@ environments:
   - name: Cache
     ports:
     - name: main
-    readinessCheck:
+    healthCheck:
       type: TCP_CONNECT
-      timeoutSeconds: 60
+      readyTimeoutSeconds: 60
     script:
       actions:
         onRun:
@@ -68,7 +68,7 @@ environments:
           print("CACHE_LISTENING", flush=True)
           while True:
               c, _ = s.accept()
-              # A TCP_CONNECT readiness probe connects and closes without
+              # A TCP_CONNECT health-check probe connects and closes without
               # sending; recv may return b"" or raise on an abortive close.
               try:
                   data = c.recv(64)
