@@ -1891,36 +1891,35 @@ likely: a monitor failure is an instance failure).
 
 ## Implementation Impact
 
-- **Python (openjd-model)**: New models for `Service`, `ServicePort`, `ServiceReadinessCheck` (a
-  discriminated union), `ServiceRestartPolicy`, `ServiceScript`, and `ServiceActions`; new
-  `jobServices` / `stepServices` fields gated on the `SERVICE` extension; `$schema`,
-  `extensions`, and an optional `services` list (with `environment` now optional) on the
-  Environment Template model;
-  name-uniqueness validators mirroring the environment ones; a `Service.*` symbol scope with the
-  scoping rules in [The `Service.*` scope](#the-service-scope); `Service.File.*` alongside
-  `Env.File.*` and `Task.File.*`; `runScope` on `Environment` with the no-`Service.*` check; the
-  four `onWrapService*` hooks and the `WrappedService.*` variables when `WRAP_ACTIONS` is also
-  enabled; the
-  `EXPR` prerequisite check; the host and port functions in the expression library; and a
-  submission-time merge step that orders external Services and performs the wrapper composition
-  check. Moderate.
-- **Python (openjd-sessions)**: A Service Session variant of the existing session that enters the
-  `SERVICE`-scoped Environments, runs `onEnter`, launches `onRun` without awaiting exit, runs
-  `onReadinessCheck` on an interval, exposes an "instance exited" callback, and runs `onExit`
-  before exiting Environments. Reuses the existing action runner, stdout scanner, cancelation, and
-  wrap-hook logic, but the session today holds exactly one current action, one log stream, and one
-  cancelation target; running `onReadinessCheck` alongside `onRun` needs a second action slot with
-  its own cancelation, per-action attribution on captured output (the session's log records
-  already carry `session_id` and a content-kind attribute as structured fields, so an action-name
-  field is the natural extension, with the `[onReadinessCheck]` tag as the plain-text rendering),
-  and non-aliasing embedded-file materialization. Moderate, and this is the largest single piece.
-- **Rust (openjd-rs)**: Same shape as Python across `openjd-model` and `openjd-sessions`.
-  Moderate.
+- **Rust (openjd-rs)**: A prototype of this RFC is implemented on the
+  [`service-extension` branch](https://github.com/mwiebe/openjd-rs/tree/service-extension) of the
+  `mwiebe/openjd-rs` fork, and it passes the `SERVICE` conformance suite that accompanies this RFC
+  along with the rest of the 2023-09 suite. At a high level it contains: in `openjd-expr`, the host
+  and port functions, gated on the `SERVICE` extension in the expression profile; in `openjd-model`,
+  the `Service`, `ServicePort`, `ServiceReadinessCheck`, `ServiceRestartPolicy`, `ServiceScript`,
+  and `ServiceActions` models, `jobServices` and `stepServices`, the Environment Template
+  `services` list, `runScope` and the `onWrapService*` hooks, the `Service.*` scope and its early
+  validation, per-document Service names, and the job-creation step that folds attached Environment
+  Templates in and performs the wrapper composition check; in `openjd-sessions`, a Service Session
+  that enters the `SERVICE`-scoped Environments, runs `onEnter`, launches `onRun` without awaiting
+  its exit, runs the readiness check concurrently with per-action log attribution, applies the
+  stdout-message rules, and runs `onExit` before exiting Environments; and in `openjd-cli`, a
+  single-host scheduler for `openjd run` that places Services on loopback, allocates ports per
+  protocol, gates Task scheduling on readiness, and implements failure handling, `KEEP`/`RERUN`,
+  relaunch, and scope-end stop ordering. The prototype's largest single piece was the Service
+  Session: the existing Session held one current action, one log stream, and one cancellation
+  target, and running `onReadinessCheck` alongside `onRun` needed a second action slot with its
+  own cancellation and per-action attribution on captured output.
+- **Python (openjd-model, openjd-sessions)**: The intent is to move the Python packages from their
+  pure-Python implementations to bindings over openjd-rs. The `v0` releases of
+  `openjd-model-for-python` and `openjd-sessions-for-python` therefore would not gain this
+  extension; a `v1` built on the openjd-rs bindings would inherit it from the Rust implementation,
+  with the Python surface exposing the new models, the Service Session, and the `Service.*` scope.
 - **Schedulers**: This is where most of the work lives. A scheduler must place Services, allocate
-  ports, guarantee cross-host reachability, gate Task scheduling on readiness, track instance
-  failures, implement `KEEP`/`RERUN`, and stop Services at scope end. A single-host runner
-  (`openjd run`) can implement all of this with loopback addresses and a process table; a
-  distributed scheduler needs a networking answer.
+  ports, guarantee cross-host reachability over each port's protocol, gate Task scheduling on
+  readiness, track instance failures, implement `KEEP`/`RERUN`, and stop Services at scope end. A
+  single-host runner can implement all of this with loopback addresses and a process table, as the
+  prototype does; a distributed scheduler needs a networking answer.
 
 No feature here is significantly harder in one language than another. There are no evaluation
 performance implications; `Service.*` adds a handful of symbols resolved at task execution time.
