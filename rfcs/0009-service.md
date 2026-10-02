@@ -1178,8 +1178,7 @@ form: an IPv6 literal is never bracketed. Schedulers SHOULD provide a hostname f
 when one resolves from every host in the Service's scope. Wherever an address and a port are joined
 into one string (a URL authority, a `--listen host:port` flag) an IPv6 literal must be bracketed, so
 templates MUST compose such strings with `join_host_port` (see [Modifications to the Expression
-Language](#modifications-to-the-expression-language)) rather than `{{ addr }}:{{ port }}`. The
-examples in this RFC do so.
+Language](#modifications-to-the-expression-language)) rather than `{{ addr }}:{{ port }}`.
 
 ##### Template processing stages
 

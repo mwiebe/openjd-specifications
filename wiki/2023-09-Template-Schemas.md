@@ -2607,6 +2607,12 @@ and a non-null result must satisfy the field's range.
 
 Every port, TCP or UDP, is bound and published on the same service host.
 
+`bindAddress` and `connectAddress` are each a hostname, an IPv4 literal, or an IPv6 literal, in bare form: an IPv6
+literal is never bracketed. Schedulers should provide a hostname for `connectAddress` when one resolves from every host
+in the Service's scope. Wherever an address and a port are joined into one string (a URL authority, a `--listen
+host:port` flag) an IPv6 literal must be bracketed, so templates must compose such strings with `join_host_port` (see
+[Expression Language](2026-02-Expression-Language#224-string-functions)) rather than `{{ addr }}:{{ port }}`.
+
 ### 9.3. `<ServiceReadinessCheck>`
 
 A `<ServiceReadinessCheck>` is one of the following objects, discriminated by the *type* property:
