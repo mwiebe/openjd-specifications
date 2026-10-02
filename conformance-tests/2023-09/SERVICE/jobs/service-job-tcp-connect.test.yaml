@@ -35,7 +35,14 @@ template:
           print("STORE_LISTENING", flush=True)
           while True:
               c, _ = s.accept()
-              c.sendall(b"ECHO:" + c.recv(1024))
+              # A TCP_CONNECT readiness probe connects and closes without
+              # sending; recv may return b"" or raise on an abortive close.
+              try:
+                  data = c.recv(1024)
+              except OSError:
+                  data = b""
+              if data:
+                  c.sendall(b"ECHO:" + data)
               c.close()
   steps:
   - name: First

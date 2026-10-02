@@ -2,7 +2,9 @@
 # §9.4). The Service's first instance exits while Task 1 is still running
 # (after answering it). Running Tasks continue -- Task 1 completes against
 # instance 1 -- completed Tasks keep their results (Task 1 is not rerun), and
-# Tasks not yet started wait for the relaunched instance to be READY.
+# Tasks not yet started wait for the relaunched instance to be READY. Whether
+# the relaunch reuses the Service Session or begins a new one is the
+# scheduler's choice (the RFC says MAY) and is not asserted.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
@@ -21,18 +23,24 @@ template:
       actions:
         onRun:
           command: python
-          args: ["{{ Service.File.Serve }}", "{{ Service.Flaky.main.bindAddress }}", "{{ Service.Flaky.main.port }}"]
+          args: ["{{ Service.File.Serve }}", "{{ Service.Flaky.main.bindAddress }}", "{{ Service.Flaky.main.port }}", "{{ Job.Name }}"]
           cancelation:
             mode: TERMINATE
+        onExit:
+          command: python
+          args: ["-c", "import os, sys, tempfile; m = os.path.join(tempfile.gettempdir(), 'openjd-' + sys.argv[1] + '.marker'); os.path.exists(m) and os.remove(m)", "{{ Job.Name }}"]
       embeddedFiles:
       - name: Serve
         type: TEXT
         data: |
-          import os, socket, sys, threading, time
+          import os, socket, sys, tempfile, time
           host, port = sys.argv[1], int(sys.argv[2])
-          # A relaunch of a READY instance stays in the same Service Session, so a
-          # marker in the Session working directory tells the instances apart.
-          marker = os.path.join(os.getcwd(), "relaunched.marker")
+          # The scheduler MAY relaunch in the same Service Session or begin a new
+          # one, so nothing in the working directory is relied on: a marker in
+          # the host's temp directory, keyed by Job.Name and deleted by onExit,
+          # tells the instances apart. A stale marker makes the first instance
+          # report itself as 2, which the TASK 1 GOT INSTANCE 1 assertion catches.
+          marker = os.path.join(tempfile.gettempdir(), "openjd-" + sys.argv[3] + ".marker")
           instance = 2 if os.path.exists(marker) else 1
           open(marker, "a").close()
           s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

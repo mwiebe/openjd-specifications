@@ -69,7 +69,14 @@ template:
           print("STORE_BOUND_FROM_SERVICE_ENVIRONMENT", flush=True)
           while True:
               c, _ = s.accept()
-              c.sendall(str(port).encode())
+              # A TCP_CONNECT readiness probe connects and closes without
+              # sending; recv may return b"" or raise on an abortive close.
+              try:
+                  data = c.recv(64)
+              except OSError:
+                  data = b""
+              if data:
+                  c.sendall(str(port).encode())
               c.close()
   steps:
   - name: Use
@@ -77,7 +84,7 @@ template:
       actions:
         onRun:
           command: python
-          args: ["-c", "import socket; c = socket.create_connection(('{{ Service.Store.main.connectAddress }}', {{ Service.Store.main.port }}), timeout=10); reply = c.recv(64).decode(); c.close(); print('TASK_PORT_MATCHES', reply == '{{ Service.Store.main.port }}')"]
+          args: ["-c", "import socket; c = socket.create_connection(('{{ Service.Store.main.connectAddress }}', {{ Service.Store.main.port }}), timeout=10); c.sendall(b'port?'); reply = c.recv(64).decode(); c.close(); print('TASK_PORT_MATCHES', reply == '{{ Service.Store.main.port }}')"]
 
 expected:
   output:

@@ -181,6 +181,8 @@ To validate your OpenJD library against these tests:
 3. For `*.invalid.yaml` files: verify your library rejects them
 4. For job execution tests (`.test.yaml`): extract template/parameters/environments, run the job, verify outputs match `expected` assertions
 
+The reference runner (`openjd run`) executes a Step's Tasks one at a time, in parameter-space order, and Steps in dependency order; several execution fixtures (notably in `SERVICE/jobs/`) rely on that ordering, so a runner that executes Tasks concurrently or in another order may need to serialize them to reproduce the expected output.
+
 ### Example Test Runner for openjd CLI
 
 The included `run_openjd_cli_tests.py` demonstrates how to run these tests using the `openjd` CLI. Implementers can adapt this approach or write their own runner targeting their library's API.

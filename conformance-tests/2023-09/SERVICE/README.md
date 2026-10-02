@@ -95,7 +95,13 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   `readinessCheck` or giving `TCP_CONNECT` on it is rejected; ranges of
   `port`, `timeoutSeconds`, `intervalSeconds`, `maxAttempts`; `@fmtstring`
   numeric fields resolved at job creation in the `<Service>.let` scope with a
-  whole-field `null` meaning "not provided".
+  whole-field `null` meaning "not provided"; `completedTasks` is a literal
+  enum, not `@fmtstring`, so a format string over a parameter is rejected at
+  validation.
+- **Extensions are per document** (§1.2 item 3): an Environment Template's
+  `extensions` apply to that document only, so an attachment that declares
+  `SERVICE` and `EXPR` may use `services`, `runScope`, and the §2.2.4 host/port
+  functions while the Job Template it is applied to declares no extensions.
 - **Expression Language §2.2.4**: `join_host_port`, `split_host_port`,
   `is_ipv4`, `is_ipv6` and their signatures.
 - **Service names are scoped to their document** (§1.2.2 item 2): an external
@@ -108,14 +114,21 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   document that does not declare `SERVICE` placed in scope of a Service — the
   only check that needs the combined Job.
 - **Lifecycle** (*How Jobs Are Run* § Services): READY before any Task,
-  referenced Services READY before the referencing Service's Session starts,
-  Service Sessions enter the Environments whose `runScope` includes `SERVICE`,
-  `onEnter` once per Session, `openjd_env` from `onEnter` reaches `onRun`,
+  referenced Services READY before the referencing Service's Session starts
+  and stopped after it is stopped, a Job Service's Session spans every Step of
+  the Job while a Step Service's ends when its Step completes, Service Sessions
+  enter the Environments whose `runScope` includes `SERVICE`, `onEnter` once
+  per Session, `openjd_env` and `openjd_redacted_env` from `onEnter` reach
+  `onRun`, `onReadinessCheck`, and `onExit` (the latter setting the variable
+  only with `REDACTED_ENV_VARS`, masked in the log regardless),
   `openjd_service_ready` honored only from `onRun`, `completedTasks: RERUN` vs
-  `KEEP` on an instance failure, `maxAttempts` exhaustion fails the scope, a
-  FAILED or failed-scope Service still runs `onExit`, a failing `onExit` does not
-  fail the scope, and wrap hooks run in place of the Service's actions with
-  `WrappedService.*` populated.
+  `KEEP` on an instance failure, a readiness timeout is an instance failure
+  that cancels an in-flight `onReadinessCheck`, a start failure consumes an
+  attempt and relaunches in a new Service Session, `maxAttempts` exhaustion
+  fails the scope whether before or after the first Task, a FAILED or
+  failed-scope Service still runs `onExit` if any of its actions ran and not
+  otherwise, a failing `onExit` does not fail the scope, and wrap hooks run in
+  place of the Service's actions with `WrappedService.*` populated.
 
 ## How these tests are designed
 
@@ -124,9 +137,16 @@ those is needed to *test* the mechanism. The execution tests use small python
 TCP listeners (`socket`, `http.server`), and one UDP datagram echo, standing in
 for a service process,
 Tasks that connect to them and print what they received, and sentinel markers
-on stdout. Instance-failure tests tell a relaunched `onRun` apart from the
-first by a marker file in the Service Session's working directory, which a
-relaunch of a READY instance keeps.
+on stdout. Listeners probed by `TCP_CONNECT` or by an `onReadinessCheck`
+tolerate a connection that sends nothing and may close abortively, replying
+only to a client that sent a request. The few fixtures that need state to
+survive a Service Session, or to pass between Steps, use a file in the host's
+temp directory (`tempfile.gettempdir()`) keyed by `Job.Name`, deleted by the
+Service's `onExit` or by the consuming Task, and written so that a stale file
+from an aborted run makes the fixture fail rather than pass; this assumes the
+Service Sessions and Task Sessions of one run share a host, as the reference
+runner's do. Nothing relies on a relaunch reusing the Service Session, which
+the RFC leaves to the scheduler.
 
 Fixtures that carry no `runOn` gate use `python`, the suite's portable
 interpreter. The `bash` wrappers (adapted from the `WRAP_ACTIONS` suite) are
@@ -297,6 +317,7 @@ SERVICE/
 │   ├── 9.4--max-attempts-not-integer.invalid.yaml
 │   ├── 9.4--completed-tasks-unknown.invalid.yaml
 │   ├── 9.4--completed-tasks-lowercase.invalid.yaml
+│   ├── 9.4--completed-tasks-format-string.invalid.yaml
 │   ├── 9.5--script-let-requires-expr.yaml
 │   ├── 9.5--embedded-files-empty.invalid.yaml
 │   ├── 9.5--script-let-duplicate-name.invalid.yaml
@@ -402,8 +423,14 @@ SERVICE/
     ├── service-session-is-its-own-session.test.yaml
     ├── service-environments-follow-run-scope.test.yaml
     ├── service-on-enter-openjd-env-reaches-on-run.test.yaml
+    ├── service-on-enter-openjd-env-reaches-readiness-check.test.yaml
+    ├── service-on-enter-openjd-redacted-env-with-extension.test.yaml
+    ├── service-on-enter-openjd-redacted-env-without-extension.test.yaml
     ├── service-on-exit-runs-after-task-failure.test.yaml
     ├── service-on-exit-failure-does-not-fail-scope.test.yaml
+    ├── service-job-service-state-persists-across-steps.test.yaml
+    ├── service-step-service-stopped-before-dependent-step.test.yaml
+    ├── service-stop-order-referencing-service-stopped-first.test.yaml
     │  # serviceEnvironments (§9 item 5)
     ├── service-environments-entry-order.test.yaml
     ├── service-environments-openjd-env-reaches-on-run.test.yaml
@@ -417,10 +444,15 @@ SERVICE/
     ├── service-external-same-name-as-step-service.test.yaml
     ├── service-external-same-name-in-two-attachments.test.yaml
     ├── service-external-same-name-both-consumed.test.yaml
+    ├── service-external-client-environment-uses-service-functions.test.yaml
     │  # Failure and restart
     ├── service-rerun-relaunch.test.yaml
     ├── service-keep-relaunch.test.yaml
+    ├── service-keep-max-attempts-exhausted-mid-scope.test.yaml
     ├── service-max-attempts-exhausted-task-never-runs.test.yaml
+    ├── service-readiness-timeout-fails-scope.test.yaml
+    ├── service-start-failure-relaunches-in-new-session.test.yaml
+    ├── service-start-failure-no-attempts-on-exit-not-run.test.yaml
     │  # WRAP_ACTIONS composition
     ├── service-wrap-service-scoped-hooks.test.yaml
     ├── service-wrap-env-hooks-wrap-inner-environment-in-service-session.test.yaml
@@ -452,9 +484,18 @@ SERVICE/
 - **Start ordering** (constraint 2): a Service that references another's
   endpoint starts only once the referenced Service is READY
   (`service-reference-chain`).
-- **Step scope** (§3 item 6): Step Services of different Steps with the same
-  name are distinct Services, each stopped when its Step completes
-  (`service-step-services-per-step`).
+- **Stop ordering** (constraint 4): a Service that references another is
+  stopped first, so its `onExit` can still reach the upstream Service
+  (`service-stop-order-referencing-service-stopped-first`).
+- **Step scope** (§3 item 6, constraints 4 and 6): Step Services of different
+  Steps with the same name are distinct Services, each stopped when its Step
+  completes (`service-step-services-per-step`); a Step Service is stopped,
+  and its `onExit` run, before a dependent Step's Tasks run, which find its
+  port refused (`service-step-service-stopped-before-dependent-step`).
+- **Job scope** (constraint 6): a Job Service's instance persists across
+  Steps, holding state written by one Step for a dependent Step to read, and is
+  stopped only when the Job completes, after Steps that never use it
+  (`service-job-service-state-persists-across-steps`).
 - **`Service.File.*` and `let`**: embedded files materialize into the Service
   Session and resolve through `<ServiceScript>.let`; `<Service>.let` resolves
   `Param.*`, `Job.Name`, `Step.Name`, and the Step's `let`
@@ -490,18 +531,31 @@ SERVICE/
   (`service-environments-wrapping-service-environment`).
 - **`openjd_env` within a Service** (§9.6): variables set by `onEnter` reach
   `onRun` and `onExit`, override declarative `variables`, and never propagate to
-  Tasks (`service-on-enter-openjd-env-reaches-on-run`).
+  Tasks (`service-on-enter-openjd-env-reaches-on-run`); they reach every
+  `onReadinessCheck` invocation of a `COMMAND` check too
+  (`service-on-enter-openjd-env-reaches-readiness-check`).
+  `openjd_redacted_env` from `onEnter` sets the variable for `onRun` and
+  `onExit` only when the document declares `REDACTED_ENV_VARS`, and its value
+  is masked in the log either way
+  (`service-on-enter-openjd-redacted-env-with-extension`,
+  `service-on-enter-openjd-redacted-env-without-extension`).
 - **Session end** (constraints 6–7): a Service's Session is ended, and its
   `onExit` run, when the scope fails (`service-on-exit-runs-after-task-failure`,
   `service-max-attempts-exhausted-task-never-runs`); a failing `onExit` does not
-  fail the scope (`service-on-exit-failure-does-not-fail-scope`).
+  fail the scope (`service-on-exit-failure-does-not-fail-scope`); `onExit` is
+  not run when no action of the Service ran, as when a `serviceEnvironments`
+  entry's `onEnter` fails with no attempts left
+  (`service-start-failure-no-attempts-on-exit-not-run`).
 - **External Services** (§1.2.2): a services-plus-environment attachment
   publishes an endpoint to a Job Template that knows nothing of `SERVICE`; the
   attachment's parameters are Job Parameters; a services-only attachment is
   started and stopped around a Job that never mentions it
   (`service-external-task-scoped-client-environment`,
   `service-external-parameter-override`,
-  `service-external-services-only-attachment`).
+  `service-external-services-only-attachment`); the attachment's `extensions`
+  gate the §2.2.4 host/port functions for its own `variables` while the Job
+  Template declares none
+  (`service-external-client-environment-uses-service-functions`).
 - **Service names are scoped to their document** (§1.2.2 item 2): an external
   Service named like a Job Service, a Step Service, or another attachment's
   Service is accepted and both start, each resolving its own
@@ -514,12 +568,20 @@ SERVICE/
   ports, and neither answer leaks to the other consumer
   (`service-external-same-name-both-consumed`).
 - **Failure and restart**: on an instance failure, `RERUN` cancels the running
-  Task without counting a failure, relaunches `onRun` in the same Service
-  Session, and reruns completed Tasks against the new instance; `KEEP` lets the
-  running Task finish and keeps completed results, gating only not-yet-started
-  Tasks on the new instance (`service-rerun-relaunch`, `service-keep-relaunch`).
-  Exhausting `maxAttempts` makes the Service FAILED and fails its scope before
-  any Task runs (`service-max-attempts-exhausted*`).
+  Task without counting a failure, relaunches `onRun`, and reruns completed
+  Tasks against the new instance; `KEEP` lets the running Task finish and keeps
+  completed results, gating only not-yet-started Tasks on the new instance
+  (`service-rerun-relaunch`, `service-keep-relaunch`). Exhausting
+  `maxAttempts` makes the Service FAILED and fails its scope, whether before
+  any Task runs (`service-max-attempts-exhausted*`) or after some Tasks have
+  completed, in which case the remaining Tasks never start and `onExit` runs
+  (`service-keep-max-attempts-exhausted-mid-scope`). A readiness timeout is an
+  instance failure: the in-flight `onReadinessCheck` is canceled, no Task runs,
+  and `onExit` runs (`service-readiness-timeout-fails-scope`). A start failure
+  — a `serviceEnvironments` entry's `onEnter` exiting non-zero — consumes an
+  attempt and the relaunch begins a new Service Session with a new working
+  directory, re-entering the Environments and re-running `onEnter`
+  (`service-start-failure-relaunches-in-new-session`).
 - **Wrap hooks** (§4.3 constraint 6, §4.3.1): a SERVICE-scoped wrapping
   Environment's four `onWrapService*` hooks run in place of the Service's
   actions with `WrappedAction.*` and the parallel `WrappedService.*` lists; the
@@ -576,11 +638,15 @@ runner contract. The behavior specific to `SERVICE`:
    launching `onRun`, and applying the readiness check — and be READY.
    `Service.<name>.<port>.port` and `.connectAddress` must resolve in the
    Task's actions to an endpoint that reaches the process.
-4. An `onRun` exit while the scope has work is an instance failure governed by
-   `restartPolicy`: relaunch up to `maxAttempts` times, applying
-   `completedTasks`; otherwise fail the scope. In every case the Service Session
-   must be ended (`onRun` canceled, `onExit` run, Environments exited) when the
-   scope completes or fails.
+4. An `onRun` exit while the scope has work, or a readiness timeout, is an
+   instance failure governed by `restartPolicy`: relaunch up to `maxAttempts`
+   times, applying `completedTasks`; otherwise fail the scope. A failure before
+   `onRun` is launched (an Environment's or the Service's `onEnter` exiting
+   non-zero) is a start failure that consumes an attempt and must be relaunched
+   in a new Service Session. In every case the Service Session must be ended
+   (`onRun` and any in-flight `onReadinessCheck` canceled, `onExit` run if any
+   action of the Service ran, Environments exited) when the scope completes or
+   fails, a Service being stopped before any Service it references.
 5. Under `WRAP_ACTIONS`, a wrapping Environment whose `runScope` includes
    `SERVICE` must run its `onWrapService*` hooks in place of the Service's
    actions with `WrappedAction.*` and `WrappedService.*` populated, scanning
