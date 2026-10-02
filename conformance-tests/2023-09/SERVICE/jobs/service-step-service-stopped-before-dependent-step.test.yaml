@@ -25,7 +25,7 @@ template:
       - name: main
       healthCheck:
         type: STDOUT
-        readyTimeoutSeconds: 60
+        readinessTimeoutSeconds: 60
       script:
         actions:
           onRun:

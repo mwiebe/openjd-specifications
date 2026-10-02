@@ -1,10 +1,10 @@
-# RFC 0009 <ServiceHealthCheck> item 4 (readyTimeoutSeconds "runs continuously,
+# RFC 0009 <ServiceHealthCheck> item 4 (readinessTimeoutSeconds "runs continuously,
 # including while a probe is in progress. If exceeded, the instance has
 # failed"), "Concurrency with onRun" rule 5 (an
 # invocation in progress when the Session ends is canceled before onExit),
 # "Failure and restart" step 4, and lifecycle constraints 6-7 (Template
 # Schemas §9.3, §9.6.1): a COMMAND check whose onHealthCheck never
-# finishes inside readyTimeoutSeconds. With the default maxAttempts of 0 the
+# finishes inside readinessTimeoutSeconds. With the default maxAttempts of 0 the
 # Service becomes FAILED and fails the Job before any Task runs; the
 # in-flight check is canceled (CHECK_FINISHED never prints) and onExit still
 # runs because an action of the Service ran.
@@ -19,7 +19,7 @@ template:
     healthCheck:
       type: COMMAND
       readinessIntervalSeconds: 1
-      readyTimeoutSeconds: 2
+      readinessTimeoutSeconds: 2
     script:
       actions:
         onRun:

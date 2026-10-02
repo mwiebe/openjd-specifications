@@ -16,7 +16,7 @@ template:
     healthCheck:
       type: COMMAND
       readinessIntervalSeconds: 1
-      readyTimeoutSeconds: 60
+      readinessTimeoutSeconds: 60
     variables:
       DECL: declared
       OVERRIDE_ME: from-variables

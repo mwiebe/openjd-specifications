@@ -2582,7 +2582,7 @@ Where:
    cannot be probed by a `TCP_CONNECT` health check; see [&lt;ServiceHealthCheck&gt;](#93-servicehealthcheck).
 
 Numeric fields marked `@fmtstring` in this section (`<ServicePort>.port`; the `<ServiceHealthCheck>` fields
-`readinessIntervalSeconds`, `readyTimeoutSeconds`, `healthIntervalSeconds`, and `failureThreshold`; and
+`readinessIntervalSeconds`, `readinessTimeoutSeconds`, `healthIntervalSeconds`, and `failureThreshold`; and
 `<ServiceRestartPolicy>.maxAttempts`) may be given as a format string whose result is the integer. They are resolved at
 job creation, with the scope of the `<Service>`'s *let* (item 3). When the value is a single whole-field expression, its
 target type is `int?`: a `null` result is treated as if the field were not provided, and a non-null result must satisfy
@@ -2604,7 +2604,7 @@ A `<ServiceHealthCheck>` is one of the following objects, discriminated by the *
 type: "TCP_CONNECT"
 ports: [ <Identifier>, ... ] # @optional
 readinessIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
-readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
@@ -2612,14 +2612,14 @@ failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```yaml
 type: "COMMAND"
 readinessIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
-readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "STDOUT"
-readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
@@ -2661,9 +2661,9 @@ Where:
 3. *readinessIntervalSeconds* (`TCP_CONNECT` and `COMMAND` only) — Seconds between probes before the instance is READY.
    Default: 1 for `TCP_CONNECT`, 5 for `COMMAND`. A `STDOUT` check that gives this field must be rejected at template
    validation.
-4. *readyTimeoutSeconds* — The maximum time, measured from the launch of the `onRun` action, that the scheduler waits
-   for the instance to become READY. It runs continuously, including while a probe is in progress. If exceeded, the
-   instance has failed. Default: 300.
+4. *readinessTimeoutSeconds* — The maximum time, measured from the launch of the `onRun` action, that the scheduler
+   waits for the instance to become READY. It runs continuously, including while a probe is in progress. If exceeded,
+   the instance has failed. Default: 300.
 5. *healthIntervalSeconds* — Seconds between probes after the instance is READY. Default: 30 for `TCP_CONNECT` and
    `COMMAND`. For `STDOUT` there is no default: when given, it is the heartbeat interval described under *type*; when
    omitted, no heartbeat is expected.

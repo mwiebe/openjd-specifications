@@ -11,7 +11,7 @@ jobServices:
   - name: admin
   healthCheck:
     type: HTTP
-    readyTimeoutSeconds: 60
+    readinessTimeoutSeconds: 60
   script:
     actions:
       onRun:

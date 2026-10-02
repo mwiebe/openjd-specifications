@@ -15,7 +15,7 @@ template:
     - name: main
     healthCheck:
       type: STDOUT
-      readyTimeoutSeconds: 60
+      readinessTimeoutSeconds: 60
     script:
       actions:
         onRun:
@@ -43,7 +43,7 @@ template:
     - name: main
     healthCheck:
       type: STDOUT
-      readyTimeoutSeconds: 60
+      readinessTimeoutSeconds: 60
     variables:
       UPSTREAM: "{{ join_host_port(Service.Back.main.connectAddress, Service.Back.main.port) }}"
     script:

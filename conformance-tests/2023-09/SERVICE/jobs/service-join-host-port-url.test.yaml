@@ -12,7 +12,7 @@ template:
     - name: http
     healthCheck:
       type: TCP_CONNECT
-      readyTimeoutSeconds: 60
+      readinessTimeoutSeconds: 60
     script:
       actions:
         onRun:

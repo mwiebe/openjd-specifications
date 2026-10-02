@@ -176,8 +176,8 @@ A scheduler must satisfy the following constraints; how it satisfies them is its
 
 Two kinds of failure lead to the restart decision. An **instance failure** occurs when `onRun` exits, with any exit
 status, while the **Service**'s scope still has work (a Task that has not completed, or that could still run), other
-than because the scheduler canceled it; when `readyTimeoutSeconds` elapses before the instance is **READY**; when the
-instance becomes **UNHEALTHY**, having failed `failureThreshold` consecutive health-check probes after **READY**; or
+than because the scheduler canceled it; when `readinessTimeoutSeconds` elapses before the instance is **READY**; when
+the instance becomes **UNHEALTHY**, having failed `failureThreshold` consecutive health-check probes after **READY**; or
 when the scheduler loses the **Service host** (it determines, by its own means, that the host is gone or unreachable).
 An exit observed after the scope has completed is not a failure, whether or not the scheduler's cancelation had yet
 reached the process. A **start failure** occurs when a **Service Session** fails before `onRun` is launched: a requested

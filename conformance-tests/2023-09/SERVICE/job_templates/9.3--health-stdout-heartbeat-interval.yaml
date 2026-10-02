@@ -12,7 +12,7 @@ jobServices:
   - name: main
   healthCheck:
     type: STDOUT
-    readyTimeoutSeconds: 120
+    readinessTimeoutSeconds: 120
     healthIntervalSeconds: 15
     failureThreshold: 2
   script:

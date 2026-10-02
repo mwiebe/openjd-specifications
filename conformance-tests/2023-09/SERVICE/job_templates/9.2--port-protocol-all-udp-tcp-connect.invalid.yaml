@@ -15,7 +15,7 @@ jobServices:
     protocol: UDP
   healthCheck:
     type: TCP_CONNECT
-    readyTimeoutSeconds: 30
+    readinessTimeoutSeconds: 30
   script:
     actions:
       onRun:

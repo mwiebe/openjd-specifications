@@ -1,4 +1,4 @@
-# Section 9.3 item 4: `readyTimeoutSeconds` is a <posinteger>; 0 must be rejected.
+# Section 9.3 item 4: `readinessTimeoutSeconds` is a <posinteger>; 0 must be rejected.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -11,7 +11,7 @@ jobServices:
   - name: admin
   healthCheck:
     type: TCP_CONNECT
-    readyTimeoutSeconds: 0
+    readinessTimeoutSeconds: 0
   script:
     actions:
       onRun:

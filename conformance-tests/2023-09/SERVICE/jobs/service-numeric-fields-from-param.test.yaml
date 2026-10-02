@@ -2,7 +2,7 @@
 # resolved at job creation from Param.* and <Service>.let bindings. A
 # whole-field expression resolving to null leaves the field unset, so the
 # runtime allocates the port. The COMMAND check's readinessIntervalSeconds and
-# readyTimeoutSeconds come from a parameter; maxAttempts from a `let`.
+# readinessTimeoutSeconds come from a parameter; maxAttempts from a `let`.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
@@ -24,7 +24,7 @@ template:
     healthCheck:
       type: COMMAND
       readinessIntervalSeconds: "{{ Param.Patience // 60 }}"
-      readyTimeoutSeconds: "{{ Param.Patience }}"
+      readinessTimeoutSeconds: "{{ Param.Patience }}"
     restartPolicy:
       maxAttempts: "{{ attempts }}"
     script:

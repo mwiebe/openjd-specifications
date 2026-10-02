@@ -12,7 +12,7 @@ jobServices:
   - name: admin
   healthCheck:
     type: STDOUT
-    readyTimeoutSeconds: 600
+    readinessTimeoutSeconds: 600
   script:
     actions:
       onRun:

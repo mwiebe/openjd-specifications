@@ -103,7 +103,7 @@ jobServices:
       - name: main
     healthCheck:
       type: TCP_CONNECT
-      readyTimeoutSeconds: 60
+      readinessTimeoutSeconds: 60
       healthIntervalSeconds: 10
       failureThreshold: 3
     restartPolicy:
@@ -175,7 +175,7 @@ steps:
           - name: metrics
         healthCheck:
           type: STDOUT
-          readyTimeoutSeconds: 120
+          readinessTimeoutSeconds: 120
         restartPolicy:
           maxAttempts: 1
           completedTasks: RERUN
@@ -886,13 +886,13 @@ Where:
    container port mapping, a firewall rule, a NAT entry). One of `TCP` or `UDP`. Default: `TCP`.
 
 Numeric fields marked `@fmtstring` — `<ServicePort>.port`; the `<ServiceHealthCheck>` fields
-`readinessIntervalSeconds`, `readyTimeoutSeconds`, `healthIntervalSeconds`, and `failureThreshold`;
-and `<ServiceRestartPolicy>.maxAttempts` — may be given as a format string whose result is the
-integer, so that a Job Parameter or a `<Service>.let` binding can supply them.
-They are resolved at job creation, with the scope of the `<Service>`'s *let* (item 3). When the
-value is a single whole-field expression (`"{{ ... }}"` with no surrounding text) its target type is
-`int?`: a `null` result is treated as if the field were not provided, and a non-null result MUST
-satisfy the field's range.
+`readinessIntervalSeconds`, `readinessTimeoutSeconds`, `healthIntervalSeconds`, and
+`failureThreshold`; and `<ServiceRestartPolicy>.maxAttempts` — may be given as a format string whose
+result is the integer, so that a Job Parameter or a `<Service>.let` binding can supply them. They
+are resolved at job creation, with the scope of the `<Service>`'s *let* (item 3). When the value is
+a single whole-field expression (`"{{ ... }}"` with no surrounding text) its target type is `int?`:
+a `null` result is treated as if the field were not provided, and a non-null result MUST satisfy the
+field's range.
 
 Every port, TCP or UDP, is bound and published on the same service host. Unix domain sockets are
 out of scope for this RFC (see [Future Work](#future-work)).
@@ -905,7 +905,7 @@ A `<ServiceHealthCheck>` is one of the following objects, discriminated by *type
 type: "TCP_CONNECT"
 ports: [ <Identifier>, ... ] # @optional
 readinessIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
-readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
@@ -913,14 +913,14 @@ failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```yaml
 type: "COMMAND"
 readinessIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
-readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
 
 ```yaml
 type: "STDOUT"
-readyTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
+readinessTimeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 healthIntervalSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 failureThreshold: <posinteger> | <posintstring> # @optional @fmtstring
 ```
@@ -965,10 +965,10 @@ Where:
 3. *readinessIntervalSeconds* (`TCP_CONNECT` and `COMMAND` only) — Seconds between probes before
    the instance is READY. Default: 1 for `TCP_CONNECT`, 5 for `COMMAND`. A `STDOUT` check that
    gives this field MUST be rejected at template validation.
-4. *readyTimeoutSeconds* — The maximum time, measured from the launch of the `onRun` action, that
-   the scheduler waits for the instance to become READY. It runs continuously, including while a
-   probe is in progress. If exceeded, the instance has failed (see
-   [Failure and restart](#failure-and-restart)). Default: 300.
+4. *readinessTimeoutSeconds* — The maximum time, measured from the launch of the `onRun` action,
+   that the scheduler waits for the instance to become READY. It runs continuously, including while
+   a probe is in progress. If exceeded, the instance has failed (see [Failure and
+   restart](#failure-and-restart)). Default: 300.
 5. *healthIntervalSeconds* — Seconds between probes after the instance is READY. Default: 30 for
    `TCP_CONNECT` and `COMMAND`. For `STDOUT` there is no default: when given, it is the heartbeat
    interval described under *type*; when omitted, no heartbeat is expected.
@@ -1353,8 +1353,8 @@ Two kinds of failure lead to the restart decision:
 
 * An **instance failure** occurs when *onRun* exits (with any status) while the Service's scope
   still has work — a Task that has not completed, or that could still run — other than because the
-  scheduler canceled it; when `readyTimeoutSeconds` elapses before the instance is READY; when the
-  instance becomes UNHEALTHY, having failed `failureThreshold` consecutive health-check probes
+  scheduler canceled it; when `readinessTimeoutSeconds` elapses before the instance is READY; when
+  the instance becomes UNHEALTHY, having failed `failureThreshold` consecutive health-check probes
   after READY; or when the scheduler loses the service host. An exit observed after the scope has
   completed is not a failure, whether or not the scheduler's cancelation had yet reached the
   process; the Service Session simply ends.
@@ -1706,8 +1706,8 @@ Job-scoped, every rule in this RFC applies unchanged.
   which is the gap this RFC fills.
 * **Docker Compose** — `depends_on: { condition: service_healthy }` plus `healthcheck` with
   `interval`, `retries`, and `start_period`, which `healthIntervalSeconds`, `failureThreshold`, and
-  `readyTimeoutSeconds` correspond to. The ordered-start-until-healthy behavior is the model for our
-  list ordering.
+  `readinessTimeoutSeconds` correspond to. The ordered-start-until-healthy behavior is the model for
+  our list ordering.
 * **GitHub Actions service containers** — `services:` in a job, started before steps and stopped
   after, with ports published to the runner. Scoped to one job on one host; the closest
   batch-oriented precedent for `stepServices`.

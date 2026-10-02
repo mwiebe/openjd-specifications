@@ -32,7 +32,7 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceHealthCheck / onWrapService
   hostRequirements: <HostRequirements>        # optional
   ports: [ <ServicePort>, ... ]               # 1–10, unique names; { name, port?, protocol?: TCP | UDP }
   healthCheck: <ServiceHealthCheck>           # TCP_CONNECT (default, TCP ports only) | COMMAND | STDOUT
-                                              #   readinessIntervalSeconds, readyTimeoutSeconds,
+                                              #   readinessIntervalSeconds, readinessTimeoutSeconds,
                                               #   healthIntervalSeconds, failureThreshold
   restartPolicy: <ServiceRestartPolicy>       # maxAttempts (0), completedTasks (RERUN | KEEP)
   variables: <EnvironmentVariables>           # optional
@@ -91,7 +91,7 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceHealthCheck / onWrapService
   `healthIntervalSeconds`; `readinessIntervalSeconds` is accepted on
   `TCP_CONNECT` as well as `COMMAND`; the keys `readinessCheck` and
   `timeoutSeconds` are unknown and rejected; ranges of `port`,
-  `readinessIntervalSeconds`, `readyTimeoutSeconds`, `healthIntervalSeconds`,
+  `readinessIntervalSeconds`, `readinessTimeoutSeconds`, `healthIntervalSeconds`,
   `failureThreshold`, `maxAttempts`; `@fmtstring` numeric fields (all four
   health-check fields included) resolved at job creation in the
   `<Service>.let` scope with a whole-field `null` meaning "not provided";
@@ -320,7 +320,7 @@ SERVICE/
 │   ├── 9.3--health-stdout-readiness-interval.invalid.yaml
 │   ├── 9.3--health-stdout-failure-threshold-without-interval.invalid.yaml
 │   ├── 9.3--health-default-with-on-health-check.invalid.yaml
-│   ├── 9.3--health-ready-timeout-zero.invalid.yaml
+│   ├── 9.3--health-readiness-timeout-zero.invalid.yaml
 │   ├── 9.3--health-old-readiness-check-key.invalid.yaml
 │   ├── 9.3--health-old-timeout-seconds-key.invalid.yaml
 │   ├── 9.3--health-unknown-type.invalid.yaml
@@ -428,7 +428,7 @@ SERVICE/
     ├── service-keep-relaunch.test.yaml
     ├── service-keep-max-attempts-exhausted-mid-scope.test.yaml
     ├── service-max-attempts-exhausted-task-never-runs.test.yaml
-    ├── service-ready-timeout-fails-scope.test.yaml
+    ├── service-readiness-timeout-fails-scope.test.yaml
     ├── service-start-failure-relaunches-in-new-session.test.yaml
     ├── service-start-failure-no-attempts-on-exit-not-run.test.yaml
     │  # Health checks after READY
@@ -547,7 +547,7 @@ SERVICE/
   completed, in which case the remaining Tasks never start and `onExit` runs
   (`service-keep-max-attempts-exhausted-mid-scope`). A ready timeout is an
   instance failure: the in-flight `onHealthCheck` is canceled, no Task runs,
-  and `onExit` runs (`service-ready-timeout-fails-scope`). A start failure
+  and `onExit` runs (`service-readiness-timeout-fails-scope`). A start failure
   — a SERVICE-scoped Environment's `onEnter` exiting non-zero — consumes an
   attempt and the relaunch begins a new Service Session with a new working
   directory, re-entering the Environments and re-running `onEnter`

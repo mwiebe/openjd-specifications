@@ -13,7 +13,7 @@ jobServices:
   healthCheck:
     type: TCP_CONNECT
     ports: [admin]
-    readyTimeoutSeconds: 30
+    readinessTimeoutSeconds: 30
   script:
     actions:
       onRun:

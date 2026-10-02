@@ -1,5 +1,5 @@
 # Section 9.3 (RFC 0009): all four numeric <ServiceHealthCheck> fields --
-# readinessIntervalSeconds, readyTimeoutSeconds, healthIntervalSeconds, and
+# readinessIntervalSeconds, readinessTimeoutSeconds, healthIntervalSeconds, and
 # failureThreshold -- are @fmtstring and may be format strings over Param.*
 # and <Service>.let bindings, resolved at job creation.
 specificationVersion: jobtemplate-2023-09
@@ -20,7 +20,7 @@ jobServices:
   healthCheck:
     type: COMMAND
     readinessIntervalSeconds: "{{ Param.Patience // 10 }}"
-    readyTimeoutSeconds: "{{ Param.Patience }}"
+    readinessTimeoutSeconds: "{{ Param.Patience }}"
     healthIntervalSeconds: "{{ Param.Patience // 2 }}"
     failureThreshold: "{{ strikes }}"
   script:

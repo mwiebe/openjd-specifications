@@ -1,5 +1,5 @@
 # Section 9.2 (RFC 0009): the numeric @fmtstring fields -- <ServicePort>.port,
-# <ServiceHealthCheck>.readyTimeoutSeconds and readinessIntervalSeconds (see
+# <ServiceHealthCheck>.readinessTimeoutSeconds and readinessIntervalSeconds (see
 # 9.3--health-numeric-fields-from-param for all four), and
 # <ServiceRestartPolicy>.maxAttempts -- may be format strings over Param.*,
 # RawParam.*, Job.Name, and <Service>.let bindings, resolved at job creation.
@@ -25,7 +25,7 @@ jobServices:
   healthCheck:
     type: COMMAND
     readinessIntervalSeconds: "{{ Param.Patience // 10 }}"
-    readyTimeoutSeconds: "{{ Param.Patience }}"
+    readinessTimeoutSeconds: "{{ Param.Patience }}"
   restartPolicy:
     maxAttempts: "{{ attempts }}"
   script:

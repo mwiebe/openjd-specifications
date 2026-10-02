@@ -25,7 +25,7 @@ template:
     - name: main
     healthCheck:
       type: STDOUT
-      readyTimeoutSeconds: 60
+      readinessTimeoutSeconds: 60
     restartPolicy:
       maxAttempts: 0
       completedTasks: KEEP
