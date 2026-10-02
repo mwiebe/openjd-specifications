@@ -167,18 +167,11 @@ valid -- for example, the value of the `default` property must adhere to the con
 
 Available when using the `SERVICE` extension.
 
-An Environment Template that defines *services* defines Services that a scheduler applies to every Job Template
-submitted through it, in the same way that its *environment* defines an Environment that is applied to every
-submission. Such Services are called **external Services** from the point of view of the Job Template. External
-Services are applied per Job: each Job created from a submission gets its own instance of each external Service, with
-Job scope, exactly as if the Services had appeared in the Job Template's `jobServices`. A Service defined this way does
-not outlive the Job; a process shared across many Jobs is infrastructure outside the scope of this specification.
-
-When a document defines both an *environment* and *services*, the entities compose as they would in a Job Template:
-the Services are Job-scoped and are ready before any Session starts, and the Environment is Session-scoped and may
-reference any of the Services' `port` and `connectAddress` values in its *variables*, actions, and embedded files. This
-is how an attachment publishes a Service to Tasks that do not reference `Service.*` themselves, by setting environment
-variables or writing a configuration file that the Tasks' tools already read.
+An Environment Template that defines *services* defines Services that the scheduler applies to every Job Template
+submitted through it, just as its *environment* defines an Environment applied to every submission. From the Job
+Template's point of view these are **external Services**. Each Job gets its own instance of each, with Job scope,
+exactly as if they had appeared in the Job Template's `jobServices`; a process shared across many Jobs is infrastructure
+outside the scope of this specification.
 
 A `Service.*` reference within an Environment Template must resolve to a Service in the same document's *services*
 list (and, within that list, to itself or an earlier Service). References to Services defined in other documents are
@@ -193,16 +186,16 @@ a queue-supplied Service.
 
 When a submission combines a Job Template with one or more Environment Templates:
 
-1. The external Services are ordered as the scheduler orders the Environment Templates, and within one template in its
-   *services* order, and are placed before every Service in the Job Template's `jobServices`; the attached Environments
-   are placed in `jobEnvironments` as today. The combined `jobServices` list is started and stopped as a single list
-   (see [How Jobs Are Run](How-Jobs-Are-Run#services)). The limit of 10 Services applies to each document's list, not to
-   the combined list; the number of Environment Templates attached is the scheduler's decision and bounds it.
+1. The external Services are ordered as the scheduler orders the Environment Templates, each template's in its
+   *services* order, and placed before every Service in the Job Template's `jobServices`; the attached Environments are
+   placed in `jobEnvironments` as today. The combined list is started and stopped as one list (see [How Jobs Are
+   Run](How-Jobs-Are-Run#services)). The limit of 10 applies to each document's list; the scheduler bounds the combined
+   list through how many Environment Templates it attaches.
 2. Service names are scoped to the document that declares them. An external Service may have the same `name` as a
-   Service in another attached Environment Template or in the Job Template, and the submission is not rejected for it:
-   every `Service.*` reference resolves within its own document, so no name is ever looked up across documents, and a
-   scheduler must keep same-named Services from different documents distinct (for example, by qualifying each with its
-   document). Nothing a queue operator attaches can make an existing Job Template unsubmittable because of a name.
+   Service in another attached Environment Template or in the Job Template; the submission is not rejected for it,
+   because every `Service.*` reference resolves within its own document. A scheduler must keep same-named Services from
+   different documents distinct (for example, by qualifying each with its document). Nothing a queue operator attaches
+   can make an existing Job Template unsubmittable because of a name.
 3. A wrapping Environment (one defining the `WRAP_ACTIONS` hooks) in a document that does not declare `SERVICE`, whether
    an attached Environment Template or the Job Template itself, has the default `runScope` of every kind of Session and
    cannot define the `onWrapService*` hooks. If the combined Job places any Service in that Environment's scope, the
@@ -212,10 +205,6 @@ When a submission combines a Job Template with one or more Environment Templates
    that attaches a Service. The remedy is for that document to declare `SERVICE` and either define the four hooks or
    declare a `runScope` that excludes `SERVICE`. This is the only check that requires the combined Job; everything else
    is checked when each document is validated on its own.
-
-An external Service has the same effect on a Job as a Service the Job Template declared itself: the Job's Tasks are
-not scheduled until it is ready, its host requirements are allocated for the Job's lifetime, and its restart policy
-governs whether the Job's completed Tasks are rerun when it restarts.
 
 ## 2. `<JobParameterDefinition>`
 
@@ -1826,11 +1815,11 @@ be reused unchanged.
 The four lists are parallel: index *i* of each describes the Service's *i*-th declared port. `bindAddress` and
 `connectAddress` are determined for the service host's network namespace. A wrap script that runs the service process in
 that namespace (a launcher, `ssh`, or a container with host networking) needs no port handling. One that gives the
-process its own network namespace must forward each port in `WrappedService.Ports`, with the protocol given by
+process its own network namespace must forward each port in `WrappedService.Ports` with the protocol in
 `WrappedService.Protocols`, so that a connection to `connectAddress`:`port` from any host in the scope reaches the
-process, and must ensure the process can bind `bindAddress` inside that namespace; a wildcard `bindAddress` works in
-either, while a loopback `bindAddress` reaches a forwarded port only with host networking. For example, a Docker wrapper
-without host networking passes
+process, and must ensure the process can bind `bindAddress` inside that namespace. A wildcard `bindAddress` (`0.0.0.0`,
+`::`) works in either case; a loopback `bindAddress` reaches a forwarded port only with host networking. For example, a
+Docker wrapper without host networking passes
 `{{ flatten([['-p', string(WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i]) + '/' + lower(WrappedService.Protocols[i])] for i in range(len(WrappedService.Ports))]) }}`.
 
 `WrappedAction.Environment` carries only session-defined variables: variables exported with `openjd_env` —
@@ -2521,9 +2510,8 @@ Where:
        independently, each in its own protocol's space, and may or may not coincide across protocols.
 7. *readinessCheck* — How the scheduler determines that the Service is ready to accept traffic. If not provided,
    defaults to `{ type: TCP_CONNECT }` applied to every declared TCP port. A Service none of whose ports is TCP must
-   provide a *readinessCheck* of type `STDOUT` or `COMMAND`: a `TCP_CONNECT` check, given or defaulted, would have no
-   port to probe and could never pass, so on such a Service omitting *readinessCheck*, or giving one of type
-   `TCP_CONNECT`, is a validation error. See: [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck).
+   provide a *readinessCheck* of type `STDOUT` or `COMMAND`; a `TCP_CONNECT` check, given or defaulted, would have no
+   port to probe. See: [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck).
 8. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the scope ends. If not
    provided, defaults to `{ maxAttempts: 0, completedTasks: RERUN }`. See:
    [&lt;ServiceRestartPolicy&gt;](#94-servicerestartpolicy).
@@ -2613,10 +2601,9 @@ Where:
 
 Numeric fields marked `@fmtstring` in this section (`<ServicePort>.port`, `<ServiceReadinessCheck>.timeoutSeconds` and
 `intervalSeconds`, and `<ServiceRestartPolicy>.maxAttempts`) may be given as a format string whose result is the
-integer. They are resolved at job creation in the scope of a `<Service>`'s *let* (`Param.*`, `RawParam.*`, `Job.Name`,
-`Step.Name` for a Step Service, and `let` bindings), and must not reference `Session.*` or `Service.*`. When the value
-is a single whole-field expression, its target type is `int?`: a `null` result is treated as if the field were not
-provided, and a non-null result must satisfy the field's range.
+integer. They are resolved at job creation, with the scope of the `<Service>`'s *let* (item 3). When the value is a
+single whole-field expression, its target type is `int?`: a `null` result is treated as if the field were not provided,
+and a non-null result must satisfy the field's range.
 
 Every port, TCP or UDP, is bound and published on the same service host.
 
@@ -2700,8 +2687,8 @@ Where:
       unreliable once lost.
     * Default: `RERUN`.
 
-   `KEEP` also declares the Service resumable: a scheduler may suspend it while no Task in its scope can run and start
-   it again later (see [How Jobs Are Run](How-Jobs-Are-Run#service-lifecycle)).
+   A `KEEP` Service may be suspended while no Task in its scope can run (see [How Jobs Are
+   Run](How-Jobs-Are-Run#service-lifecycle)).
 
 If *maxAttempts* is exhausted, an `onRun` exit fails the scope regardless of *completedTasks*.
 
@@ -2739,12 +2726,10 @@ onExit: <Action> # @optional
 
 Where:
 
-1. *onEnter* — A one-time setup action run before the first `onRun` of the Service in a Service Session. It is an
-   ordinary action, like an Environment's `onEnter`: it runs to completion, its `timeout` and `cancelation` apply as for
-   any `<Action>`, and the scheduler cancels it with its cancelation method if the scope ends while it is running. A
-   non-zero exit status or a timeout is a start failure of the Service (see
-   [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)). It runs once per Service Session, not once per
-   launch of *onRun*.
+1. *onEnter* — A one-time setup action run before the first `onRun` of the Service in a Service Session; it runs once
+   per Service Session, not once per launch of *onRun*. It is an ordinary action, like an Environment's `onEnter`: it
+   runs to completion and its `timeout` and `cancelation` apply as for any `<Action>`. A non-zero exit status or a
+   timeout is a start failure of the Service (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)).
 2. *onRun* — The long-lived action whose process is the service. The scheduler starts it, watches it for readiness, and
    expects it to run until canceled. If *onRun* exits for any reason, with any exit status, before the scheduler cancels
    it, the Service instance has failed. The scheduler stops the Service by canceling *onRun* according to its
@@ -2811,9 +2796,9 @@ in the Service's scope.
 
 ### 9.7. Validation
 
-Everything in this section is checkable when a template is validated on its own, with two exceptions: the `@fmtstring`
-numeric fields, which are checked when they are resolved at job creation (item 8), and one check that needs the combined
-Job, below. At template validation, an implementation must check:
+Everything in this section is checkable when a template is validated on its own, except the `@fmtstring` numeric fields,
+which are checked when resolved at job creation (item 8), and one check that needs the combined Job (below). At template
+validation, an implementation must check:
 
 1. Every `Service.*` reference resolves to a Service and port declared in the same document, is used only where the
    scope rules in [Section 9](#9-service-extension-service) permit, and, for a reference from a Service, refers to that
