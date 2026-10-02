@@ -43,9 +43,8 @@ The `SERVICE` extension adds the following, each specified in the sections named
   among Services, when Tasks may be scheduled, what happens when an instance fails or its host is
   lost, and the `completedTasks` choice between keeping and rerunning completed work. See
   [Modifications to How Jobs Are Run](#modifications-to-how-jobs-are-run).
-* **Services run inside Environments.** A Service Session enters the Environments of its scope, then
-  the Service's own `serviceEnvironments` (the analogue of `stepEnvironments`, for provisioning one
-  Service differently from its Tasks). A new `runScope` property on `<Environment>` names the kinds
+* **Services run inside Environments.** A Service Session enters the Environments of its scope
+  before the Service's own actions. A new `runScope` property on `<Environment>` names the kinds
   of Session an Environment applies to, so that an Environment which configures Tasks to *use* a
   Service stays out of Service Sessions. See [`<Environment>`](#environment).
 * **External Services.** An Environment Template may define a `services:` list alongside or
@@ -72,8 +71,9 @@ reads it as `Service.Cache.main.port` and binds `Service.Cache.main.bindAddress`
 be on other hosts, read the same `Service.Cache.main.port` and connect to
 `Service.Cache.main.connectAddress`. If the service process dies the scheduler relaunches it, and
 because a cache can be repopulated, completed Tasks keep their results (`completedTasks: KEEP`). The
-Valkey binary comes from a Conda environment the Tasks do not need, so the Service declares it as a
-`serviceEnvironments` entry, entered only in the Service's own Session.
+Valkey binary comes from a Conda environment the Tasks do not need, so the Service creates it in its
+own *onEnter*, which runs once per Service Session before *onRun*, and puts it on `PATH` with an
+`openjd_env` message.
 
 ```yaml
 specificationVersion: "jobtemplate-2023-09"
@@ -95,13 +95,6 @@ jobServices:
       amounts:
         - name: amount.worker.memory
           min: 8192
-    serviceEnvironments:
-      - name: ValkeyConda
-        script:
-          actions:
-            onEnter:
-              command: bash
-              args: ["-c", "conda create -y -p ./valkey-env -c conda-forge valkey && echo openjd_env: PATH=$PWD/valkey-env/bin:$PATH"]
     ports:
       - name: main
     readinessCheck:
@@ -112,6 +105,10 @@ jobServices:
       completedTasks: KEEP
     script:
       actions:
+        # onEnter runs once per Service Session; the Tasks never see this Conda environment.
+        onEnter:
+          command: bash
+          args: ["-c", "conda create -y -p ./valkey-env -c conda-forge valkey && echo openjd_env: PATH=$PWD/valkey-env/bin:$PATH"]
         # onRun is the long-lived action: its process IS the service.
         onRun:
           command: valkey-server
@@ -414,8 +411,9 @@ An `<Environment>` almost fits but differs in four ways that a schema needs to m
    service author must be able to say whether Tasks that completed against the old instance are
    still valid.
 
-Everything else about a Service — `name`, `description`, `variables`, `let`, embedded files, the
-`<Action>` model and its cancelation methods — is deliberately identical to `<Environment>`.
+A Service borrows the rest of its shape from existing entities: `description`, `variables`, `let`,
+embedded files, and the `<Action>` model with its cancelation methods from `<Environment>`, and
+`hostRequirements` from `<StepTemplate>`.
 
 A Service also needs what the Tasks need. The Valkey binary, the coordinator's Python environment,
 or the renderer in server mode is provisioned today by the Job's Environments (a Conda or Rez
@@ -665,9 +663,7 @@ New property:
        a Service Session may begin before any Service other than its own has an endpoint, and its
        own endpoint is not meaningful to an Environment that provisions it. An Environment that
        references `Service.*` must therefore have a *runScope* that excludes `SERVICE`, for example
-       `runScope: [TASK]`. This rule does not apply to a Service's `serviceEnvironments`, which are
-       entered in exactly one Service Session and may reference that Service (see
-       [`<Service>`](#service)).
+       `runScope: [TASK]`.
 
 > A modification to [`4.3. <EnvironmentActions>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#43-environmentactions)
 
@@ -713,10 +709,10 @@ RFC 0008's rules extend to the new hooks as follows:
    hook. Inner Environments are entered in every kind of Session, so every wrapping Environment MUST
    define `onWrapEnvEnter` and `onWrapEnvExit`. It MUST define `onWrapTaskRun` if and only if its
    *runScope* includes `TASK`, and MUST define all four `onWrapService*` hooks if and only if its
-   *runScope* includes `SERVICE`. A Service's `serviceEnvironments` have an effective *runScope* of
-   `[SERVICE]`. A template that defines a hook its *runScope* does not call for, or omits one it
-   does, MUST be rejected at template validation. For a wrapping Environment in a document that does
-   not declare `SERVICE`, see the submission-time check in [Validation](#validation).
+   *runScope* includes `SERVICE`. A template that defines a hook its *runScope* does not call for,
+   or omits one it does, MUST be rejected at template validation. For a wrapping Environment in a
+   document that does not declare `SERVICE`, see the submission-time check in
+   [Validation](#validation).
 2. *Nothing to replace.* `onWrapServiceEnter`, `onWrapServiceReadinessCheck`, and
    `onWrapServiceExit` run only for a Service that defines the corresponding action. Every Service
    defines *onRun*, so `onWrapServiceRun` runs for every wrapped Service.
@@ -766,7 +762,6 @@ name: <ServiceName>
 description: <Description> # @optional
 let: <LetBindings> # @optional @extension EXPR
 hostRequirements: <HostRequirements> # @optional
-serviceEnvironments: [ <Environment>, ... ] # @optional
 ports: [ <ServicePort>, ... ]
 readinessCheck: <ServiceReadinessCheck> # @optional
 restartPolicy: <ServiceRestartPolicy> # @optional
@@ -785,27 +780,13 @@ Where:
    `<StepTemplate>`'s *let*. Bindings may reference `Param.*`, `RawParam.*`, `Job.Name`, and (for a
    Step Service) `Step.Name` and the Step's bindings, but not `Session.*` or `Service.*`, which are
    not known until the Service is placed. Bound names are available in *hostRequirements*,
-   *serviceEnvironments*, *variables*, and *script*, as a Step's bindings are in its
-   `stepEnvironments`. Available with the `EXPR` extension.
+   *variables*, and *script*, as a Step's bindings are in its `stepEnvironments`. Available with
+   the `EXPR` extension.
 4. *hostRequirements* — Requirements on the Worker Host's capabilities that must be satisfied for
    the Service to be placed on the host. Amount capabilities are allocated to the Service Session
    for the lifetime of the Service. This is independent of the *hostRequirements* of any Step
    whose Tasks use the Service.
-5. *serviceEnvironments* — An ordered list of Environments entered only in this Service's Session,
-   the analogue of a Step's `stepEnvironments`. They are entered, in order, after the Environments
-   of the Service's scope (the Job's, and for a Step Service the Step's) and before the Service's
-   *onEnter*, and exited in reverse order after its *onExit*. Use them to provision the Service
-   differently from the Tasks that use it: a Valkey from one Conda environment while the Tasks run
-   in another, or a container that wraps this one Service (see
-   [`<Environment>`](#environment)). Because a Service Environment is entered only in the
-   declaring Service's Session, its format strings have the Service's own scope: they may reference
-   the Service's ports, including `bindAddress`, and the ports of Services earlier in the start
-   order, which are READY before the Session begins. Constraints:
-    1. No two Environments in this list may have the same `name`, and none may have the `name` of
-       a Job Environment or, for a Step Service, of the declaring Step's Step Environments.
-    2. *runScope* MUST NOT be provided on a Service Environment; its scope is fixed to the
-       declaring Service's Session. For the wrap-hook rule it is treated as `runScope: [SERVICE]`.
-6. *ports* — The named ports that the Service exposes. See [`<ServicePort>`](#serviceport).
+5. *ports* — The named ports that the Service exposes. See [`<ServicePort>`](#serviceport).
     1. Minimum number of elements: 1.
     2. Maximum number of elements: 10.
     3. No two ports may have the same `name`.
@@ -814,16 +795,16 @@ Where:
        number gives that number explicitly on both ports. Ports whose `port` is not provided are
        allocated independently, each in its own protocol's space, and may or may not coincide
        across protocols.
-7. *readinessCheck* — How the scheduler determines that the Service is ready to accept traffic. If
+6. *readinessCheck* — How the scheduler determines that the Service is ready to accept traffic. If
    not provided, defaults to `{ type: TCP_CONNECT }` applied to every TCP port. A Service none of
    whose ports is TCP MUST provide a *readinessCheck* of type `STDOUT` or `COMMAND`; a `TCP_CONNECT`
    check, given or defaulted, would have no port to probe. See
    [`<ServiceReadinessCheck>`](#servicereadinesscheck).
-8. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the
+7. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the
    scope ends. If not provided, defaults to `{ maxAttempts: 0, completedTasks: RERUN }`: the
    Service is never relaunched, and its exit fails the scope. See
    [`<ServiceRestartPolicy>`](#servicerestartpolicy).
-9. *variables* — A set of environment variable name/value pairs, with the values being Format
+8. *variables* — A set of environment variable name/value pairs, with the values being Format
    Strings resolved when the Service is started, that are set in the process environment of every
    action of the Service's *script*, including *onReadinessCheck*. It has the same schema as the
    *variables* property of
@@ -831,8 +812,8 @@ Where:
    A Service's *variables* are **not** propagated to the entities in its scope; they receive the
    endpoint through `Service.*` only. Values computed at *onEnter* time are passed to *onRun* with
    `openjd_env` instead (see [`<ServiceActions>`](#serviceactions)).
-10. *script* — The actions that the Service runs on its host. See
-    [`<ServiceScript>`](#servicescript).
+9. *script* — The actions that the Service runs on its host. See
+   [`<ServiceScript>`](#servicescript).
 
 The format string scopes available to format strings within a `<Service>` are:
 
@@ -1155,11 +1136,10 @@ until the scheduler places the Service, and may change if the Service is relocat
 
 `Service.<name>.<port>.*` for a Service `<name>` is in scope in:
 
-1. The Service `<name>` itself (all three values), including its `serviceEnvironments`.
+1. The Service `<name>` itself (all three values).
 2. Any Service later in the same `jobServices` or `stepServices` list, and — for a Job Service — any
-   Step Service in the Job, including those Services' `serviceEnvironments` (`port` and
-   `connectAddress` only). A Service cannot reference a Service later in its own list, nor a Step
-   Service of a different Step.
+   Step Service in the Job (`port` and `connectAddress` only). A Service cannot reference a Service
+   later in its own list, nor a Step Service of a different Step.
 3. For a Job Service: every `jobEnvironments` entry whose `runScope` excludes `SERVICE`, and every
    Step's `stepEnvironments` whose `runScope` excludes `SERVICE`, `stepServices`, and `script`.
 4. For a Step Service: that Step's `stepEnvironments` whose `runScope` excludes `SERVICE`, later
@@ -1305,12 +1285,11 @@ A Service Session enters the Environments of the Service's scope whose `runScope
 `SERVICE`, in the same order a Session for a Task in that scope would enter them: a Job Service
 enters the Job's `jobEnvironments` (including any attached from Environment Templates, in the
 scheduler's order); a Step Service enters the Job's `jobEnvironments` followed by its Step's
-`stepEnvironments`. After those it enters its own `serviceEnvironments`, in order. All are entered
-before the Service's *onEnter* and exited, in reverse, after its *onExit*. Environment variables set
-by an Environment's `variables` or `openjd_env` apply to every action of the Service, later
-Environments taking precedence over earlier ones, with the Service's own *variables* taking
-precedence over all of them and variables set by the Service's *onEnter* taking precedence over
-both.
+`stepEnvironments`. All are entered before the Service's *onEnter* and exited, in reverse, after its
+*onExit*. Environment variables set by an Environment's `variables` or `openjd_env` apply to every
+action of the Service, later Environments taking precedence over earlier ones, with the Service's
+own *variables* taking precedence over all of them and variables set by the Service's *onEnter*
+taking precedence over both.
 
 Under the `WRAP_ACTIONS` extension, a wrapping Environment whose `runScope` includes `SERVICE`
 wraps the Service's actions with its `onWrapService*` hooks, and the inner Environments of the
@@ -1396,15 +1375,12 @@ that needs the combined Job (below). At template validation, an implementation M
    Service) refers to that Service or one earlier in the start order.
 2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s `let`, or in a Job
    or Step Environment whose `runScope` includes `SERVICE`.
-3. `runScope` contains only recognized names, without duplicates, and is not provided on a
-   Service Environment.
+3. `runScope` contains only recognized names, without duplicates.
 4. `readinessCheck` is consistent with `<ServiceActions>` and with `ports`: `onReadinessCheck` is
    defined if and only if the type is `COMMAND`; every port a `TCP_CONNECT` check names is declared
    and has `protocol: TCP`; and a Service none of whose ports is TCP has a `readinessCheck` of type
    `STDOUT` or `COMMAND`.
-5. Service and port names are valid `<Identifier>`s, not `File`, and unique within their lists;
-   Service Environment names are unique within their list and distinct from the Job Environments
-   and, for a Step Service, the Step's Step Environments.
+5. Service and port names are valid `<Identifier>`s, not `File`, and unique within their lists.
 6. The wrap hooks an Environment defines are exactly those its `runScope` calls for, per
    [`<Environment>`](#environment).
 7. A template that lists `SERVICE` also lists `EXPR`.
@@ -1589,14 +1565,6 @@ ordinary sense, so every existing rule about Environments (ordering, `openjd_env
 failure, wrap hooks) applies unchanged, and an Environment Template written for Tasks works for
 Services.
 
-### `serviceEnvironments`, the analogue of `stepEnvironments`
-
-Entering the scope's Environments gives a Service the provisioning its Tasks have, but not
-provisioning of its own: a Valkey from `conda-forge` while the Tasks use a renderer's Conda
-environment, or a container for the one Service that needs isolation. Without a Service-scoped list
-the only recourse is a Job Environment that every Service in scope also enters, or folding the
-provisioning into *onEnter*, which is what Environments exist to avoid.
-
 ### `runScope` rather than an inferred exclusion rule
 
 Two kinds of Environment exist once Services do: those that provision a process (Conda, a container)
@@ -1740,6 +1708,19 @@ needed; no other queue-provided entity requires one; and the stub would add a di
 forward-reference rule. Unchecked `Service.*` references resolved at submission time are rejected as
 well, because they would make `openjd check` unable to catch a typo and hide the dependency from
 readers.
+
+### `serviceEnvironments`, a Service-scoped Environment list
+
+A `<Service>` could carry its own list of Environments, the analogue of `stepEnvironments`, entered
+only in its Session. Rejected because it offers nothing *onEnter* does not. Within a Job Template,
+Environments are defined inline, so a Service-scoped list gives no reuse: the `conda create` that
+provisions a Valkey is the same command in either place. `stepEnvironments` earn their place by
+amortizing setup across the many Tasks a Session runs, but a Service Session already runs one
+*onEnter*, once per Session, before *onRun*, so there is nothing to amortize. Wrapping one Service
+in a container inside the template is simply an *onRun* that invokes the container; the wrap-hook
+machinery exists for queue-supplied wrappers, which enter every Service Session through the scope's
+Environments and never needed a per-Service list. A per-Service list could return as future work if
+a per-Service *external* wrapper is ever needed.
 
 ## Future Work
 

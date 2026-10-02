@@ -1,12 +1,13 @@
-# RFC 0009 "Failure and restart" (a start failure -- here the onEnter of one of
-# the Service's serviceEnvironments exiting non-zero -- consumes a relaunch
+# RFC 0009 "Failure and restart" (a start failure -- here the onEnter of a
+# SERVICE-scoped Job Environment exiting non-zero -- consumes a relaunch
 # attempt, and "After a start failure ... it MUST begin a new Service
 # Session"), lifecycle constraint 9 (a new Session means a new working
 # directory, Environments re-entered, onEnter re-run), and Design Choice
 # Rationale "Start failures consume a restart attempt" (Template Schemas
-# §9.4, §9 item 5). With maxAttempts: 1 the Service Environment's onEnter
-# fails on the first Session and succeeds on the second, which runs in a
-# different working directory; the Service then comes up and the Task runs.
+# §9.4, §4 item 3). The Environment has `runScope: [SERVICE]` so no Task
+# Session enters it. With maxAttempts: 1 its onEnter fails on the first
+# Service Session and succeeds on the second, which runs in a different
+# working directory; the Service then comes up and the Task runs.
 #
 # The two Sessions are told apart by a marker file in the host's temp
 # directory keyed by Job.Name (nothing in the first Session survives into the
@@ -21,31 +22,32 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: StartFailureRelaunchesInNewSession
+  jobEnvironments:
+  - name: Provision
+    runScope: [SERVICE]
+    script:
+      actions:
+        onEnter:
+          command: python
+          args: ["{{ Env.File.Provision }}", "{{ Job.Name }}"]
+      embeddedFiles:
+      - name: Provision
+        type: TEXT
+        data: |
+          import os, sys, tempfile
+          marker = os.path.join(tempfile.gettempdir(), "openjd-" + sys.argv[1] + ".marker")
+          if not os.path.exists(marker):
+              with open(marker, "w") as f:
+                  f.write(os.getcwd())
+              print("PROVISION_FAILING_ONCE", flush=True)
+              sys.exit(3)
+          with open(marker) as f:
+              first_cwd = f.read()
+          os.remove(marker)
+          print("PROVISION_NEW_WORKDIR", os.getcwd() != first_cwd, flush=True)
+          print("PROVISION_OK", flush=True)
   jobServices:
   - name: Store
-    serviceEnvironments:
-    - name: Provision
-      script:
-        actions:
-          onEnter:
-            command: python
-            args: ["{{ Env.File.Provision }}", "{{ Job.Name }}"]
-        embeddedFiles:
-        - name: Provision
-          type: TEXT
-          data: |
-            import os, sys, tempfile
-            marker = os.path.join(tempfile.gettempdir(), "openjd-" + sys.argv[1] + ".marker")
-            if not os.path.exists(marker):
-                with open(marker, "w") as f:
-                    f.write(os.getcwd())
-                print("PROVISION_FAILING_ONCE", flush=True)
-                sys.exit(3)
-            with open(marker) as f:
-                first_cwd = f.read()
-            os.remove(marker)
-            print("PROVISION_NEW_WORKDIR", os.getcwd() != first_cwd, flush=True)
-            print("PROVISION_OK", flush=True)
     ports:
     - name: main
     readinessCheck:

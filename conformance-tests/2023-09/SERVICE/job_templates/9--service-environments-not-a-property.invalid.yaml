@@ -1,6 +1,7 @@
-# Section 9 item 3 / 3.6.2 (RFC 0009): a Service Environment's
-# `<EnvironmentScript>.let` may not shadow a `<Service>.let` binding in scope,
-# as a Step Environment's may not shadow the Step's.
+# Section 9: <Service> has no `serviceEnvironments` property. A Service is
+# provisioned by the Environments of its scope (those whose runScope includes
+# SERVICE) and by its own onEnter; a Service-scoped Environment list is an
+# unknown property and must be rejected.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -8,17 +9,13 @@ extensions:
 name: TestJob
 jobServices:
 - name: Store
-  let:
-  - threads = 8
   serviceEnvironments:
-  - name: Conda
+  - name: Provision
     script:
-      let:
-      - threads = 4
       actions:
         onEnter:
           command: python
-          args: ["-c", "print({{ threads }})"]
+          args: ["-c", "print()"]
   ports:
   - name: main
   script:

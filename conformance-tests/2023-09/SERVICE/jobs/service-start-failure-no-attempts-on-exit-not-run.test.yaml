@@ -1,24 +1,26 @@
 # RFC 0009 lifecycle constraint 7 ("onExit runs if it is defined and any
 # action of the Service has run") and "Failure and restart" (a start failure
 # is "an Environment's onEnter fails" and, with no attempts left, step 4
-# fails the scope): the onEnter of one of the Service's serviceEnvironments
-# always fails, so no action of the Service itself -- onEnter, onRun -- ever
-# runs. With the default maxAttempts of 0 the Service is FAILED, the Job
-# fails before any Task runs, and the Service's onExit is NOT run because
-# nothing of the Service ran (Template Schemas §9 item 5, §9.4, §9.6).
+# fails the scope): the onEnter of a SERVICE-scoped Job Environment, which
+# no Task Session enters, always fails, so no action of the Service itself
+# -- onEnter, onRun -- ever runs. With the default maxAttempts of 0 the
+# Service is FAILED, the Job fails before any Task runs, and the Service's
+# onExit is NOT run because nothing of the Service ran (Template Schemas
+# §4 item 3, §9.4, §9.6).
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: StartFailureNoAttemptsOnExitNotRun
+  jobEnvironments:
+  - name: Provision
+    runScope: [SERVICE]
+    script:
+      actions:
+        onEnter:
+          command: python
+          args: ["-c", "print('PROVISION_FAILING', flush=True); raise SystemExit(3)"]
   jobServices:
   - name: Store
-    serviceEnvironments:
-    - name: Provision
-      script:
-        actions:
-          onEnter:
-            command: python
-            args: ["-c", "print('PROVISION_FAILING', flush=True); raise SystemExit(3)"]
     ports:
     - name: main
     readinessCheck:

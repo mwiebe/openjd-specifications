@@ -30,7 +30,6 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   description: <Description>                  # optional
   let: <LetBindings>                          # optional (job creation)
   hostRequirements: <HostRequirements>        # optional
-  serviceEnvironments: [ <Environment>, ... ] # optional; entered only in this Service's Session
   ports: [ <ServicePort>, ... ]               # 1–10, unique names; { name, port?, protocol?: TCP | UDP }
   readinessCheck: <ServiceReadinessCheck>     # TCP_CONNECT (default, TCP ports only) | COMMAND | STDOUT
   restartPolicy: <ServiceRestartPolicy>       # maxAttempts (0), completedTasks (RERUN | KEEP)
@@ -45,7 +44,7 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
 |---|---|---|
 | `Service.<name>.<port>.port` | `int` | the declaring Service; every entity in its scope |
 | `Service.<name>.<port>.connectAddress` | `string` | the declaring Service; every entity in its scope |
-| `Service.<name>.<port>.bindAddress` | `string` | the declaring Service **only**, including its `serviceEnvironments` |
+| `Service.<name>.<port>.bindAddress` | `string` | the declaring Service **only** |
 | `Service.File.<name>` | `path` | the declaring Service's script |
 | `WrappedService.Name` / `.PortNames` / `.Ports` / `.BindAddresses` / `.Protocols` | `string` / `list[string]` / `list[int]` / `list[string]` / `list[string]` | the four `onWrapService*` hooks |
 
@@ -57,7 +56,9 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   `WRAP_ACTIONS` and `SERVICE`; `SERVICE` requires `EXPR` (§9.7 item 7).
 - **List shape and names** (§1.1 item 8, §1.2 item 6, §3 item 6, §9 item 5,
   §9.1, §9.2): 1–10 elements, unique names, no Job/Step Service name collision
-  (different Steps may reuse a name), identifiers that are not `File`.
+  (different Steps may reuse a name), identifiers that are not `File`. A
+  `<Service>` has a closed set of properties; in particular it has no
+  `serviceEnvironments` list, and one is rejected as an unknown property.
 - **Environment Template root** (§1.2): `$schema` and `extensions` accepted,
   `environment` optional, at least one of `environment` or `services`.
 - **`runScope`** (§4 item 3): recognized names only, no duplicates, not empty;
@@ -66,17 +67,8 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
 - **Hooks follow `runScope`** (§4.3 constraint 6): a wrapping Environment
   defines `onWrapEnvEnter`/`onWrapEnvExit` always, `onWrapTaskRun` iff `TASK`,
   and all four `onWrapService*` hooks iff `SERVICE`; a hook the `runScope` does
-  not call for is rejected. A Service Environment has an effective `runScope`
-  of `[SERVICE]`, and a Service Session's stack (the scope's `SERVICE`-scoped
-  Environments, then the Service's `serviceEnvironments`) holds at most one
-  wrap layer.
-- **`serviceEnvironments`** (§9 items 3, 5): names unique within the list and
-  distinct from the Job Environments and, for a Step Service, the Step's Step
-  Environments; `runScope` not provided; the declaring Service's own scope
-  (`bindAddress` included, earlier Services' `port`/`connectAddress`, the
-  `<Service>.let` bindings, which the Environment's own `let` may not shadow;
-  not a later Service, another Service's `let`, `Task.*`, or
-  `Service.File.*`).
+  not call for is rejected. A Service Session's stack (the scope's
+  `SERVICE`-scoped Environments) holds at most one wrap layer.
 - **Scope rules** (§7.3.1, §9, §9.7 items 1–2): forward-only references
   between Services, Job Services visible to Step Services and Steps, Step
   Services visible only to their Step, `bindAddress` only in the declaring
@@ -84,11 +76,11 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   `let`, or an action `timeout`; `Task.*` never inside a Service;
   `Service.File.*` only in the declaring Service's script; types `int` /
   `string` / `path`.
-- **Port protocol** (§9 item 6 constraint 4, §9.2 item 3, §9.7 item 8):
+- **Port protocol** (§9 item 5 constraint 4, §9.2 item 3, §9.7 item 8):
   `protocol` is `TCP` (default) or `UDP`, a case-sensitive literal that is not
   `@fmtstring`; two ports may share a `port` number only when their `protocol`
   differs.
-- **Readiness and restart** (§9 item 7, §9.3, §9.4, §9.7 item 4):
+- **Readiness and restart** (§9 item 6, §9.3, §9.4, §9.7 item 4):
   `onReadinessCheck` defined iff the type is `COMMAND`; every `TCP_CONNECT`
   port declared and TCP, defaulting to every TCP port; a Service none of whose
   ports is TCP must give a `STDOUT` or `COMMAND` check, so omitting
@@ -325,26 +317,7 @@ SERVICE/
 │   ├── 9.6--service-actions-all-four.yaml
 │   ├── 9.6--service-action-empty-command.invalid.yaml
 │   ├── 9.6--service-actions-unknown-action.invalid.yaml
-│   │  # §9 item 5 serviceEnvironments
-│   ├── 9--service-environments-minimal.yaml
-│   ├── 9--service-environments-on-step-service.yaml
-│   ├── 9--service-environments-references-own-bind-address.yaml
-│   ├── 9--service-environments-references-earlier-service.yaml
-│   ├── 9--service-environments-service-let-available.yaml
-│   ├── 9--service-environments-wrapping-six-hooks.yaml
-│   ├── 9--service-environments-wrapping-composes-with-task-wrapper.yaml
-│   ├── 9--service-environments-duplicate-name.invalid.yaml
-│   ├── 9--service-environments-name-collides-with-job-environment.invalid.yaml
-│   ├── 9--service-environments-step-service-name-collides-with-step-environment.invalid.yaml
-│   ├── 9--service-environments-run-scope-provided.invalid.yaml
-│   ├── 9--service-environments-references-later-service.invalid.yaml
-│   ├── 9--service-environments-references-earlier-service-bind-address.invalid.yaml
-│   ├── 9--service-environments-let-shadows-service-let.invalid.yaml
-│   ├── 9--service-environments-other-services-let-not-in-scope.invalid.yaml
-│   ├── 9--service-environments-no-task-or-service-file.invalid.yaml
-│   ├── 9--service-environments-wrapping-with-task-hook.invalid.yaml
-│   ├── 9--service-environments-wrapping-missing-service-hook.invalid.yaml
-│   └── 9--service-environments-wrapping-second-wrap-layer.invalid.yaml
+│   └── 9--service-environments-not-a-property.invalid.yaml
 ├── env_templates/                  # Environment template validation tests
 │   │  # §1.2 root, §1.2.2 Services from Environment Templates
 │   ├── 1.2--services-only.yaml
@@ -370,14 +343,6 @@ SERVICE/
 │   ├── 1.2--environment-references-bind-address.invalid.yaml
 │   ├── 1.2--environment-references-undeclared-service.invalid.yaml
 │   ├── 1.2--environment-only-references-service.invalid.yaml
-│   │  # §9 item 5 serviceEnvironments of external Services
-│   ├── 1.2--services-with-service-environments.yaml
-│   ├── 1.2--service-let-available-in-service-environments.yaml
-│   ├── 1.2--service-environments-duplicate-name.invalid.yaml
-│   ├── 1.2--service-environment-name-collides-with-environment.invalid.yaml
-│   ├── 1.2--service-environment-run-scope-provided.invalid.yaml
-│   ├── 1.2--service-environment-references-later-service.invalid.yaml
-│   ├── 1.2--service-environment-references-step-name.invalid.yaml
 │   │  # §4 runScope
 │   ├── 4--run-scope-service-environment.yaml
 │   ├── 4--run-scope-unknown-name.invalid.yaml
@@ -400,10 +365,6 @@ SERVICE/
 │   ├── 4.3.1--wrapped-service-in-env-exit-hook.invalid.yaml
 │   ├── 4.3.1--wrapped-service-in-embedded-file.invalid.yaml
 │   ├── 4.3.1--wrapped-step-in-service-hook-timeout.invalid.yaml
-│   ├── 4.3--wrapping-service-environment-six-hooks.yaml
-│   ├── 4.3--wrapping-service-environment-with-task-hook.invalid.yaml
-│   ├── 4.3--wrapping-service-environment-missing-service-hook.invalid.yaml
-│   ├── 4.3--wrapping-service-environment-second-wrap-layer.invalid.yaml
 │   │  # Expression Language §2.2.4 host/port functions gated on SERVICE
 │   └── expr2.2.4--join-host-port-requires-service-extension.invalid.yaml
 └── jobs/                           # End-to-end execution tests
@@ -431,11 +392,6 @@ SERVICE/
     ├── service-job-service-state-persists-across-steps.test.yaml
     ├── service-step-service-stopped-before-dependent-step.test.yaml
     ├── service-stop-order-referencing-service-stopped-first.test.yaml
-    │  # serviceEnvironments (§9 item 5)
-    ├── service-environments-entry-order.test.yaml
-    ├── service-environments-openjd-env-reaches-on-run.test.yaml
-    ├── service-environments-bind-address-in-service-environment.test.yaml
-    ├── service-environments-wrapping-service-environment.test.yaml
     │  # External Services (§1.2.2)
     ├── service-external-task-scoped-client-environment.test.yaml
     ├── service-external-parameter-override.test.yaml
@@ -515,20 +471,6 @@ SERVICE/
   Service Session enters the Environments whose `runScope` includes `SERVICE`;
   Environment `variables` reach the Service's actions with the Service's own
   `variables` taking precedence (`service-environments-follow-run-scope`).
-- **`serviceEnvironments`** (§9 item 5): a Service Session enters the
-  Service's own Environments, in order, after the scope's and before `onEnter`,
-  and exits them in reverse after `onExit`; the Task Session never enters them
-  (`service-environments-entry-order`). Their `variables` and `openjd_env`
-  exports reach every Service action, later Environments over earlier ones and
-  over the scope's, the Service's `variables` over all
-  (`service-environments-openjd-env-reaches-on-run`). They have the Service's
-  own scope — `bindAddress`, an earlier Service's endpoint, `Env.File.*`, their
-  `let` — and can hand the bind endpoint to `onRun`
-  (`service-environments-bind-address-in-service-environment`). A wrapping
-  Service Environment wraps that Service's actions and the Service Environments
-  after it, with `WrappedService.*` and the Service's scope in its hooks, and
-  nothing in the Task Session
-  (`service-environments-wrapping-service-environment`).
 - **`openjd_env` within a Service** (§9.6): variables set by `onEnter` reach
   `onRun` and `onExit`, override declarative `variables`, and never propagate to
   Tasks (`service-on-enter-openjd-env-reaches-on-run`); they reach every
@@ -543,8 +485,8 @@ SERVICE/
   `onExit` run, when the scope fails (`service-on-exit-runs-after-task-failure`,
   `service-max-attempts-exhausted-task-never-runs`); a failing `onExit` does not
   fail the scope (`service-on-exit-failure-does-not-fail-scope`); `onExit` is
-  not run when no action of the Service ran, as when a `serviceEnvironments`
-  entry's `onEnter` fails with no attempts left
+  not run when no action of the Service ran, as when a SERVICE-scoped
+  Environment's `onEnter` fails with no attempts left
   (`service-start-failure-no-attempts-on-exit-not-run`).
 - **External Services** (§1.2.2): a services-plus-environment attachment
   publishes an endpoint to a Job Template that knows nothing of `SERVICE`; the
@@ -578,7 +520,7 @@ SERVICE/
   (`service-keep-max-attempts-exhausted-mid-scope`). A readiness timeout is an
   instance failure: the in-flight `onReadinessCheck` is canceled, no Task runs,
   and `onExit` runs (`service-readiness-timeout-fails-scope`). A start failure
-  — a `serviceEnvironments` entry's `onEnter` exiting non-zero — consumes an
+  — a SERVICE-scoped Environment's `onEnter` exiting non-zero — consumes an
   attempt and the relaunch begins a new Service Session with a new working
   directory, re-entering the Environments and re-running `onEnter`
   (`service-start-failure-relaunches-in-new-session`).
