@@ -463,9 +463,11 @@ out of the Service's own Session, which is what `runScope` provides.
 This RFC is additive and gated by the `SERVICE` extension name declared under RFC 0002:
 
 - Schedulers that do not implement `SERVICE` MUST reject templates that list it in `extensions:`.
-- A template that uses `jobServices`, `stepServices`, or the `Service.*` format-string scope MUST
-  list `SERVICE` in `extensions:`, and a scheduler MUST reject a template that uses any of these
-  without declaring the extension.
+- A template that uses `jobServices`, `stepServices`, `services`, `runScope`, the `Service.*`
+  format-string scope, or the string functions `join_host_port`, `split_host_port`, `is_ipv4`, or
+  `is_ipv6` MUST list `SERVICE` in `extensions:`, and a scheduler MUST reject a template that uses
+  any of these without declaring the extension. The four functions exist only when `SERVICE` is
+  declared; `EXPR` alone does not provide them.
 - No existing field changes meaning. A template with no `SERVICE` extension is unaffected on its
   own. One combination is newly rejected at submission: a wrapping Environment (RFC 0008) whose
   document does not declare `SERVICE`, in a Job that has a Service in that Environment's scope; see
@@ -567,8 +569,8 @@ New and changed properties:
   `Service.<name>.<port>.connectAddress`.
 * *services* — An ordered list of Services that the Environment Template defines, with the same
   constraints as a Job Template's `jobServices`: at least one element, at most 10, unique `name`s,
-  and a Service may reference only Services earlier in the list. At least one of *environment* or
-  *services* must be provided.
+  and a Service may reference only itself and Services earlier in the list. At least one of
+  *environment* or *services* must be provided.
 
 **Services from Environment Templates.** An Environment Template that defines *services* defines
 Services that the scheduler applies to every Job Template submitted through it, just as its
@@ -586,9 +588,10 @@ and embedded files. This is how an attachment publishes a Service to Tasks that 
 Tasks' tools already read.
 
 A `Service.*` reference within an Environment Template MUST resolve to a Service in the same
-document's *services* list (and, within that list, to an earlier Service, as in `jobServices`).
-References to Services defined in other documents are not permitted, so every `Service.*`
-reference in every template is checkable without knowledge of the scheduler's configuration.
+document's *services* list (and, within that list, to itself or an earlier Service, as in
+`jobServices`). References to Services defined in other documents are not permitted, so every
+`Service.*` reference in every template is checkable without knowledge of the scheduler's
+configuration.
 
 A Job Template never references an external Service. Its `Service.*` references MUST resolve to
 Services it declares itself; an external Service reaches a Job's Tasks only through the effects of
@@ -643,11 +646,11 @@ New property:
   be run, before any Service it references. A Step Service is available only to the Step that
   declares it; it is not available to other Steps, including Steps that depend on this one. See
   [`<Service>`](#service). Constraints: 1. Minimum number of elements: If provided, then this list
-  must contain at least one element. 2. Maximum number of elements: 10. 3. No two Services in this
-  list may have the same value for the `name` property. 4. The Services defined in this list must
+  must contain at least one element. 2. No two Services in this list may have the same value for
+  the `name` property. 3. Maximum number of elements: 10. 4. The Services defined in this list must
   not have the same `name` as a Job Service defined in the same Job Template. 5. A Service in this
   list may reference, through `Service.*`, only itself, Services earlier in this list, and the Job
-  Services of the Job Template. 6. Note: as with Step Environments, the scope of a Step Service's
+  Services of the Job Template. Note: as with Step Environments, the scope of a Step Service's
   `name` is the Step that defines it. Different Steps may each define a Step Service with the same
   `name`.
 
@@ -693,9 +696,6 @@ New property:
        an Environment. This rule does not apply to a Service's `serviceEnvironments`, which are
        entered in exactly one Service Session and may reference that Service (see
        [`<Service>`](#service)).
-
-  Future extensions may define additional names; a scheduler MUST reject a name it does not
-  recognize.
 
 > A modification to [`4.3. <EnvironmentActions>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#43-environmentactions)
 
@@ -856,7 +856,7 @@ Where:
        number gives that number explicitly on both ports. Ports whose `port` is not provided are
        allocated independently, each in its own protocol's space, and may or may not coincide
        across protocols.
-7. *readinessCheck* — How the scheduler determines that the Service is ready to accept connections.
+7. *readinessCheck* — How the scheduler determines that the Service is ready to accept traffic.
    If not provided, defaults to `{ type: TCP_CONNECT }` applied to every TCP port. A Service none
    of whose ports is TCP MUST provide a *readinessCheck* of type `STDOUT` or `COMMAND`: a
    `TCP_CONNECT` check, given or defaulted, would have no port to probe and could never pass, so on
@@ -1179,10 +1179,11 @@ Session with their usual meanings; the working directory is the Service Session'
 
 **Environment variables within a Service.** Implementations MUST additionally watch the stdout of
 *onEnter* for `openjd_env`, `openjd_redacted_env`, and `openjd_unset_env`, with the same syntax and
-redaction rules as for an Environment's `onEnter`, including that `openjd_redacted_env` is honored
-only when the document declares the `REDACTED_ENV_VARS` extension. A variable set this way is set in
-the process environment of every subsequent action of the same Service Session — every instance of
-*onRun*, *onReadinessCheck*, and *onExit* — and is retained across relaunches of *onRun* within the
+redaction rules as for an Environment's `onEnter`, including that `openjd_redacted_env` sets the
+variable only when the document declares the `REDACTED_ENV_VARS` extension, while its value is
+redacted from the log regardless. A variable set this way is set in the process environment of
+every subsequent action of the same Service Session — every instance of *onRun*,
+*onReadinessCheck*, and *onExit* — and is retained across relaunches of *onRun* within the
 Session. This is how *onEnter* hands values it computes (a generated credential, a discovered
 device, a path it created) to the service process, and it is the reason those values survive a
 relaunch when *onEnter* is not re-run. Variables set by *onEnter* take precedence over the
@@ -1284,14 +1285,15 @@ execution (and at service execution, for the Service's own actions). They type-c
 
 > Additions to
 > [Expression Language](https://github.com/OpenJobDescription/openjd-specifications/wiki/2026-02-Expression-Language),
-> §1.2 (job template symbols) and §2.2.4 (string functions)
+> §1.2.2 (built-in symbol types) and §2.2.4 (string functions)
 
 **Service symbols.** `Service.File.<name>` (`path`) joins the file-location symbols, and a "Service
 Symbols" table lists `Service.<name>.<port>.port` (`int`), `bindAddress` (`string`), and
 `connectAddress` (`string`), all resolved at task or service execution and typed `unresolved[...]`
 at earlier stages, with the scopes in [The `Service.*` scope](#the-service-scope).
 
-**Host and port functions.** Four string functions are added:
+**Host and port functions.** Four string functions are added. They are available only in documents
+that declare `SERVICE`; `EXPR` alone does not provide them:
 
 | Signature | Description |
 |---|---|
@@ -1502,7 +1504,9 @@ connect is not a sufficient indicator that the service can do useful work.
 #### Validation
 
 Everything this RFC adds is checkable when a template is validated on its own, with two
-exceptions. At template validation, an implementation MUST check:
+exceptions: the `@fmtstring` numeric fields, which are checked when they are resolved at job
+creation (item 8), and one check that needs the combined Job, below. At template validation, an
+implementation MUST check:
 
 1. Every `Service.*` reference resolves to a Service and port declared in the same document, is
    used only where the [scope rules](#the-service-scope) permit, and (for a reference from a
@@ -1546,10 +1550,10 @@ Service on a host that also runs Sessions. A single-host runner such as `openjd 
 Service alongside the Tasks on the same host with `bindAddress` and `connectAddress` both on
 loopback.
 
-Whatever the placement, the scheduler is responsible for network reachability: `connectAddress`
-and `port` as seen from any host in the scope MUST reach the service process. How that is
-achieved — a shared network, an overlay, port forwarding, a proxy — is an implementation
-concern and is not visible in the template.
+Whatever the placement, the scheduler is responsible for network reachability: `connectAddress` and
+`port`, over the port's `protocol`, as seen from any host in the scope MUST reach the service
+process. How that is achieved — a shared network, an overlay, port forwarding, a proxy — is an
+implementation concern and is not visible in the template.
 
 #### Stdout/Stderr messages
 

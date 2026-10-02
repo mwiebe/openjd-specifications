@@ -109,11 +109,11 @@ includes `SERVICE` wraps the **Service**'s `onEnter`, `onRun`, `onReadinessCheck
 `onWrapTaskRun` wraps a Task's `onRun`, and wraps the inner **Environments** of the **Service Session** with
 `onWrapEnvEnter` and `onWrapEnvExit` as in any **Session**. Placement is up to the scheduler: a distributed render
 manager might dedicate a host to a **Service**, while a single-host runner starts it alongside the Tasks on loopback.
-Whatever the placement, the scheduler is responsible for making `connectAddress` and `port`, as seen from any host in
-the scope, reach the service process. A **Service Session** is a **Session** in every other respect too: it has its own
-working directory, and it receives [Path Mapping Rules](#path-mapping) for the **Service host** the same way a
-**Session** running Tasks does, so `PATH` Job Parameters in a **Service**'s actions are mapped for the host the
-**Service** runs on.
+Whatever the placement, the scheduler is responsible for making `connectAddress` and `port`, over the port's `protocol`,
+as seen from any host in the scope, reach the service process. A **Service Session** is a **Session** in every other
+respect too: it has its own working directory, and it receives [Path Mapping Rules](#path-mapping) for the **Service
+host** the same way a **Session** running Tasks does, so `PATH` Job Parameters in a **Service**'s actions are mapped for
+the host the **Service** runs on.
 
 ### Service lifecycle
 

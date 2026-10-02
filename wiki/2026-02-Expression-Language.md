@@ -854,7 +854,7 @@ type-check as `unresolved[...]` at earlier stages.
 
 | Symbol | Type | Description |
 |--------|------|-------------|
-| `Service.<name>.<port>.port` | `int` | The port number allocated for port `<port>` of Service `<name>` |
+| `Service.<name>.<port>.port` | `int` | The port number allocated (or requested) for port `<port>` of Service `<name>`, in the space of that port's `protocol` |
 | `Service.<name>.<port>.bindAddress` | `string` | The interface address the service process binds. Available within the declaring Service only |
 | `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address entities in the Service's scope use to reach the Service |
 
@@ -1549,10 +1549,10 @@ Examples:
 | `zfill(s: string, width: int) -> string` | Pad with leading zeros to width; a leading sign (`+`/`-`) is preserved before the padding |
 | `zfill(n: int, width: int) -> string` | Convert int to string, pad with leading zeros; negative integers preserve the sign before padding |
 | `zfill(x: float, width: int) -> string` | Convert float to string, pad with leading zeros; negative floats preserve the sign before padding |
-| `join_host_port(host: string, port: int) -> string` | Join a host and a port as `host:port`, enclosing `host` in square brackets when it is an IPv6 literal (contains a colon and is not already bracketed), as a URL authority or `host:port` flag value requires |
-| `split_host_port(s: string) -> list[string]?` | Split `host:port` or `[host]:port` into `[host, port]`, removing the brackets from an IPv6 literal; `null` when `s` has no port, including an unbracketed IPv6 literal; an error for malformed brackets |
-| `is_ipv4(s: string) -> bool` | True if `s` is an IPv4 literal |
-| `is_ipv6(s: string) -> bool` | True if `s` is an IPv6 literal, bracketed or not, with or without a zone identifier |
+| `join_host_port(host: string, port: int) -> string` | Join a host and a port as `host:port`, enclosing `host` in square brackets when it is an IPv6 literal (contains a colon and is not already bracketed), as a URL authority or `host:port` flag value requires (`SERVICE` extension) |
+| `split_host_port(s: string) -> list[string]?` | Split `host:port` or `[host]:port` into `[host, port]`, removing the brackets from an IPv6 literal; `null` when `s` has no port, including an unbracketed IPv6 literal; an error for malformed brackets (`SERVICE` extension) |
+| `is_ipv4(s: string) -> bool` | True if `s` is an IPv4 literal (`SERVICE` extension) |
+| `is_ipv6(s: string) -> bool` | True if `s` is an IPv6 literal, bracketed or not, with or without a zone identifier (`SERVICE` extension) |
 
 Examples:
 - `split("a,b,c", ",")` and `"a,b,c".split(",")` return `["a", "b", "c"]`

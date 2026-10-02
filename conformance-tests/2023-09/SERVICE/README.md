@@ -47,13 +47,14 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
 | `Service.<name>.<port>.connectAddress` | `string` | the declaring Service; every entity in its scope |
 | `Service.<name>.<port>.bindAddress` | `string` | the declaring Service **only**, including its `serviceEnvironments` |
 | `Service.File.<name>` | `path` | the declaring Service's script |
-| `WrappedService.Name` / `.PortNames` / `.Ports` / `.BindAddresses` | `string` / `list[string]` / `list[int]` / `list[string]` | the four `onWrapService*` hooks |
+| `WrappedService.Name` / `.PortNames` / `.Ports` / `.BindAddresses` / `.Protocols` | `string` / `list[string]` / `list[int]` / `list[string]` / `list[string]` | the four `onWrapService*` hooks |
 
 ## RFC rules these tests verify
 
-- **Extension gating**: `jobServices`, `stepServices`, `services`, and `runScope`
-  require `SERVICE`; the `onWrapService*` hooks require both `WRAP_ACTIONS` and
-  `SERVICE`; `SERVICE` requires `EXPR` (§9.7 item 7).
+- **Extension gating**: `jobServices`, `stepServices`, `services`, `runScope`,
+  and the string functions `join_host_port`, `split_host_port`, `is_ipv4`, and
+  `is_ipv6` require `SERVICE`; the `onWrapService*` hooks require both
+  `WRAP_ACTIONS` and `SERVICE`; `SERVICE` requires `EXPR` (§9.7 item 7).
 - **List shape and names** (§1.1 item 8, §1.2 item 6, §3 item 6, §9 item 5,
   §9.1, §9.2): 1–10 elements, unique names, no Job/Step Service name collision
   (different Steps may reuse a name), identifiers that are not `File`.
@@ -203,6 +204,7 @@ SERVICE/
 │   ├── 7.3.1--service-let-sees-params-and-job-name.yaml
 │   ├── 7.3.1--service-file-in-declaring-service.yaml
 │   ├── 7.3.1--service-value-types.yaml
+│   ├── 7.3.1--service-port-int-arithmetic-type-checks.yaml
 │   ├── 7.3.1--bind-address-in-step-script.invalid.yaml
 │   ├── 7.3.1--bind-address-in-later-service.invalid.yaml
 │   ├── 7.3.1--bind-address-in-task-scoped-environment.invalid.yaml
@@ -225,10 +227,16 @@ SERVICE/
 │   ├── 7.3.1--service-file-of-other-service.invalid.yaml
 │   ├── 7.3.1--service-file-in-step-script.invalid.yaml
 │   ├── 7.3.1--service-port-plus-string.invalid.yaml
+│   ├── 7.3.1--service-port-is-int-string-method-type-error.invalid.yaml
+│   ├── 7.3.1--service-connect-address-is-string-plus-int-type-error.invalid.yaml
 │   ├── expr2.2.4--join-host-port-with-service.yaml
 │   ├── expr2.2.4--join-host-port-swapped-arguments.invalid.yaml
 │   ├── expr2.2.4--join-host-port-string-port.invalid.yaml
 │   ├── expr2.2.4--is-ipv6-on-int.invalid.yaml
+│   ├── expr2.2.4--join-host-port-requires-service-extension.invalid.yaml
+│   ├── expr2.2.4--split-host-port-requires-service-extension.invalid.yaml
+│   ├── expr2.2.4--is-ipv4-requires-service-extension.invalid.yaml
+│   ├── expr2.2.4--is-ipv6-requires-service-extension.invalid.yaml
 │   │  # §9–§9.6 <Service> structure
 │   ├── 9--service-all-fields.yaml
 │   ├── 9--ports-ten.yaml
@@ -244,6 +252,7 @@ SERVICE/
 │   ├── 9.1--service-name-leading-digit.invalid.yaml
 │   ├── 9.2--port-explicit-number.yaml
 │   ├── 9.2--numeric-fields-from-param.yaml
+│   ├── 9.2--port-arithmetic-on-literals-in-range.yaml
 │   ├── 9.2--port-name-file.invalid.yaml
 │   ├── 9.2--port-name-not-identifier.invalid.yaml
 │   ├── 9.2--port-zero.invalid.yaml
@@ -252,6 +261,8 @@ SERVICE/
 │   ├── 9.2--numeric-field-references-session.invalid.yaml
 │   ├── 9.2--numeric-field-references-service.invalid.yaml
 │   ├── 9.2--numeric-field-constant-out-of-range.invalid.yaml
+│   ├── 9.2--port-arithmetic-on-literals-out-of-range.invalid.yaml
+│   ├── 9.2--port-let-bound-out-of-range.invalid.yaml
 │   ├── 9.2--port-protocol-tcp-explicit.yaml
 │   ├── 9.2--port-protocol-udp-with-stdout-readiness.yaml
 │   ├── 9.2--port-protocol-mixed-default-readiness.yaml
@@ -371,7 +382,9 @@ SERVICE/
 │   ├── 4.3--wrapping-service-environment-six-hooks.yaml
 │   ├── 4.3--wrapping-service-environment-with-task-hook.invalid.yaml
 │   ├── 4.3--wrapping-service-environment-missing-service-hook.invalid.yaml
-│   └── 4.3--wrapping-service-environment-second-wrap-layer.invalid.yaml
+│   ├── 4.3--wrapping-service-environment-second-wrap-layer.invalid.yaml
+│   │  # Expression Language §2.2.4 host/port functions gated on SERVICE
+│   └── expr2.2.4--join-host-port-requires-service-extension.invalid.yaml
 └── jobs/                           # End-to-end execution tests
     │  # Readiness checks and the Service.* scope
     ├── service-job-tcp-connect.test.yaml
