@@ -2649,12 +2649,14 @@ Where:
       is canceled and is one failed probe, as is any exit status other than 0. Neither is by itself a failure of the
       Service.
     * `STDOUT` — A probe is a line of the form `openjd_service_ready: <message>` written to stdout by the `onRun`
-      action, with the same syntax as the other `openjd_*` messages (see
-      [How Jobs Are Run](How-Jobs-Are-Run#stdoutstderr-messages)). The first such line makes the instance READY;
-      `<message>` has no functional purpose but may be surfaced in UI elements. After READY, when
-      *healthIntervalSeconds* is given the line is a heartbeat: each interval in which no such line arrives is one
-      failed probe. When it is omitted, the health of a `STDOUT` instance is that its `onRun` process is still running,
-      and further lines have no effect. *readinessIntervalSeconds* does not apply to this type.
+      action, with the same syntax as the other `openjd_*` messages (see [How Jobs Are
+      Run](How-Jobs-Are-Run#stdoutstderr-messages)). The first such line makes the instance READY; `<message>` has no
+      functional purpose but may be surfaced in UI elements. After READY, when *healthIntervalSeconds* is given the line
+      is a heartbeat: each interval in which no such line arrives is one failed probe. With `healthIntervalSeconds: 10`
+      and `failureThreshold: 3`, a service that prints the line every five seconds stays READY, and one that falls
+      silent is UNHEALTHY thirty seconds after its last line. When it is omitted, the health of a `STDOUT` instance is
+      that its `onRun` process is still running, and further lines have no effect. *readinessIntervalSeconds* does not
+      apply to this type.
 2. *ports* (`TCP_CONNECT` only) — The names of the ports to probe. Each must be declared in the Service's *ports* and
    have `protocol: TCP`; naming a UDP port is a validation error, since a UDP port cannot accept a connection. Defaults
    to every TCP port the Service declares.
