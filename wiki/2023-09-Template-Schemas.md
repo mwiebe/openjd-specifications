@@ -1819,15 +1819,17 @@ be reused unchanged.
 | `WrappedService.PortNames`     | `list[string]` | The `name` of each of the Service's ports, in declaration order. |
 | `WrappedService.Ports`         | `list[int]`    | The allocated port number of each port, in the same order. |
 | `WrappedService.BindAddresses` | `list[string]` | The `bindAddress` of each port, in the same order. |
+| `WrappedService.Protocols`     | `list[string]` | The `protocol` of each port (`TCP` or `UDP`), in the same order. |
 
-The three lists are parallel: index *i* of each describes the Service's *i*-th declared port. `bindAddress` and
+The four lists are parallel: index *i* of each describes the Service's *i*-th declared port. `bindAddress` and
 `connectAddress` are determined for the service host's network namespace. A wrap script that runs the service process in
 that namespace (a launcher, `ssh`, or a container with host networking) needs no port handling. One that gives the
-process its own network namespace must forward each port in `WrappedService.Ports` so that a connection to
-`connectAddress`:`port` from any host in the scope reaches the process, and must ensure the process can bind
-`bindAddress` inside that namespace; a wildcard `bindAddress` works in either, while a loopback `bindAddress` reaches a
-forwarded port only with host networking. For example, a Docker wrapper without host networking passes
-`{{ flatten([['-p', string(p) + ':' + string(p)] for p in WrappedService.Ports]) }}`.
+process its own network namespace must forward each port in `WrappedService.Ports`, with the protocol given by
+`WrappedService.Protocols`, so that a connection to `connectAddress`:`port` from any host in the scope reaches the
+process, and must ensure the process can bind `bindAddress` inside that namespace; a wildcard `bindAddress` works in
+either, while a loopback `bindAddress` reaches a forwarded port only with host networking. For example, a Docker wrapper
+without host networking passes
+`{{ flatten([['-p', string(WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i]) + '/' + lower(WrappedService.Protocols[i])] for i in range(len(WrappedService.Ports))]) }}`.
 
 `WrappedAction.Environment` carries only session-defined variables: variables exported with `openjd_env` —
 including by earlier actions that themselves ran via a wrap hook — and entries of entered environments'
@@ -2197,7 +2199,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Task.File.<name>`|The filesystem location to which the Task Embedded File with key `<name>` has been written.| Available within the Step Script Actions and Embedded Files.|
 |`Env.File.<name>`|The filesystem location to which the Environment Attachment with key `<name>` has been written.|Available within the Environment Script Actions and Embedded Files.|
 |`Service.File.<name>`|The filesystem location to which the Service Embedded File with key `<name>` has been written. Requires the `SERVICE` extension.|Available within the Service Script Actions and Embedded Files of the declaring Service.|
-|`Service.<name>.<port>.port`|The TCP port number allocated (or requested) for port `<port>` of Service `<name>`. This is an `int` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope. See [&lt;Service&gt;](#9-service-extension-service) for the scoping rules.|
+|`Service.<name>.<port>.port`|The port number allocated (or requested) for port `<port>` of Service `<name>`, in the space of that port's `protocol`. This is an `int` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope. See [&lt;Service&gt;](#9-service-extension-service) for the scoping rules.|
 |`Service.<name>.<port>.bindAddress`|The interface address that the service process must bind to so that entities in the Service's scope can reach it: a hostname, an IPv4 literal, or an unbracketed IPv6 literal. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service only.|
 |`Service.<name>.<port>.connectAddress`|The hostname or IP address that entities in the Service's scope use to reach port `<port>` of Service `<name>`: a hostname, an IPv4 literal, or an unbracketed IPv6 literal. Join it with a port using `join_host_port` (see [Expression Language](2026-02-Expression-Language#224-string-functions)), which adds the brackets an IPv6 literal needs in a URL. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service and within every entity in the Service's scope.|
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
@@ -2459,7 +2461,7 @@ without `EXPR`.
 A Service is a long-lived process that a scheduler starts before scheduling the Tasks in its scope, keeps running
 for the lifetime of its scope, and stops once the scope no longer needs it. The scope of a Service is the Job for a
 Service listed in `jobServices`, and the declaring Step for a Service listed in `stepServices`. A Service publishes one
-or more named TCP ports that the runtime allocates on the Service's host, and every entity in the Service's scope
+or more named ports that the runtime allocates on the Service's host, and every entity in the Service's scope
 (Tasks, Environments, and later Services) can discover the resulting endpoint via the `Service.*` format-string scope.
 Unlike an Environment, a Service may be placed on a different Worker Host than the Tasks that use it. A Service runs
 in a Session of its own on that host, inside the Environments of its scope (the Job's `jobEnvironments`, and for a Step
@@ -2507,19 +2509,26 @@ Where:
 2. *runScope* must not be provided on a Service Environment; its scope is fixed to the declaring Service's Session. For
        the wrap-hook rule in [&lt;EnvironmentActions&gt;](#43-environmentactions) it is treated as `runScope:
        [SERVICE]`.
-6. *ports* — The named TCP ports that the Service exposes. See: [&lt;ServicePort&gt;](#92-serviceport).
+6. *ports* — The named ports that the Service exposes. See: [&lt;ServicePort&gt;](#92-serviceport).
     1. Minimum number of elements: 1.
     2. Maximum number of elements: 10.
     3. No two elements may have the same value for the *name* property.
+    4. No two elements with the same value for the *protocol* property may have the same value for the *port*
+       property. Two ports may have the same number when their *protocol* differs: a service that speaks TCP and UDP
+       on one number gives that number explicitly on both ports. Ports whose *port* is not provided are allocated
+       independently, each in its own protocol's space, and may or may not coincide across protocols.
 7. *readinessCheck* — How the scheduler determines that the Service is ready to accept connections. If not provided,
-   defaults to `{ type: TCP_CONNECT }` applied to every declared port. See: [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck).
+   defaults to `{ type: TCP_CONNECT }` applied to every declared TCP port. A Service none of whose ports is TCP must
+   provide a *readinessCheck* of type `STDOUT` or `COMMAND`: a `TCP_CONNECT` check, given or defaulted, would have no
+   port to probe and could never pass, so on such a Service omitting *readinessCheck*, or giving one of type
+   `TCP_CONNECT`, is a validation error. See: [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck).
 8. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the scope ends. If not
    provided, defaults to `{ maxAttempts: 0, completedTasks: RERUN }`. See:
    [&lt;ServiceRestartPolicy&gt;](#94-servicerestartpolicy).
-9. *variables* — A set of environment variable name/value pairs, with the values being [Format Strings](#73-format-
-   strings) that are resolved when the Service is started, that are set in the process environment of every action of
-   the Service's *script*. This is the declarative way to configure a service process that takes its configuration from
-   environment variables, without wrapping the command in a shell. See:
+9. *variables* — A set of environment variable name/value pairs, with the values being [Format
+   Strings](#73-format-strings) that are resolved when the Service is started, that are set in the process environment
+   of every action of the Service's *script*. This is the declarative way to configure a service process that takes its
+   configuration from environment variables, without wrapping the command in a shell. See:
    [&lt;EnvironmentVariables&gt;](#44-environmentvariables). A Service's *variables* are not propagated to the entities
    in its scope; they receive the Service's endpoint through `Service.*` only. Values computed by *onEnter* are passed
    to *onRun* with `openjd_env` instead (see [&lt;ServiceActions&gt;](#96-serviceactions)).
@@ -2579,20 +2588,26 @@ A `<ServicePort>` is the object:
 ```yaml
 name: <Identifier>
 port: <posinteger> | <posintstring> # @optional @fmtstring
+protocol: enum("TCP", "UDP") # @optional
 ```
 
 Where:
 
 1. *name* — The name of the port. It is the second component of `Service.<service>.<port>.*` references. Must not be
    `File`.
-2. *port* — If provided, the Service requires this specific TCP port number on its host. If the scheduler cannot provide
-   that port on the chosen host, that is a start failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-
-   restart)), and relocation to another host may succeed. If not provided, the runtime allocates an available port.
-   Range: 1–65535. Authors should omit this and let the runtime allocate, so that multiple Services and Sessions can
-   share a host. An allocated port is reserved only in the runtime's own bookkeeping; on a host shared with unrelated
-   processes, one of them may bind the port before `onRun` does, in which case `onRun` exits with an error or never
-   becomes ready, either of which is an instance failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-
-   restart)).
+2. *port* — If provided, the Service requires this specific port number on its host, in the space of the port's
+   *protocol*. If the scheduler cannot provide that port on the chosen host, that is a start failure (see
+   [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)), and relocation to another host may succeed. If
+   not provided, the runtime allocates an available port of the port's *protocol*. Range: 1–65535. Authors should omit
+   this and let the runtime allocate, so that multiple Services and Sessions can share a host. An allocated port is
+   reserved only in the runtime's own bookkeeping; on a host shared with unrelated processes, one of them may bind the
+   port before `onRun` does, in which case `onRun` exits with an error or never becomes ready, either of which is an
+   instance failure (see [How Jobs Are Run](How-Jobs-Are-Run#service-failure-and-restart)).
+3. *protocol* — The transport protocol the service process binds the port with, and which the scheduler uses for any
+   publishing or forwarding it performs to make the port reachable (a container port mapping, a firewall rule, a NAT
+   entry). One of `TCP` or `UDP`. Default: `TCP`. Everything said of *port* applies to either protocol; TCP and UDP port
+   numbers are separate spaces, so the number is requested or allocated in the space of this protocol. A UDP port
+   cannot be probed by a `TCP_CONNECT` readiness check; see [&lt;ServiceReadinessCheck&gt;](#93-servicereadinesscheck).
 
 Numeric fields marked `@fmtstring` in this section (`<ServicePort>.port`, `<ServiceReadinessCheck>.timeoutSeconds` and
 `intervalSeconds`, and `<ServiceRestartPolicy>.maxAttempts`) may be given as a format string whose result is the
@@ -2601,7 +2616,7 @@ integer. They are resolved at job creation in the scope of a `<Service>`'s *let*
 is a single whole-field expression, its target type is `int?`: a `null` result is treated as if the field were not
 provided, and a non-null result must satisfy the field's range.
 
-All ports are TCP, and all of a Service's ports are bound and published on the same host.
+Every port, TCP or UDP, is bound and published on the same service host.
 
 ### 9.3. `<ServiceReadinessCheck>`
 
@@ -2627,10 +2642,12 @@ timeoutSeconds: <posinteger> | <posintstring> # @optional @fmtstring
 Where:
 
 1. *type* — The probe mechanism:
-    * `TCP_CONNECT` — The Service is ready once a TCP connection to each of the listed ports succeeds. The connection is
-      made from the service host to the allocated `port` on the loopback interface, or on `bindAddress` when it is not
-      a wildcard address (`0.0.0.0` or `::`), and is closed immediately. The scheduler retries at an
-      implementation-defined interval (recommended: 1 second) until success or timeout.
+    * `TCP_CONNECT` — The Service is ready once a TCP connection to each of the listed ports (by default, every TCP
+      port the Service declares) succeeds. The connection is made from the service host to the allocated `port` on the
+      loopback interface, or on `bindAddress` when it is not a wildcard address (`0.0.0.0` or `::`), and is closed
+      immediately. The scheduler retries at an implementation-defined interval (recommended: 1 second) until success
+      or timeout. This type is usable only on a Service with at least one TCP port; see *readinessCheck* in
+      [&lt;Service&gt;](#9-service-extension-service).
     * `COMMAND` — The Service is ready once its *onReadinessCheck* action (see [&lt;ServiceActions&gt;](#96-serviceactions))
       exits with status 0 while `onRun` is still running. The Service must define *onReadinessCheck* when this type is
       used. The action runs in the Service Session concurrently with `onRun`; see
@@ -2644,8 +2661,9 @@ Where:
       `openjd_service_ready: <message>` to stdout, with the same syntax as the other `openjd_*` messages (see
       [How Jobs Are Run](How-Jobs-Are-Run#stdoutstderr-messages)). The message has no functional purpose but may be
       surfaced in UI elements.
-2. *ports* (`TCP_CONNECT` only) — The names of the ports to probe. Each must be declared in the Service's *ports*.
-   Defaults to all of them.
+2. *ports* (`TCP_CONNECT` only) — The names of the ports to probe. Each must be declared in the Service's *ports* and
+   have `protocol: TCP`; naming a UDP port is a validation error, since a UDP port cannot accept a connection. Defaults
+   to every TCP port the Service declares.
 3. *intervalSeconds* (`COMMAND` only) — Seconds to wait between the end of one *onReadinessCheck* invocation and the
    start of the next. Default: 5.
 4. *timeoutSeconds* — The maximum time, measured from the start of the `onRun` action, that the scheduler waits for the
@@ -2799,14 +2817,17 @@ validation, an implementation must check:
 2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s `let`, or in a Job or Step Environment
    whose `runScope` includes `SERVICE`.
 3. `runScope` contains only recognized names, without duplicates, and is not provided on a Service Environment.
-4. `readinessCheck` is consistent with `<ServiceActions>`: `onReadinessCheck` is defined if and only if the type is
-   `COMMAND`, and every port a `TCP_CONNECT` check names is declared.
+4. `readinessCheck` is consistent with `<ServiceActions>` and with `ports`: `onReadinessCheck` is defined if and only
+   if the type is `COMMAND`; every port a `TCP_CONNECT` check names is declared and has `protocol: TCP`; and a Service
+   none of whose ports is TCP has a `readinessCheck` of type `STDOUT` or `COMMAND`.
 5. Service and port names are valid identifiers, not `File`, and unique within their lists; Service Environment names
    are unique within their list and distinct from the Job Environments and, for a Step Service, the Step's Step
    Environments.
 6. The wrap hooks an Environment defines are exactly those its `runScope` calls for (see
    [&lt;EnvironmentActions&gt;](#43-environmentactions)).
 7. A template that lists `SERVICE` also lists `EXPR`.
+8. No two ports of a Service with the same `protocol` have the same `port` number. For a `port` given as a format
+   string this is checked when the value is resolved at job creation, as its range is.
 
 One check relates documents that only the scheduler sees together and is performed at submission: the
 wrapping-Environment rule in [Services from Environment Templates](#122-services-from-environment-templates).

@@ -298,6 +298,71 @@ steps:
               --valkey-host "$VALKEY_HOST" --valkey-port "$VALKEY_PORT"
 ```
 
+### A metrics sink with a UDP ingest port
+
+This Job collects per-frame timings in a StatsD-style metrics sink that every Task reports to over
+UDP, and exposes the aggregated results through a TCP HTTP API that the final Step reads. The
+`ingest` port declares `protocol: UDP`, so a scheduler that publishes or forwards ports between
+hosts forwards it as UDP; the `api` port is TCP by default. The Service gives no `readinessCheck`,
+so the default `TCP_CONNECT` applies, and it probes the Service's TCP ports only: once `api` accepts
+a connection the sink is up and `ingest` is bound with it. The UDP port carries the same three
+values as a TCP port, and the Tasks use `connectAddress` and `port` without caring which it is.
+
+```yaml
+specificationVersion: "jobtemplate-2023-09"
+extensions: [SERVICE, EXPR]
+name: "Frame Render With Metrics Sink"
+
+jobServices:
+  - name: Metrics
+    description: "Collects frame timings over UDP; serves the aggregate over HTTP."
+    ports:
+      - name: ingest
+        protocol: UDP
+      - name: api
+    restartPolicy:
+      maxAttempts: 3
+      completedTasks: KEEP
+    script:
+      actions:
+        onRun:
+          command: metrics-sink
+          args:
+            - "--udp-listen"
+            - "{{ join_host_port(Service.Metrics.ingest.bindAddress, Service.Metrics.ingest.port) }}"
+            - "--http-listen"
+            - "{{ join_host_port(Service.Metrics.api.bindAddress, Service.Metrics.api.port) }}"
+
+steps:
+  - name: RenderFrames
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: INT
+          range: "1-100"
+    script:
+      actions:
+        onRun:
+          command: render-frame
+          args:
+            - "--frame"
+            - "{{ Task.Param.Frame }}"
+            - "--statsd-host"
+            - "{{ Service.Metrics.ingest.connectAddress }}"
+            - "--statsd-port"
+            - "{{ Service.Metrics.ingest.port }}"
+  - name: Report
+    dependencies:
+      - dependsOn: RenderFrames
+    script:
+      actions:
+        onRun:
+          command: curl
+          args:
+            - "-sf"
+            - "http://{{ join_host_port(Service.Metrics.api.connectAddress, Service.Metrics.api.port) }}/summary"
+```
+
 ### Execution order
 
 For a Job with one `jobService` `S`, one `jobEnvironment` `E`, and one Step with Tasks `T1..Tn`
@@ -661,13 +726,14 @@ New properties, available only when both `WRAP_ACTIONS` (RFC 0008) and `SERVICE`
   | `WrappedService.PortNames` | `list[string]` | The `name` of each of the Service's ports, in declaration order. |
   | `WrappedService.Ports` | `list[int]` | The allocated port number of each port, in the same order. |
   | `WrappedService.BindAddresses` | `list[string]` | The `bindAddress` of each port, in the same order. |
+  | `WrappedService.Protocols` | `list[string]` | The `protocol` of each port (`TCP` or `UDP`), in the same order. |
 
-  The three lists are parallel: index *i* of each describes the Service's *i*-th declared port. A
+  The four lists are parallel: index *i* of each describes the Service's *i*-th declared port. A
   wrapper that launches the service process in its own network namespace (a container without
-  host networking) uses them to forward every port; a Docker wrapper passes
-  `{{ flatten([['-p', string(p) + ':' + string(p)] for p in WrappedService.Ports]) }}` in its
-  `args`, and one that restricts the host-side binding to the allocated interface passes
-  `{{ flatten([['-p', join_host_port(WrappedService.BindAddresses[i], WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i])] for i in range(len(WrappedService.Ports))]) }}`.
+  host networking) uses them to forward every port with its protocol; a Docker wrapper passes
+  `{{ flatten([['-p', string(WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i]) + '/' + lower(WrappedService.Protocols[i])] for i in range(len(WrappedService.Ports))]) }}`
+  in its `args`, and one that restricts the host-side binding to the allocated interface passes
+  `{{ flatten([['-p', join_host_port(WrappedService.BindAddresses[i], WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i]) + '/' + lower(WrappedService.Protocols[i])] for i in range(len(WrappedService.Ports))]) }}`.
 
 RFC 0008's rules extend to the new hooks as follows:
 
@@ -711,11 +777,12 @@ RFC 0008's rules extend to the new hooks as follows:
 6. *Networking.* `bindAddress` and `connectAddress` are determined for the service host's network
    namespace. A wrapper that runs the service process in that namespace (a launcher, `ssh`, or a
    container with host networking) needs no port handling. A wrapper that gives the process its own
-   network namespace MUST forward each port in `WrappedService.Ports` so that a connection to
-   `connectAddress`:`port` from any host in the scope reaches the process, and MUST ensure the
-   process can bind `bindAddress` inside that namespace; a wildcard `bindAddress` (`0.0.0.0`, `::`)
-   works in either, while a loopback `bindAddress` reaches a forwarded port only with host
-   networking. Host networking is the simplest way to satisfy this rule.
+   network namespace MUST forward each port in `WrappedService.Ports`, with the protocol given by
+   `WrappedService.Protocols`, so that a connection to `connectAddress`:`port` from any host in the
+   scope reaches the process, and MUST ensure the process can bind `bindAddress` inside that
+   namespace; a wildcard `bindAddress` (`0.0.0.0`, `::`) works in either, while a loopback
+   `bindAddress` reaches a forwarded port only with host networking. Host networking is the simplest
+   way to satisfy this rule.
 
 A wrapping Environment's own *onEnter* and *onExit* are never wrapped, in a Service Session as in
 any other.
@@ -784,9 +851,17 @@ Where:
     1. Minimum number of elements: 1.
     2. Maximum number of elements: 10.
     3. No two ports may have the same `name`.
+    4. No two ports with the same `protocol` may have the same `port` number. Two ports MAY have
+       the same number when their `protocol` differs: a service that speaks TCP and UDP on one
+       number gives that number explicitly on both ports. Ports whose `port` is not provided are
+       allocated independently, each in its own protocol's space, and may or may not coincide
+       across protocols.
 7. *readinessCheck* — How the scheduler determines that the Service is ready to accept connections.
-   If not provided, defaults to `{ type: TCP_CONNECT }` applied to every port. See
-   [`<ServiceReadinessCheck>`](#servicereadinesscheck).
+   If not provided, defaults to `{ type: TCP_CONNECT }` applied to every TCP port. A Service none
+   of whose ports is TCP MUST provide a *readinessCheck* of type `STDOUT` or `COMMAND`: a
+   `TCP_CONNECT` check, given or defaulted, would have no port to probe and could never pass, so on
+   such a Service omitting *readinessCheck*, or giving one of type `TCP_CONNECT`, is a validation
+   error. See [`<ServiceReadinessCheck>`](#servicereadinesscheck).
 8. *restartPolicy* — What the scheduler does when the Service's `onRun` action exits before the
    scope ends. If not provided, defaults to `{ maxAttempts: 0, completedTasks: RERUN }`: the
    Service is never relaunched, and its exit fails the scope. See
@@ -845,22 +920,31 @@ A `<ServicePort>` is the object:
 ```yaml
 name: <Identifier>
 port: <posinteger> | <posintstring> # @optional @fmtstring
+protocol: enum("TCP", "UDP") # @optional
 ```
 
 Where:
 
 1. *name* — The name of the port. It is the second component of `Service.<service>.<port>.*`
    references. Must not be `File`.
-2. *port* — If provided, the Service requires this specific TCP port number on its host. If the
-   scheduler cannot provide that port on the chosen host (for example, because it is in use), that
-   is a start failure (see [Failure and restart](#failure-and-restart)), and relocation to another
-   host may succeed. If not provided, the runtime allocates an available port. Range: 1–65535.
+2. *port* — If provided, the Service requires this specific port number on its host, in the space
+   of the port's *protocol*. If the scheduler cannot provide that port on the chosen host (for
+   example, because it is in use), that is a start failure (see
+   [Failure and restart](#failure-and-restart)), and relocation to another host may succeed. If not
+   provided, the runtime allocates an available port of the port's *protocol*. Range: 1–65535.
    Authors SHOULD omit this and let the runtime allocate, so that multiple Services and Sessions can
    share a host. An allocated port is reserved only in the runtime's own bookkeeping; on a host
    shared with unrelated processes, one of them may bind the port between allocation and *onRun*'s
    bind. When that happens *onRun* exits with an error or never becomes READY, either of which is an
    instance failure, and the restart decision applies (see
    [Failure and restart](#failure-and-restart)).
+3. *protocol* — The transport protocol the service process binds the port with, and which the
+   scheduler uses for any publishing or forwarding it performs to make the port reachable (a
+   container port mapping, a firewall rule, a NAT entry). One of `TCP` or `UDP`. Default: `TCP`.
+   Everything said of *port* applies to either protocol; TCP and UDP port numbers are separate
+   spaces, so the number is requested or allocated in the space of this protocol. A UDP port
+   cannot be probed by a `TCP_CONNECT` readiness check; see
+   [`<ServiceReadinessCheck>`](#servicereadinesscheck).
 
 Numeric fields marked `@fmtstring` — `<ServicePort>.port`, `<ServiceReadinessCheck>.timeoutSeconds`
 and `intervalSeconds`, and `<ServiceRestartPolicy>.maxAttempts` — may be given as a format string
@@ -871,8 +955,8 @@ When the value is a single whole-field expression (`"{{ ... }}"` with no surroun
 target type is `int?`: a `null` result is treated as if the field were not provided, and a non-null
 result MUST satisfy the field's range.
 
-All ports are TCP. Every port is bound and published on the same service host. UDP ports and
-Unix domain sockets are out of scope for this RFC (see [Future Work](#future-work)).
+Every port, TCP or UDP, is bound and published on the same service host. Unix domain sockets are
+out of scope for this RFC (see [Future Work](#future-work)).
 
 ##### `<ServiceReadinessCheck>`
 
@@ -899,11 +983,12 @@ Where:
 
 1. *type* — The probe mechanism:
     * `TCP_CONNECT` — The Service is READY once a TCP connection to each of the listed ports (by
-      default, every port the Service declares) succeeds. The connection is made from the service
-      host to the allocated `port` on the loopback interface, or on `bindAddress` when it is not a
-      wildcard address (`0.0.0.0` or `::`, which cannot be connected to on every operating
+      default, every TCP port the Service declares) succeeds. The connection is made from the
+      service host to the allocated `port` on the loopback interface, or on `bindAddress` when it
+      is not a wildcard address (`0.0.0.0` or `::`, which cannot be connected to on every operating
       system), and is closed immediately. The scheduler retries at an implementation-defined
-      interval (recommended: 1 second) until success or timeout.
+      interval (recommended: 1 second) until success or timeout. This type is usable only on a
+      Service with at least one TCP port; see *readinessCheck* in [`<Service>`](#service).
     * `COMMAND` — The Service is READY once the Service's *onReadinessCheck* action (see
       [`<ServiceActions>`](#serviceactions)) exits with status 0 while `onRun` is still running.
       The Service MUST define *onReadinessCheck* when this type is used. The action is run in the
@@ -922,7 +1007,8 @@ Where:
       mechanism of choice for services whose readiness is not observable from outside the
       process.
 2. *ports* (`TCP_CONNECT` only) — The names of the ports to probe. Each must be declared in the
-   Service's *ports*. Defaults to all of them.
+   Service's *ports* and have `protocol: TCP`; naming a UDP port is a validation error, since a
+   UDP port cannot accept a connection. Defaults to every TCP port the Service declares.
 3. *intervalSeconds* (`COMMAND` only) — Seconds to wait between the end of one *onReadinessCheck*
    invocation and the start of the next. Default: 5.
 4. *timeoutSeconds* — The maximum time, measured from the start of the `onRun` action, that the
@@ -1135,7 +1221,7 @@ until the scheduler places the Service, and may change if the Service is relocat
 
 | Value | Type | Description | Scope |
 |---|---|---|---|
-| `Service.<name>.<port>.port` | `int` | The TCP port number allocated (or requested) for port `<port>` of Service `<name>`. The same number is used for binding and for connecting. | Within the declaring Service; within every entity in the Service's scope (see below). |
+| `Service.<name>.<port>.port` | `int` | The port number allocated (or requested) for port `<port>` of Service `<name>`, in the space of that port's `protocol`. The same number is used for binding and for connecting. | Within the declaring Service; within every entity in the Service's scope (see below). |
 | `Service.<name>.<port>.bindAddress` | `string` | The interface address the service process MUST bind to so that entities in the Service's scope can reach it. Typically `0.0.0.0` (or `::`) for a distributed scheduler and `127.0.0.1` for a single-host runner. | Within the declaring Service only. |
 | `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address that entities in the Service's scope use to reach it. See [Address forms](#address-forms). | Within every entity in the Service's scope. Also within the declaring Service, for self-reference (e.g. to print its own URL). |
 | `Service.File.<name>` | `path` | The filesystem location to which the Service embedded file with key `<name>` has been written. | Within the Service Script actions and embedded files of the declaring Service. |
@@ -1425,14 +1511,19 @@ exceptions. At template validation, an implementation MUST check:
    or Step Environment whose `runScope` includes `SERVICE`.
 3. `runScope` contains only recognized names, without duplicates, and is not provided on a
    Service Environment.
-4. `readinessCheck` is consistent with `<ServiceActions>`: `onReadinessCheck` is defined if and
-   only if the type is `COMMAND`, and every port a `TCP_CONNECT` check names is declared.
+4. `readinessCheck` is consistent with `<ServiceActions>` and with `ports`: `onReadinessCheck` is
+   defined if and only if the type is `COMMAND`; every port a `TCP_CONNECT` check names is declared
+   and has `protocol: TCP`; and a Service none of whose ports is TCP has a `readinessCheck` of type
+   `STDOUT` or `COMMAND`.
 5. Service and port names are valid `<Identifier>`s, not `File`, and unique within their lists;
    Service Environment names are unique within their list and distinct from the Job Environments
    and, for a Step Service, the Step's Step Environments.
 6. The wrap hooks an Environment defines are exactly those its `runScope` calls for, per
    [`<Environment>`](#environment).
 7. A template that lists `SERVICE` also lists `EXPR`.
+8. No two ports of a Service with the same `protocol` have the same `port` number. For a `port`
+   given as a format string this is checked when the value is resolved at job creation, as its
+   range is.
 
 These checks appear in the wiki as §9.7. One check requires the combined Job, because it relates
 documents that only the scheduler sees together, and is performed at submission:
@@ -1466,7 +1557,7 @@ concern and is not visible in the template.
 
 * `openjd_service_ready: <message>` where `<message>` is any string — Used and interpreted only
   when emitted by the `onRun` action of a Service whose readiness check *type* is `STDOUT`, where
-  it indicates that the service is accepting connections on all of its declared ports. Emitting it
+  it indicates that the service is accepting traffic on all of its declared ports. Emitting it
   more than once has no additional effect. It is ignored from any other action, and from `onRun`
   when the readiness check *type* is not `STDOUT`. When `onRun` is wrapped by
   `onWrapServiceRun`, the line is recognized on the wrap script's stdout, as for every `openjd_*`
@@ -1526,7 +1617,31 @@ A scheduler cannot know when an arbitrary process is ready. The three probe type
 places readiness is observable: the network (`TCP_CONNECT`, the zero-configuration default), an
 external check (`COMMAND`, for protocol-level health such as a `PING` or an HTTP `/healthz`), and
 the process itself (`STDOUT`, for services whose authors can add one print statement). The default
-of TCP_CONNECT-on-all-ports means the simplest templates need no `readinessCheck:` block at all.
+of TCP_CONNECT-on-every-TCP-port means the simplest templates need no `readinessCheck:` block at
+all.
+
+### Why the protocol is declared on the port
+
+A port number alone is enough for a single-host runner, where the service process binds whatever
+protocol it likes and a Task on the same host reaches it with no help. A distributed scheduler is
+in a different position: to make the port reachable from other hosts it publishes or forwards it
+(a container port mapping, a firewall rule, a NAT entry), and every one of those is defined per
+protocol. A template that says nothing about the protocol therefore works on one host and silently
+fails on a farm, where the scheduler forwards TCP because it has no way to know otherwise. The
+`protocol` field on `<ServicePort>` gives the scheduler the one fact it lacks, in the place the
+port is declared, and leaves everything else alone: `port`, `bindAddress`, and `connectAddress`
+are the same three scalars for either protocol, `join_host_port` composes them the same way, and
+the default of `TCP` means a template that never mentions the field declares plain TCP ports,
+which is what most services want.
+
+`TCP_CONNECT` is scoped to TCP ports rather than forbidden on any Service that has a UDP port. A
+service that speaks both — a TCP API with a UDP telemetry or discovery port beside it — is as
+probeable as any other through its TCP port, and once that port accepts connections the process
+is up; requiring such a Service to supply a `COMMAND` check would be busywork. So the check's
+default is every TCP port, naming a UDP port in it is an error because the probe could never
+succeed against it, and a Service whose ports are all UDP, which the default could never pass,
+MUST declare a `STDOUT` or `COMMAND` check. A UDP service that prints one line once it has bound
+satisfies that with no further machinery.
 
 ### `restartPolicy.completedTasks` is per-Service, defaulting to `RERUN`
 
@@ -1863,8 +1978,11 @@ unable to catch a typo and hide the dependency from readers.
   scope to the last. `runScope` on `<Environment>` is the first appearance of scope names in the
   schema, and its grammar (a list of names, unknown names rejected) is chosen so that user-defined
   names can be added without changing it.
-* **UDP ports and Unix domain sockets.** A `protocol:` field on `<ServicePort>` is the natural
-  extension.
+* **Unix domain sockets.** A Unix domain socket is not a port: it is a filesystem path rather than
+  a number in a protocol's space, there is no address to publish since it is reachable only from
+  the host that holds it, and nothing about it can be forwarded. It therefore fits none of `port`,
+  `bindAddress`, or `connectAddress`, and a Service used only from its own host would need a
+  distinct kind of endpoint rather than another `protocol` value.
 * **Co-scheduled Steps, for systems like MPI and Dask.** With this RFC, an MPI or Dask workload is a
   Step whose Tasks are the ranks or workers, plus a Step Service that is their rendezvous point: a
   PMIx server that the ranks' `MPI_Init` connects to, or the Dask scheduler that the workers and the

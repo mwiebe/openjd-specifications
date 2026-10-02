@@ -854,7 +854,7 @@ type-check as `unresolved[...]` at earlier stages.
 
 | Symbol | Type | Description |
 |--------|------|-------------|
-| `Service.<name>.<port>.port` | `int` | The TCP port number allocated for port `<port>` of Service `<name>` |
+| `Service.<name>.<port>.port` | `int` | The port number allocated for port `<port>` of Service `<name>` |
 | `Service.<name>.<port>.bindAddress` | `string` | The interface address the service process binds. Available within the declaring Service only |
 | `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address entities in the Service's scope use to reach the Service |
 

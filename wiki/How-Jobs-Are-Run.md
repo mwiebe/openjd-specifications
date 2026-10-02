@@ -88,7 +88,7 @@ When the SERVICE extension is in use (introduced in
 Step can additionally declare **Services**. A **Service** is a long-lived process that the scheduler starts *before*
 scheduling any Task in its scope, keeps running for the lifetime of its scope, and stops once the scope no longer
 needs it. The scope of a Job Service (`jobServices`) is the whole Job; the scope of a Step Service (`stepServices`) is
-the declaring Step. A **Service** publishes one or more named TCP ports; the scheduler allocates a concrete address and
+the declaring Step. A **Service** publishes one or more named ports; the scheduler allocates a concrete address and
 port on the **Service**'s host and makes them available to every entity in the scope through the `Service.*`
 format-string scope, so that a Task on any Worker Host knows where to connect.
 
@@ -288,7 +288,7 @@ messages to convey information about the **Action** to the render management sys
   is exited, or for the **Service**'s own subsequent **Action**s.
 * `openjd_service_ready: <message>` where `<message>` is any string. Requires the SERVICE extension. This can only be
   emitted by the `onRun` **Action** of a **Service** whose readiness check type is `STDOUT`, and indicates that the
-  service is accepting connections on all of its declared ports. Emitting it more than once has no additional effect;
+  service is accepting traffic on all of its declared ports. Emitting it more than once has no additional effect;
   emitting it from any other **Action** is ignored. When `onRun` is wrapped by `onWrapServiceRun`, the line is
   recognized on the wrap script's stdout, as for every `openjd_*` message under WRAP_ACTIONS.
 

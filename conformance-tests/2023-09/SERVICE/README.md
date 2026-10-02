@@ -8,8 +8,9 @@ Conformance tests for the `SERVICE` extension defined in
 `SERVICE` adds a new entity, the `<Service>` (Template Schemas §9): a long-lived
 process that a scheduler starts before scheduling the Tasks in its scope, keeps
 running for the lifetime of its scope, and stops once the scope no longer needs
-it. A Service publishes one or more named TCP ports whose endpoint the entities
-in its scope read through the `Service.*` format-string scope.
+it. A Service publishes one or more named ports, each TCP (the default) or UDP,
+whose endpoint the entities in its scope read through the `Service.*`
+format-string scope.
 
 ```yaml
 # Job Template (§1.1) / Environment Template (§1.2)
@@ -30,8 +31,8 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   let: <LetBindings>                          # optional (job creation)
   hostRequirements: <HostRequirements>        # optional
   serviceEnvironments: [ <Environment>, ... ] # optional; entered only in this Service's Session
-  ports: [ <ServicePort>, ... ]               # 1–10, unique names
-  readinessCheck: <ServiceReadinessCheck>     # TCP_CONNECT (default) | COMMAND | STDOUT
+  ports: [ <ServicePort>, ... ]               # 1–10, unique names; { name, port?, protocol?: TCP | UDP }
+  readinessCheck: <ServiceReadinessCheck>     # TCP_CONNECT (default, TCP ports only) | COMMAND | STDOUT
   restartPolicy: <ServiceRestartPolicy>       # maxAttempts (0), completedTasks (RERUN | KEEP)
   variables: <EnvironmentVariables>           # optional
   script:
@@ -82,9 +83,16 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
   `let`, or an action `timeout`; `Task.*` never inside a Service;
   `Service.File.*` only in the declaring Service's script; types `int` /
   `string` / `path`.
-- **Readiness and restart** (§9.3, §9.4, §9.7 item 4): `onReadinessCheck`
-  defined iff the type is `COMMAND`; every `TCP_CONNECT` port declared; ranges
-  of `port`, `timeoutSeconds`, `intervalSeconds`, `maxAttempts`; `@fmtstring`
+- **Port protocol** (§9 item 6 constraint 4, §9.2 item 3, §9.7 item 8):
+  `protocol` is `TCP` (default) or `UDP`, a case-sensitive literal that is not
+  `@fmtstring`; two ports may share a `port` number only when their `protocol`
+  differs.
+- **Readiness and restart** (§9 item 7, §9.3, §9.4, §9.7 item 4):
+  `onReadinessCheck` defined iff the type is `COMMAND`; every `TCP_CONNECT`
+  port declared and TCP, defaulting to every TCP port; a Service none of whose
+  ports is TCP must give a `STDOUT` or `COMMAND` check, so omitting
+  `readinessCheck` or giving `TCP_CONNECT` on it is rejected; ranges of
+  `port`, `timeoutSeconds`, `intervalSeconds`, `maxAttempts`; `@fmtstring`
   numeric fields resolved at job creation in the `<Service>.let` scope with a
   whole-field `null` meaning "not provided".
 - **Expression Language §2.2.4**: `join_host_port`, `split_host_port`,
@@ -112,7 +120,8 @@ onWrapServiceEnter / onWrapServiceRun / onWrapServiceReadinessCheck / onWrapServ
 
 The RFC motivates Services with Valkey, coordinators, and caches, but none of
 those is needed to *test* the mechanism. The execution tests use small python
-TCP listeners (`socket`, `http.server`) standing in for a service process,
+TCP listeners (`socket`, `http.server`), and one UDP datagram echo, standing in
+for a service process,
 Tasks that connect to them and print what they received, and sentinel markers
 on stdout. Instance-failure tests tell a relaunched `onRun` apart from the
 first by a marker file in the Service Session's working directory, which a
@@ -243,6 +252,19 @@ SERVICE/
 │   ├── 9.2--numeric-field-references-session.invalid.yaml
 │   ├── 9.2--numeric-field-references-service.invalid.yaml
 │   ├── 9.2--numeric-field-constant-out-of-range.invalid.yaml
+│   ├── 9.2--port-protocol-tcp-explicit.yaml
+│   ├── 9.2--port-protocol-udp-with-stdout-readiness.yaml
+│   ├── 9.2--port-protocol-mixed-default-readiness.yaml
+│   ├── 9.2--port-protocol-mixed-tcp-connect-names-tcp-port.yaml
+│   ├── 9.2--port-protocol-same-number-tcp-and-udp.yaml
+│   ├── 9.2--port-protocol-tcp-connect-names-udp-port.invalid.yaml
+│   ├── 9.2--port-protocol-all-udp-default-readiness.invalid.yaml
+│   ├── 9.2--port-protocol-all-udp-tcp-connect.invalid.yaml
+│   ├── 9.2--port-protocol-same-number-same-protocol.invalid.yaml
+│   ├── 9.2--port-protocol-same-number-udp-twice.invalid.yaml
+│   ├── 9.2--port-protocol-unknown-value.invalid.yaml
+│   ├── 9.2--port-protocol-lowercase.invalid.yaml
+│   ├── 9.2--port-protocol-not-string.invalid.yaml
 │   ├── 9.3--readiness-tcp-connect-ports.yaml
 │   ├── 9.3--readiness-tcp-connect-default-ports.yaml
 │   ├── 9.3--readiness-command.yaml
@@ -355,6 +377,7 @@ SERVICE/
     ├── service-job-tcp-connect.test.yaml
     ├── service-step-stdout-readiness.test.yaml
     ├── service-command-readiness.test.yaml
+    ├── service-udp-port-echo.test.yaml
     ├── service-ready-message-only-from-on-run.test.yaml
     ├── service-reference-chain.test.yaml
     ├── service-step-services-per-step.test.yaml
@@ -409,7 +432,10 @@ SERVICE/
   (`service-step-stdout-readiness`), and `COMMAND` with `onReadinessCheck`
   running concurrently with `onRun` (`service-command-readiness`).
   `openjd_service_ready` is honored only from `onRun`
-  (`service-ready-message-only-from-on-run`).
+  (`service-ready-message-only-from-on-run`). A `protocol: UDP` port is bound
+  by a datagram listener that signals readiness through `STDOUT`, and the Task
+  reaches it through the same `connectAddress` and `port` values a TCP port
+  carries (`service-udp-port-echo`).
 - **Start ordering** (constraint 2): a Service that references another's
   endpoint starts only once the referenced Service is READY
   (`service-reference-chain`).
@@ -532,7 +558,8 @@ runner contract. The behavior specific to `SERVICE`:
    it.
 3. Before any Task of a scope runs, every Service of the scope must be
    started in a Service Session of its own — entering the Environments whose
-   `runScope` includes `SERVICE`, allocating its ports, running `onEnter`,
+   `runScope` includes `SERVICE`, allocating its ports in each port's own
+   `protocol` space, running `onEnter`,
    launching `onRun`, and applying the readiness check — and be READY.
    `Service.<name>.<port>.port` and `.connectAddress` must resolve in the
    Task's actions to an endpoint that reaches the process.
