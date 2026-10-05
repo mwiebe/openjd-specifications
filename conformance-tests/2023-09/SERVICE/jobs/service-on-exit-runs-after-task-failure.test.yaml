@@ -1,12 +1,12 @@
 # RFC 0009 "Service lifecycle" constraints 6-7: a Service Session ends when
 # its scope completes, including because the scope failed. A Task failure
-# fails the Job (the local runner has no Task retry) and the Job Service's
+# fails the Job (the local runner has no Task retry) and the Service's
 # Session is still ended normally: onRun is canceled and onExit runs.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: OnExitAfterTaskFailure
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

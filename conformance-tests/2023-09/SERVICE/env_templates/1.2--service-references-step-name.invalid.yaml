@@ -1,5 +1,5 @@
-# Section 1.2.2 / Section 9: external Services have Job scope, so Step.Name
-# is not available within them (only Job.Name is).
+# Section 9 (RFC 0009): a Service belongs to no Step, so Step.Name is not
+# available within it (only Job.Name is).
 specificationVersion: environment-2023-09
 extensions:
 - SERVICE

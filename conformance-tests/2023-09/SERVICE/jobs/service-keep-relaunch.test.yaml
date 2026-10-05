@@ -1,5 +1,5 @@
 # RFC 0009 "Failure and restart" with completedTasks: KEEP (Template Schemas
-# §9.4). The Service's first instance exits while Task 1 is still running
+# §9.5). The Service's first instance exits while Task 1 is still running
 # (after answering it). Running Tasks continue -- Task 1 completes against
 # instance 1 -- completed Tasks keep their results (Task 1 is not rerun), and
 # Tasks not yet started wait for the relaunched instance to be READY. Whether
@@ -9,7 +9,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: KeepRelaunch
-  jobServices:
+  services:
   - name: Flaky
     ports:
     - name: main

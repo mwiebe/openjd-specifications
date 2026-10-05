@@ -1,11 +1,11 @@
-# Section 9 / Section 9.7 item 1: a reference to a port name the Service does
+# Section 9 / Section 9.9 item 1: a reference to a port name the Service does
 # not declare is invalid.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

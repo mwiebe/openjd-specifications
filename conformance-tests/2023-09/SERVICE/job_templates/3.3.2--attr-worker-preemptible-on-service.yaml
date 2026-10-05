@@ -1,11 +1,11 @@
-# Section 3.3.2.1 / Section 9 item 4 (RFC 0009): a stateful Service requires
+# Section 3.3.2.1 / Section 9 item 5 (RFC 0009): a stateful Service requires
 # non-preemptible capacity through its own hostRequirements.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

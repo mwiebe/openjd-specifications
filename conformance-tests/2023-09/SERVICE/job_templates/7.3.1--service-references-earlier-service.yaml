@@ -1,11 +1,12 @@
-# Section 9 scope rule 2: a Service may reference any Service earlier in the
-# same list. The reference guarantees Back is ready before Front starts.
+# Section 9 scope rule 2 / Section 9.1 rule 3 (RFC 0009): a Service may
+# reference any other Service in the same list. The reference guarantees Back
+# is READY before Front starts, and puts Front's scope inside Back's.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Back
   ports:
   - name: main

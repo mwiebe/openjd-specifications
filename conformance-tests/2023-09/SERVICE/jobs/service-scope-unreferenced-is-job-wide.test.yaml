@@ -1,0 +1,59 @@
+# Template Schemas §9.1 rule 4 / How Jobs Are Run constraint 6: a Service
+# that nothing references has every Step in its scope. It is READY before the
+# first Task and still running when the last Step's Task runs; onExit runs
+# once, after the Job. The Service's onRun records its presence in a file in
+# the host's temp directory keyed by Job.Name (assuming the Service Session and
+# the Task Sessions share a host, as the reference runner's do), and its onExit
+# removes it; the last Task checks the file exists and leaves it for onExit.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions: [SERVICE, EXPR]
+  name: UnreferencedIsJobWide
+  services:
+  - name: Sidecar
+    ports:
+    - name: main
+    healthCheck:
+      type: STDOUT
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["{{ Service.File.Serve }}", "{{ Job.Name }}"]
+          cancelation:
+            mode: TERMINATE
+        onExit:
+          command: python
+          args: ["-c", "import os,tempfile; os.remove(os.path.join(tempfile.gettempdir(), 'openjd-' + '{{ Job.Name }}' + '.up')); print('SIDECAR_EXIT')"]
+      embeddedFiles:
+      - name: Serve
+        type: TEXT
+        data: |
+          import os, sys, tempfile, time
+          with open(os.path.join(tempfile.gettempdir(), "openjd-" + sys.argv[1] + ".up"), "w") as f:
+              f.write("up")
+          print("openjd_service_ready: sidecar up", flush=True)
+          time.sleep(600)
+  steps:
+  - name: First
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["-c", "import os,tempfile; print('FIRST_SEES_SIDECAR', os.path.exists(os.path.join(tempfile.gettempdir(), 'openjd-' + '{{ Job.Name }}' + '.up')))"]
+  - name: Last
+    dependencies:
+    - dependsOn: First
+    script:
+      actions:
+        onRun:
+          command: python
+          args: ["-c", "import os,tempfile; print('LAST_SEES_SIDECAR', os.path.exists(os.path.join(tempfile.gettempdir(), 'openjd-' + '{{ Job.Name }}' + '.up')))"]
+
+expected:
+  output:
+  - FIRST_SEES_SIDECAR True
+  - LAST_SEES_SIDECAR True
+  - SIDECAR_EXIT
+  forbidden:
+  - SEES_SIDECAR False

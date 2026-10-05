@@ -17,7 +17,7 @@ template:
         onExit:
           command: echo
           args: ["TOOLING_EXIT"]
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

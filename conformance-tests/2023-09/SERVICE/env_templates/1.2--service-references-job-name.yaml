@@ -1,4 +1,4 @@
-# Section 1.2.2 / Section 9 item 5: external Services have Job scope, so
+# Section 1.2.2 / Section 9 item 5: external Services belong to the Job, so
 # Job.Name and the document's own parameters are available within them.
 specificationVersion: environment-2023-09
 extensions:

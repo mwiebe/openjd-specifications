@@ -7,7 +7,7 @@ extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   serviceEnvironments:
   - name: Provision

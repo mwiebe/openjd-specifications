@@ -1,4 +1,4 @@
-# Template Schemas §9.4 item 1 (RFC 0009): maxAttempts resolved through a
+# Template Schemas §9.5 item 1 (RFC 0009): maxAttempts resolved through a
 # parameter must still be 0 or greater; -1 is rejected at job creation.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -8,7 +8,7 @@ template:
   - name: Attempts
     type: INT
     default: 1
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

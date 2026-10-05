@@ -30,7 +30,7 @@ jobEnvironments:
       onWrapServiceRun:
         command: python
         args: ["-c", "print()", "{{ 'port=' + WrappedService.Ports[0] }}"]
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

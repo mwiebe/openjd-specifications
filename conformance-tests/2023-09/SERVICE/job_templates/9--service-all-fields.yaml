@@ -11,7 +11,7 @@ parameterDefinitions:
 - name: Verbose
   type: INT
   default: 1
-jobServices:
+services:
 - name: Store
   description: "A per-Job key/value store."
   let:

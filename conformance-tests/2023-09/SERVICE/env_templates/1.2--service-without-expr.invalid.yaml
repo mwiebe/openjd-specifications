@@ -1,4 +1,4 @@
-# Section 9 / Section 9.7 item 7: an Environment Template that lists SERVICE
+# Section 9 / Section 9.9 item 7: an Environment Template that lists SERVICE
 # must also list EXPR.
 specificationVersion: environment-2023-09
 extensions:

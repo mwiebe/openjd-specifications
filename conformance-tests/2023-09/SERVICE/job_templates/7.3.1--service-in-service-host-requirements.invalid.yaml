@@ -1,11 +1,11 @@
-# Section 9 / Section 9.7 item 2: `Service.*` is never in scope in a
+# Section 9 / Section 9.9 item 2: `Service.*` is never in scope in a
 # Service's own hostRequirements either, not even its own endpoint.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

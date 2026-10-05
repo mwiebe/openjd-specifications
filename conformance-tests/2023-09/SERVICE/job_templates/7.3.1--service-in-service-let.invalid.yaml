@@ -1,11 +1,11 @@
-# Section 9 item 3 / Section 9.7 item 2: a <Service>'s `let` is evaluated at
+# Section 9 item 3 / Section 9.9 item 2: a <Service>'s `let` is evaluated at
 # job creation and may not reference `Service.*`.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   let:
   - Port = Service.Store.main.port

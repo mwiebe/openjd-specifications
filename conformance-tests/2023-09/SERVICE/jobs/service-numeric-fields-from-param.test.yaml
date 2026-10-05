@@ -1,4 +1,4 @@
-# Template Schemas §9.2 (RFC 0009): the numeric @fmtstring fields are
+# Template Schemas §9.3 (RFC 0009): the numeric @fmtstring fields are
 # resolved at job creation from Param.* and <Service>.let bindings. A
 # whole-field expression resolving to null leaves the field unset, so the
 # runtime allocates the port. The COMMAND check's readinessIntervalSeconds and
@@ -14,7 +14,7 @@ template:
   - name: Patience
     type: INT
     default: 60
-  jobServices:
+  services:
   - name: Store
     let:
     - attempts = 1 if Param.Patience > 30 else 0

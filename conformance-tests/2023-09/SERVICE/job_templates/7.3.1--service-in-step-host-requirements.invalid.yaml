@@ -1,4 +1,4 @@
-# Section 9 / Section 9.7 item 2: `Service.*` is never in scope in a
+# Section 9 / Section 9.9 item 2: `Service.*` is never in scope in a
 # hostRequirements object. A Step's host requirements are resolved at job
 # creation, before any Service endpoint is known.
 specificationVersion: jobtemplate-2023-09
@@ -6,7 +6,7 @@ extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

@@ -57,7 +57,7 @@ parameterDefinitions:
   minValue: 1
   maxValue: 50
 
-jobServices:
+services:
 - name: AssetServer
   description: Serves generated assets over HTTP to every Task of the Job.
   ports:

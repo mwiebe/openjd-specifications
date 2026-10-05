@@ -9,7 +9,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: StopOrderReferencingServiceStoppedFirst
-  jobServices:
+  services:
   - name: Back
     ports:
     - name: main

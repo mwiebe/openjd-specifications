@@ -1,0 +1,29 @@
+# Section 4 item 3 / Section 9.1 rule 1 (RFC 0009): a Step Environment that
+# references a Service and gives no runScope defaults to [TASK], so it is
+# never entered in the Service's Session and the reference is valid. The
+# reference puts its Step in the Service's scope.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+services:
+- name: Coordinator
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", ]
+steps:
+- name: Step1
+  stepEnvironments:
+  - name: Client
+    variables:
+      COORD_PORT: "{{ Service.Coordinator.main.port }}"
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

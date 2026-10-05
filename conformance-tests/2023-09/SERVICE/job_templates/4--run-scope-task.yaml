@@ -10,7 +10,7 @@ jobEnvironments:
   runScope: [TASK]
   variables:
     FOO: bar
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

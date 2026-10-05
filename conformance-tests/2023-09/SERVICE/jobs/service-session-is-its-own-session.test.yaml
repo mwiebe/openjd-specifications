@@ -8,7 +8,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: ServiceSessionIsItsOwn
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

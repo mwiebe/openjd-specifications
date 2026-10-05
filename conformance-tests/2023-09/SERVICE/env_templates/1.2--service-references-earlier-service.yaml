@@ -1,5 +1,5 @@
 # Section 1.2 item 6 constraint 4: a Service in `services` may reference the
-# endpoints of Services earlier in the list, as in `jobServices`.
+# endpoints of other Services in the list, as in a Job Template's `services`.
 specificationVersion: environment-2023-09
 extensions:
 - SERVICE

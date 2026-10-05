@@ -1,4 +1,4 @@
-# Template Schemas §9.3 COMMAND / §9.6.1: onRun starts listening only after a
+# Template Schemas §9.4 COMMAND / §9.7.1: onRun starts listening only after a
 # delay, and the Service's onHealthCheck, run concurrently with onRun every
 # readinessIntervalSeconds, exits 0 once a TCP connection succeeds. The Task
 # is not scheduled until then, so it never sees a refused connection.
@@ -6,7 +6,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: CommandHealthCheck
-  jobServices:
+  services:
   - name: Slow
     ports:
     - name: main

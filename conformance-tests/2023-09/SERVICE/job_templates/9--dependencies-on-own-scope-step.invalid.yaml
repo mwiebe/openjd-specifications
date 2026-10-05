@@ -1,0 +1,26 @@
+# Section 9 item 4 constraint 3 / Section 9.9 item 10 (RFC 0009): a Step in
+# the Service's own scope cannot be a dependency. Prepare references Indexer,
+# so Prepare is in Indexer's scope; Indexer depending on Prepare is a cycle.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+services:
+- name: Indexer
+  dependencies:
+  - dependsOn: Prepare
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+steps:
+- name: Prepare
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Service.Indexer.main.port }}"]

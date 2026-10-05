@@ -1,12 +1,12 @@
 # RFC 0009 "Address forms" / Expression Language §2.2.4: wherever an address
 # and a port are joined into one string -- here a URL authority -- templates
 # compose it with join_host_port so that an IPv6 connectAddress is bracketed.
-# A python http.server Job Service answers a Task's urllib request.
+# A python http.server Service answers a Task's urllib request.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: JoinHostPortUrl
-  jobServices:
+  services:
   - name: Web
     ports:
     - name: http

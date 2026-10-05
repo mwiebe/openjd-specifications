@@ -1,5 +1,5 @@
 # RFC 0009 <ServiceActions> "Environment variables within a Service" (Template
-# Schemas §9.6): a variable set with openjd_env by the Service's onEnter "is
+# Schemas §9.7): a variable set with openjd_env by the Service's onEnter "is
 # set in the process environment of every subsequent action of the same
 # Service Session -- every instance of onRun, onHealthCheck, and onExit"
 # and "take[s] precedence over the Service's declarative variables". The
@@ -9,7 +9,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: OnEnterOpenjdEnvReachesHealthCheck
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

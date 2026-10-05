@@ -1,10 +1,10 @@
-# Template Schemas §9 / §9.7 item 7: SERVICE requires EXPR; a template that
+# Template Schemas §9 / §9.9 item 7: SERVICE requires EXPR; a template that
 # lists SERVICE alone must be rejected.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE]
   name: ServiceWithoutExpr
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

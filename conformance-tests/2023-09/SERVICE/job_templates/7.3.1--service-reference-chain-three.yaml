@@ -1,0 +1,41 @@
+# Section 9 scope rule 2 / Section 9.1 rule 3 (RFC 0009): Services may
+# reference one another freely as long as the reference graph is acyclic.
+# Back references Store, Front references Back and Store, and the Step
+# references all three; Store starts first, then Back, then Front.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+services:
+- name: Front
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Service.Back.main.port }}", "{{ Service.Store.main.connectAddress }}"]
+- name: Back
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Service.Store.main.port }}"]
+- name: Store
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", ]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Service.Front.main.port }}", "{{ Service.Back.main.port }}", "{{ Service.Store.main.port }}"]

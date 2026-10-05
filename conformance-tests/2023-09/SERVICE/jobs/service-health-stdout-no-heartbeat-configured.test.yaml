@@ -1,5 +1,5 @@
 # RFC 0009 <ServiceHealthCheck> STDOUT without healthIntervalSeconds (Template
-# Schemas §9.3 item 5): no heartbeat is expected, and the health of the
+# Schemas §9.4 item 5): no heartbeat is expected, and the health of the
 # instance is that its onRun process is still running. The service prints
 # `openjd_service_ready` exactly once and never again; the Tasks take long
 # enough between them that any wrongly assumed heartbeat interval would have
@@ -9,7 +9,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: HealthStdoutNoHeartbeatConfigured
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

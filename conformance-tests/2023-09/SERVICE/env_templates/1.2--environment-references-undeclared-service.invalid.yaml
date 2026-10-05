@@ -1,4 +1,4 @@
-# Section 1.2.2 / Section 9.7 item 1: a Service.* reference in an Environment
+# Section 1.2.2 / Section 9.9 item 1: a Service.* reference in an Environment
 # Template must resolve to a Service in the same document's `services` list.
 # References to Services defined in other documents are not permitted.
 specificationVersion: environment-2023-09

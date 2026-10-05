@@ -1,0 +1,22 @@
+# Section 1.2 item 5 / Section 4 item 3 (RFC 0009): the Environment may
+# reference the document's Services when its runScope excludes SERVICE. With
+# no runScope given, an Environment that references Service.* defaults to
+# [TASK], so the reference is valid and the Environment is never entered in
+# the Service's own Session.
+specificationVersion: environment-2023-09
+extensions:
+- SERVICE
+- EXPR
+services:
+- name: Cache
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", ]
+environment:
+  name: CacheClient
+  variables:
+    CACHE_PORT: "{{ Service.Cache.main.port }}"

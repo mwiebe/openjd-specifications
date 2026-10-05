@@ -1,5 +1,5 @@
-# Template Schemas §1.2.2 item 2, both Services consumed: the RFC's shared
-# Valkey Job Template (Job Service `Cache`) is submitted alongside the RFC's
+# Template Schemas §1.2.2 item 3, both Services consumed: the RFC's shared
+# Valkey Job Template (inline Service `Cache`) is submitted alongside the RFC's
 # queue-cache Environment Template (external Service `Cache`, published to
 # Tasks by a TASK-scoped client Environment through VALKEY_HOST /
 # VALKEY_PORT). A scheduler must keep the two distinct: the Task's
@@ -12,7 +12,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: SameNameBothConsumed
-  jobServices:
+  services:
   - name: Cache
     ports:
     - name: main

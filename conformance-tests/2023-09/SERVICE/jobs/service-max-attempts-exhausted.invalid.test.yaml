@@ -1,4 +1,4 @@
-# RFC 0009 "Failure and restart" step 4 / Template Schemas §9.4: a Job
+# RFC 0009 "Failure and restart" step 4 / Template Schemas §9.5: a Job
 # Service whose onRun exits before becoming READY every time. After
 # maxAttempts relaunches the Service is FAILED and its scope -- the Job --
 # fails, so the run must exit non-zero.
@@ -6,7 +6,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: MaxAttemptsExhausted
-  jobServices:
+  services:
   - name: Broken
     ports:
     - name: main

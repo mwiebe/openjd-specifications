@@ -1,5 +1,5 @@
 # RFC 0009 <ServiceActions> "Environment variables within a Service"
-# (Template Schemas §9.6), the control for
+# (Template Schemas §9.7), the control for
 # service-on-enter-openjd-redacted-env-with-extension: without the
 # REDACTED_ENV_VARS extension, an openjd_redacted_env line on a Service
 # onEnter's stdout does NOT set the variable -- onRun does not see it -- but
@@ -9,7 +9,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: OnEnterRedactedEnvWithoutExtension
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

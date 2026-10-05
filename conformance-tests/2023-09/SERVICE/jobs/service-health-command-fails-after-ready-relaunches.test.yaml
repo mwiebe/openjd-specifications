@@ -1,4 +1,4 @@
-# RFC 0009 <ServiceHealthCheck> (Template Schemas §9.3) after READY, lifecycle
+# RFC 0009 <ServiceHealthCheck> (Template Schemas §9.4) after READY, lifecycle
 # constraint 11, and "Failure and restart": a COMMAND probe that passes until
 # Task 1 writes a marker, then fails. With healthIntervalSeconds: 1 and
 # failureThreshold: 2, two consecutive failed probes make instance 1 UNHEALTHY,
@@ -11,7 +11,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: HealthCommandFailsAfterReadyRelaunches
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

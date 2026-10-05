@@ -1,4 +1,4 @@
-# RFC 0009 <ServiceHealthCheck> item 6 (Template Schemas §9.3): failures
+# RFC 0009 <ServiceHealthCheck> item 6 (Template Schemas §9.4): failures
 # below failureThreshold do not change the Service's state, and "a single
 # successful probe resets the count". The COMMAND probe fails exactly twice
 # after READY and then recovers; with failureThreshold: 3 the instance stays
@@ -9,7 +9,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: HealthThresholdToleratesBlips
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

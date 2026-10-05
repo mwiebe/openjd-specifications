@@ -11,7 +11,7 @@ jobEnvironments:
   runScope: [TASK]
   variables:
     STORE_BIND: "{{ Service.Store.main.bindAddress }}"
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

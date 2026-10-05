@@ -1,12 +1,12 @@
-# Template Schemas §1.2.2 item 3: the remedy for the rejected wrapper is to
+# Template Schemas §1.2.2 item 4: the remedy for the rejected wrapper is to
 # declare SERVICE and a runScope that excludes SERVICE. A TASK-scoped queue
-# wrapper attached to a Job with a Job Service is accepted: it wraps the
+# wrapper attached to a Job with a Service is accepted: it wraps the
 # Task and never enters the Service Session.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: WrapperTaskScopedWithService
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

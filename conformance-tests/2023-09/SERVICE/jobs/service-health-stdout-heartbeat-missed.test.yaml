@@ -1,5 +1,5 @@
 # RFC 0009 <ServiceHealthCheck> STDOUT with healthIntervalSeconds (Template
-# Schemas §9.3 items 1, 5, 6) and the `openjd_service_ready` heartbeat in
+# Schemas §9.4 items 1, 5, 6) and the `openjd_service_ready` heartbeat in
 # How Jobs Are Run: after READY the service must print the line at least once
 # per interval. It heartbeats every 0.3 seconds until it has answered Task 1,
 # then stops while continuing to serve. With healthIntervalSeconds: 1 and
@@ -10,7 +10,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: HealthStdoutHeartbeatMissed
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

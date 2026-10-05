@@ -29,7 +29,7 @@ jobEnvironments:
       onWrapServiceRun:
         command: python
         args: ["-c", "print()", "{{ WrappedAction.Command }}", "{{ repr_py(WrappedAction.Args) }}", "{{ WrappedAction.Timeout }}", "{{ WrappedAction.Cancelation.Mode }}"]
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

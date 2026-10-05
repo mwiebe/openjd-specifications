@@ -1,10 +1,10 @@
-# Section 9 item 5 constraint 3: no two ports may have the same `name`.
+# Section 9 item 6 constraint 3: no two ports may have the same `name`.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

@@ -1,4 +1,4 @@
-# Template Schemas §1.2.2 item 3 (submission-time check), the other
+# Template Schemas §1.2.2 item 4 (submission-time check), the other
 # direction: a Job Template with an RFC 0008 wrapper (no SERVICE declared) is
 # submitted to a queue that attaches an external Service. The Service would
 # run in a Session the Job's wrapper enters but cannot wrap.

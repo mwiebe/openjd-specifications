@@ -4,7 +4,7 @@
 # Session"), lifecycle constraint 9 (a new Session means a new working
 # directory, Environments re-entered, onEnter re-run), and Design Choice
 # Rationale "Start failures consume a restart attempt" (Template Schemas
-# §9.4, §4 item 3). The Environment has `runScope: [SERVICE]` so no Task
+# §9.5, §4 item 3). The Environment has `runScope: [SERVICE]` so no Task
 # Session enters it. With maxAttempts: 1 its onEnter fails on the first
 # Service Session and succeeds on the second, which runs in a different
 # working directory; the Service then comes up and the Task runs.
@@ -46,7 +46,7 @@ template:
           os.remove(marker)
           print("PROVISION_NEW_WORKDIR", os.getcwd() != first_cwd, flush=True)
           print("PROVISION_OK", flush=True)
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

@@ -1,4 +1,4 @@
-# Section 4 item 3 constraint 1 / Section 9.7 item 3: no <RunScopeName> may
+# Section 4 item 3 constraint 1 / Section 9.9 item 3: no <RunScopeName> may
 # appear more than once in `runScope`.
 specificationVersion: jobtemplate-2023-09
 extensions:

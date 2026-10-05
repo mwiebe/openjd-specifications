@@ -28,7 +28,7 @@ template:
     runScope: [SERVICE]
     variables:
       SEEN_SERVICE_ONLY: "yes"
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

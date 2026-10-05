@@ -1,0 +1,34 @@
+# Section 9.1 rule 2 (RFC 0009): a Job Environment that references a Service
+# puts every Step in the Service's scope, including Steps whose scripts never
+# mention it. The Environment's runScope defaults to [TASK] (Section 4 item 3).
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+jobEnvironments:
+- name: Client
+  variables:
+    COORD_PORT: "{{ Service.Coordinator.main.port }}"
+services:
+- name: Coordinator
+  ports:
+  - name: main
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", ]
+steps:
+- name: Step1
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]
+- name: Step2
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()"]

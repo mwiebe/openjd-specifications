@@ -1,4 +1,4 @@
-# Template Schemas §9.5 item 3 / §7.3.1: Service.File.<name> is the location
+# Template Schemas §9.6 item 3 / §7.3.1: Service.File.<name> is the location
 # of an embedded file of the Service, available in its actions, in other
 # embedded files, and in <ServiceScript>.let. The Service reads its config
 # file (whose content references the Service's own endpoint) and serves it.
@@ -6,7 +6,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: ServiceFile
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

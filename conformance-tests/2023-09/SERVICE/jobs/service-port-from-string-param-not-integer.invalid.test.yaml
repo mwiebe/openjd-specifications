@@ -1,4 +1,4 @@
-# Template Schemas §9.2 (RFC 0009) / Expression Language §1.3.2: a
+# Template Schemas §9.3 (RFC 0009) / Expression Language §1.3.2: a
 # whole-field expression on `port` has target type int?. A STRING parameter
 # is coerced at job creation; a value that is not an integer must be
 # rejected there.
@@ -10,7 +10,7 @@ template:
   - name: Port
     type: STRING
     default: "16379"
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

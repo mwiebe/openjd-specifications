@@ -1,4 +1,4 @@
-# Template Schemas §9.2 (RFC 0009): a numeric @fmtstring field's non-null
+# Template Schemas §9.3 (RFC 0009): a numeric @fmtstring field's non-null
 # result must satisfy the field's range. The template is valid on its own;
 # the supplied parameter value makes `port` resolve to 70000 at job creation,
 # which must be rejected.
@@ -10,7 +10,7 @@ template:
   - name: Port
     type: INT
     default: 16379
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

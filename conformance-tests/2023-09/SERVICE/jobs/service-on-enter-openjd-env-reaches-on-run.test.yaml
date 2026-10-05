@@ -1,4 +1,4 @@
-# Template Schemas §9.6 "Environment variables within a Service": a variable
+# Template Schemas §9.7 "Environment variables within a Service": a variable
 # set with openjd_env by the Service's onEnter is set in the process
 # environment of every subsequent action of the Service Session -- onRun and
 # onExit here -- and takes precedence over the Service's declarative
@@ -8,7 +8,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: OnEnterOpenjdEnv
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

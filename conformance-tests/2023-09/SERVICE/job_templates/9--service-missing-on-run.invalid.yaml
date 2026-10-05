@@ -1,11 +1,11 @@
-# Section 9.6: `onRun` is the only required action of a Service; a Service
+# Section 9.7: `onRun` is the only required action of a Service; a Service
 # with only onEnter and onExit must be rejected.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
 - EXPR
 name: TestJob
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

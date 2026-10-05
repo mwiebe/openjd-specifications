@@ -1,4 +1,4 @@
-# Section 9.7 item 7 (RFC 0009): the EXPR prerequisite applies to the
+# Section 9.9 item 7 (RFC 0009): the EXPR prerequisite applies to the
 # `extensions` list itself, even when the template declares no Service.
 specificationVersion: jobtemplate-2023-09
 extensions:

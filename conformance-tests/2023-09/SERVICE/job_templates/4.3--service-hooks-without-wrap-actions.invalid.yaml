@@ -25,7 +25,7 @@ jobEnvironments:
       onWrapServiceExit:
         command: python
         args: ["-c", "print()"]
-jobServices:
+services:
 - name: Store
   ports:
   - name: main

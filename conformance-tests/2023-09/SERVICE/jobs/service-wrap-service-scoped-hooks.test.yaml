@@ -12,7 +12,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: WrapServiceScopedHooks
-  jobServices:
+  services:
   - name: Store
     ports:
     - name: main

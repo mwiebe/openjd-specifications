@@ -1,9 +1,9 @@
-# Template Schemas §1.2.2 item 2: two attached Environment Templates may
-# each define an external Service named `Cache`; neither document is invalid
-# on its own and the submission is not rejected for the shared name. Both
-# Services start, in attachment order, each resolving its own
-# Service.Cache.main.port, and the Job Template — which declares no Service —
-# runs its Task once both are READY.
+# Template Schemas §1.2.2 item 3: two attached Environment Templates may each
+# define an external Service named `Cache`; neither document is invalid on
+# its own, and because no `requiresServices` entry names `Cache` the
+# submission is not rejected for the shared name. Both Services start, each
+# resolving its own Service.Cache.main.port, and the Job Template — which
+# declares no Service — runs its Task once both are READY.
 template:
   specificationVersion: jobtemplate-2023-09
   name: TwoAttachmentsSameName

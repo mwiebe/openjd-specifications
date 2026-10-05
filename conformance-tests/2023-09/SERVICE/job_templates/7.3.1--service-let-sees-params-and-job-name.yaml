@@ -12,7 +12,7 @@ parameterDefinitions:
 - name: threads
   type: INT
   default: 4
-jobServices:
+services:
 - name: Store
   let:
   - label = Job.Name + "-" + string(Param.threads)

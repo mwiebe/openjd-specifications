@@ -1,5 +1,5 @@
 # RFC 0009 "Failure and restart" with completedTasks: RERUN (Template Schemas
-# §9.4). The Service's first instance exits while Task 1 is still running
+# §9.5). The Service's first instance exits while Task 1 is still running
 # (after answering it). The scheduler cancels the running Task (not a Task
 # failure), relaunches onRun -- in the same Service Session or a new one, its
 # choice -- and returns every completed Task to the queue. Every Task
@@ -9,7 +9,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: RerunRelaunch
-  jobServices:
+  services:
   - name: Flaky
     ports:
     - name: main

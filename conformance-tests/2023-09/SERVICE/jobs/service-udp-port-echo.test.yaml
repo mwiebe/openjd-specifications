@@ -1,4 +1,4 @@
-# RFC 0009 / Template Schemas §9.2 item 3, §9 item 7: a Job Service whose only
+# RFC 0009 / Template Schemas §9.3 item 3, §9 item 7: a Service whose only
 # port is `protocol: UDP` (a python datagram echo listener). It cannot be
 # probed by TCP_CONNECT, so it declares a STDOUT health check and prints
 # `openjd_service_ready` once bound. The UDP port carries the same `port`,
@@ -8,7 +8,7 @@ template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: UdpPortEcho
-  jobServices:
+  services:
   - name: Udp
     ports:
     - name: dgram

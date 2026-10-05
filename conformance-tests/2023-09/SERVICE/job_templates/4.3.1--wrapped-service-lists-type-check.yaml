@@ -35,7 +35,7 @@ jobEnvironments:
         - "{{ repr_py(flatten([['-p', join_host_port(WrappedService.BindAddresses[i], WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i])] for i in range(len(WrappedService.Ports))])) }}"
         - "{{ WrappedService.Ports[0] + 1 }}"
         - "{{ WrappedService.PortNames[0].upper() }}"
-jobServices:
+services:
 - name: Store
   ports:
   - name: main
