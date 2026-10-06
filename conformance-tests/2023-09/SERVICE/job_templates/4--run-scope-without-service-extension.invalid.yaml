@@ -1,4 +1,4 @@
-# Section 4 item 3: `runScope` is available only when using the SERVICE
+# Section 4 item 4: `runScope` is available only when using the SERVICE
 # extension. A template that uses it without SERVICE must be rejected, even
 # though the value itself would be valid.
 specificationVersion: jobtemplate-2023-09

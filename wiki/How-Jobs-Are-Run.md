@@ -90,11 +90,11 @@ any Task in its scope, keeps running for the lifetime of its scope, and stops on
 **scope** of a **Service** is the set of Steps whose Tasks depend on it, declared in the template's `dependencies`
 lists (see [Section 9.1](2023-09-Template-Schemas#91-service-scope)): a Step that lists `service:<name>` in its
 `dependencies` is in the **Service**'s scope, a **Service** that lists it contributes its own scope, and a Job
-**Environment** that references it puts every Step in its scope; a **Service** that no Step depends on is rejected at
-template validation. A **Service** supplied by an Environment Template has every Step of the Job in its scope. A
-**Service** publishes one or more named ports; the scheduler allocates a concrete address and port on the
-**Service**'s host and makes them available to every entity that depends on it through the `Service.*` format-string
-scope, so that a Task on any Worker Host knows where to connect.
+**Environment** that lists it puts every Step in its scope; a **Service** that no Step, **Service**, or Job
+**Environment** lists is rejected at template validation. A **Service** supplied by an Environment Template has every
+Step of the Job in its scope. A **Service** publishes one or more named ports; the scheduler allocates a concrete
+address and port on the **Service**'s host and makes them available to every entity that depends on it through the
+`Service.*` format-string scope, so that a Task on any Worker Host knows where to connect.
 
 Unlike an **Environment**, a **Service** is not tied to the host that runs Tasks. It runs in a **Session** of its own,
 the **Service Session**, on a **Service host** chosen by the scheduler subject to the **Service**'s host requirements,
@@ -105,8 +105,9 @@ Step's **Environments**. Later **Environments** take precedence over earlier one
 **Service**'s own `variables` over all of them. Which kinds of **Session** an **Environment** is entered in is declared
 by its `runScope`: by default every kind, so existing **Environments** apply to **Services** unchanged, and only an
 **Environment** whose `runScope` includes `SERVICE` is entered in a **Service Session**. An **Environment** that
-configures Tasks to use a **Service** (and therefore references `Service.*`) is entered in Task **Sessions** only; that
-is its default `runScope`, and an explicit `runScope` on it must exclude `SERVICE`. Under the WRAP_ACTIONS extension, a
+configures Tasks to use a **Service** lists `service:<name>` in its `dependencies`, which is what lets it reference
+`Service.*`, and is entered in Task **Sessions** only; that is its default `runScope`, and an explicit `runScope` on it
+must exclude `SERVICE`. Under the WRAP_ACTIONS extension, a
 wrapping **Environment** whose `runScope` includes `SERVICE` wraps the **Service**'s `onEnter`, `onRun`,
 `onHealthCheck`, and `onExit` with its `onWrapServiceEnter`, `onWrapServiceRun`, `onWrapServiceHealthCheck`, and
 `onWrapServiceExit` hooks, exactly as `onWrapTaskRun` wraps a Task's `onRun`, and wraps the inner **Environments** of

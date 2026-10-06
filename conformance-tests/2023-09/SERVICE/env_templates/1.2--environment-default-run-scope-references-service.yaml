@@ -1,8 +1,6 @@
-# Section 1.2 item 5 / Section 4 item 3 (RFC 0009): the Environment may
-# reference the document's Services when its runScope excludes SERVICE. With
-# no runScope given, an Environment that references Service.* defaults to
-# [TASK], so the reference is valid and the Environment is never entered in
-# the Service's own Session.
+# Section 1.2 item 5 / Section 4 item 4 (RFC 0009): the Environment may list
+# the document's Services in `dependencies` and reference their endpoints;
+# because it depends on a Service its runScope defaults to [TASK].
 specificationVersion: environment-2023-09
 extensions:
 - SERVICE
@@ -18,5 +16,7 @@ services:
         args: ["-c", "print()", ]
 environment:
   name: CacheClient
+  dependencies:
+  - dependsOn: service:Cache
   variables:
     CACHE_PORT: "{{ Service.Cache.main.port }}"

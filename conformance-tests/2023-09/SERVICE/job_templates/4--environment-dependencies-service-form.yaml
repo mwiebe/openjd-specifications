@@ -1,7 +1,8 @@
-# Section 4 item 4 constraint 2 / Section 9 scope rule 4: a Job Environment
-# whose explicit runScope excludes SERVICE may reference the `port` and
-# `connectAddress` of a Service it lists in `dependencies`, in its variables,
-# actions, and embedded files.
+# Section 4 item 3 (RFC 0009): a Job Environment may list the Services it
+# depends on in `dependencies`, in the `service:<name>` form, and may then
+# reference the listed Service's `port` and `connectAddress` in its variables,
+# actions, and embedded files. The dependency puts every Step in Store's scope
+# (Section 9.1 rule 3), so no Step needs to list it.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -11,7 +12,6 @@ jobEnvironments:
 - name: Client
   dependencies:
   - dependsOn: service:Store
-  runScope: [TASK]
   variables:
     STORE_HOST: "{{ Service.Store.main.connectAddress }}"
     STORE_PORT: "{{ Service.Store.main.port }}"
@@ -33,7 +33,7 @@ services:
     actions:
       onRun:
         command: python
-        args: ["-c", "print()"]
+        args: ["-c", "print()", "{{ Service.Store.main.port }}"]
 steps:
 - name: Step1
   script:

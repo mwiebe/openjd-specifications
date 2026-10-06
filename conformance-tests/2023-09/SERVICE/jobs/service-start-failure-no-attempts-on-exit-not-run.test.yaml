@@ -6,7 +6,7 @@
 # -- onEnter, onRun -- ever runs. With the default maxAttempts of 0 the
 # Service is FAILED, the Job fails before any Task runs, and the Service's
 # onExit is NOT run because nothing of the Service ran (Template Schemas
-# §4 item 3, §9.5, §9.7).
+# §4 item 4, §9.5, §9.7).
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]

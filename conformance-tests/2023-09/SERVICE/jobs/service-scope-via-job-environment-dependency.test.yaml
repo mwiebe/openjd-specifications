@@ -1,15 +1,18 @@
 # Template Schemas §9.1 rule 3 / How Jobs Are Run constraint 6: a Service
-# referenced only by a Job Environment (whose runScope defaults to [TASK]) has
-# every Step in its scope, with no Step listing it in `dependencies`. Neither
-# Step's script mentions the Service; both Tasks reach it through the
-# Environment's variables, and the second, which depends on the first, still
-# finds it up. onExit runs once, after both.
+# listed only by a Job Environment's `dependencies` (whose runScope defaults
+# to [TASK]) has every Step in its scope, with no Step listing it. The Service
+# is up for every Step through the Environment's dependency alone: neither
+# Step's script mentions the Service; both Tasks read the variables the
+# Environment set from Service.Store.*, and the second, which depends on the
+# first, still finds it up. onExit runs once, after both.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
-  name: JobEnvironmentReferenceIsJobWide
+  name: ScopeViaJobEnvironmentDependency
   jobEnvironments:
   - name: Client
+    dependencies:
+    - dependsOn: service:Store
     variables:
       STORE_HOST: "{{ Service.Store.main.connectAddress }}"
       STORE_PORT: "{{ Service.Store.main.port }}"

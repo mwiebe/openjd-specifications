@@ -1,4 +1,4 @@
-# Section 4 item 3 constraint 1: no <RunScopeName> may appear more than once.
+# Section 4 item 4 constraint 1: no <RunScopeName> may appear more than once.
 specificationVersion: environment-2023-09
 extensions:
 - SERVICE

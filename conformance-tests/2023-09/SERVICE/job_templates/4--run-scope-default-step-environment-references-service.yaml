@@ -1,4 +1,4 @@
-# Section 4 item 3 / Section 9 scope rule 3 (RFC 0009): a Step Environment
+# Section 4 item 4 / Section 9 scope rule 3 (RFC 0009): a Step Environment
 # that references a Service and gives no runScope defaults to [TASK], so it is
 # never entered in the Service's Session and the reference is valid. The Step
 # lists the Service in `dependencies`, which is what lets its Step Environment

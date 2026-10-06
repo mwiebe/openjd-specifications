@@ -1,4 +1,4 @@
-# Section 1.1 item 9 / Section 9.9 item 11: `requiresServices` is permitted
+# Section 1.1 item 9 / Section 9.9 item 13: `requiresServices` is permitted
 # only in a Job Template. A requirement from one attachment on another's
 # Service is not supported.
 specificationVersion: environment-2023-09
@@ -11,5 +11,7 @@ requiresServices:
   - name: main
 environment:
   name: Client
+  dependencies:
+  - dependsOn: service:Ext
   variables:
     EXT_PORT: "{{ Service.Ext.main.port }}"

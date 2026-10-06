@@ -1,9 +1,10 @@
-# Template Schemas §4 item 3 / How Jobs Are Run § Services: an Environment
-# that references Service.* and gives no runScope is entered in Task Sessions
-# only, exactly as if `runScope: [TASK]` were given, while an Environment that
-# references nothing and gives no runScope is entered in every Session,
-# including the Service's. Each Environment's onEnter prints which Session it
-# is in; the Service's onRun and the Task report which variables they see.
+# Template Schemas §4 item 4 / How Jobs Are Run § Services: an Environment
+# that lists a Service in `dependencies` and gives no runScope is entered in
+# Task Sessions only, exactly as if `runScope: [TASK]` were given, while an
+# Environment that lists nothing and gives no runScope is entered in every
+# Session, including the Service's. Each Environment's onEnter prints which
+# Session it is in; the Service's onRun and the Task report which variables
+# they see.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
@@ -13,6 +14,8 @@ template:
     variables:
       SEEN_EVERYWHERE: "yes"
   - name: ClientByDefault
+    dependencies:
+    - dependsOn: service:Store
     variables:
       STORE_PORT: "{{ Service.Store.main.port }}"
     script:

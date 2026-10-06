@@ -1,5 +1,7 @@
-# Section 4 item 3 constraint 2 / Section 9.9 item 2: an Environment with
-# `runScope: [SERVICE]` must not reference any Service.* value.
+# Section 4 item 4 constraint 2 / Section 9.9 items 2 and 14: an Environment
+# with `runScope: [SERVICE]` must neither list a Service in `dependencies` nor
+# reference Service.*; a Service Session may begin before any Service other
+# than its own has an endpoint.
 specificationVersion: environment-2023-09
 extensions:
 - SERVICE
@@ -15,6 +17,8 @@ services:
         args: ["-c", "print()", ]
 environment:
   name: ServiceSide
+  dependencies:
+  - dependsOn: service:Cache
   runScope: [SERVICE]
   variables:
     CACHE_PORT: "{{ Service.Cache.main.port }}"

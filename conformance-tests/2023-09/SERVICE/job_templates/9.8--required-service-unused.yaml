@@ -1,5 +1,5 @@
 # Section 9.8 (RFC 0009): a required Service that no Step, Service, or Job
-# Environment lists or references is not an error, unlike an inline Service
+# Environment lists in `dependencies` is not an error, unlike an inline Service
 # that nothing depends on (Section 9.1 rule 4). The requirement is still
 # matched at submission; it may exist for a consumer that reaches the Service
 # by other means, such as a wrapper script or a configuration file.

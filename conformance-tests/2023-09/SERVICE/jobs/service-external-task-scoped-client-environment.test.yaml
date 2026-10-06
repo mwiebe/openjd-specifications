@@ -1,9 +1,10 @@
 # RFC 0009 example 3 / Template Schemas §1.2.2: an Environment Template a
 # queue would attach defines an external Service and a TASK-scoped client
-# Environment that publishes the Service's endpoint through environment
-# variables. The Job Template does not use the SERVICE extension at all and
-# consumes the Service through CACHE_HOST / CACHE_PORT. The attachment's
-# parameter default is applied to the external Service.
+# Environment that lists the Service in `dependencies` and publishes its
+# endpoint through environment variables. The Job Template does not use the
+# SERVICE extension at all and consumes the Service through CACHE_HOST /
+# CACHE_PORT. The attachment's parameter default is applied to the external
+# Service.
 template:
   specificationVersion: jobtemplate-2023-09
   name: ExternalCacheConsumer
@@ -67,6 +68,8 @@ environments:
               c.close()
   environment:
     name: CacheClient
+    dependencies:
+    - dependsOn: service:Cache
     runScope: [TASK]
     variables:
       CACHE_HOST: "{{ Service.Cache.main.connectAddress }}"

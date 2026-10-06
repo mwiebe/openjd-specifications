@@ -1,7 +1,7 @@
-# Section 4 item 3 constraint 2 / Section 9.9 item 2: an Environment whose
-# runScope includes SERVICE must not reference any Service.* value, because
-# a Service Session may begin before any Service other than its own has an
-# endpoint.
+# Section 4 item 4 constraint 2 / Section 9.9 items 2 and 14: an Environment
+# whose runScope includes SERVICE must neither list a Service in `dependencies`
+# nor reference any Service.* value, because a Service Session may begin before
+# any Service other than its own has an endpoint.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -9,6 +9,8 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: Env1
+  dependencies:
+  - dependsOn: service:Store
   runScope: [SERVICE]
   variables:
     STORE_PORT: "{{ Service.Store.main.port }}"
