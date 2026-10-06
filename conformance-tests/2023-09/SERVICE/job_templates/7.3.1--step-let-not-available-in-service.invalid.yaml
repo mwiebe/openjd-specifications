@@ -17,6 +17,8 @@ services:
         args: ["-c", "print()", "{{ threads }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Coordinator
   let:
   - threads = 4
   script:

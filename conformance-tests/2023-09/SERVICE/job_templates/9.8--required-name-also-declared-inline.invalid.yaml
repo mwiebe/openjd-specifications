@@ -20,6 +20,8 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Use
+  dependencies:
+  - dependsOn: service:Cache
   script:
     actions:
       onRun:

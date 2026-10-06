@@ -1,6 +1,7 @@
 # Section 9 item 4 (RFC 0009): a Service may depend on Steps, with the same
 # shape as a Step's `dependencies`. Indexer starts only after Prepare has
-# completed; Use references it, so Use is its scope, and Prepare is not.
+# completed; Use depends on service:Indexer, so Use is its scope, and Prepare
+# is not.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -27,6 +28,7 @@ steps:
 - name: Use
   dependencies:
   - dependsOn: Prepare
+  - dependsOn: service:Indexer
   script:
     actions:
       onRun:

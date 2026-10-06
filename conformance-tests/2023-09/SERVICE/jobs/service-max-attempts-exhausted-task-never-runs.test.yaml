@@ -27,6 +27,8 @@ template:
           args: ["-c", "print(\"BROKEN_EXIT_RAN\")"]
   steps:
   - name: Never
+    dependencies:
+    - dependsOn: service:Broken
     script:
       actions:
         onRun:

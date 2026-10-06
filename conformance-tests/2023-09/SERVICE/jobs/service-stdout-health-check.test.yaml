@@ -1,5 +1,5 @@
 # RFC 0009 example 2 / Template Schemas §9.4 STDOUT, §9.7: a Service with
-# onEnter, onRun, and onExit, whose scope is the one Step that references it.
+# onEnter, onRun, and onExit, whose scope is the one Step that depends on it.
 # It becomes READY when onRun prints `openjd_service_ready: <message>`; its
 # onEnter runs once before onRun and its onExit runs once the Step's Tasks are
 # done. Each Task receives a distinct assignment from the Service, which owns
@@ -47,6 +47,8 @@ template:
               c.close()
   steps:
   - name: Coordinated
+    dependencies:
+    - dependsOn: service:Coordinator
     parameterSpace:
       taskParameterDefinitions:
       - name: Tile

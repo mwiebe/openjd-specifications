@@ -38,6 +38,8 @@ template:
           args: ["-c", "print('SLOW_EXIT_RAN')"]
   steps:
   - name: Never
+    dependencies:
+    - dependsOn: service:Slow
     script:
       actions:
         onRun:

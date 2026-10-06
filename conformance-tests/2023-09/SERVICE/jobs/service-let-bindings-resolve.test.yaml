@@ -38,6 +38,8 @@ template:
         data: "threads={{ threads }}"
   steps:
   - name: Render
+    dependencies:
+    - dependsOn: service:Coordinator
     let:
     - threads = Param.Workers * 2
     script:

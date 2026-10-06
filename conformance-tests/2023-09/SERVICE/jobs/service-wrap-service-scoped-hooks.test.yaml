@@ -53,6 +53,8 @@ template:
               c.close()
   steps:
   - name: Use
+    dependencies:
+    - dependsOn: service:Store
     script:
       actions:
         onRun:

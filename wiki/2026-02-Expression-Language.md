@@ -854,9 +854,9 @@ type-check as `unresolved[...]` at earlier stages.
 
 | Symbol | Type | Description |
 |--------|------|-------------|
-| `Service.<name>.<port>.port` | `int` | The port number allocated (or requested) for port `<port>` of Service `<name>`, in the space of that port's `protocol`. `<name>` is a Service the document declares or, in a Job Template, requires |
+| `Service.<name>.<port>.port` | `int` | The port number allocated (or requested) for port `<port>` of Service `<name>`, in the space of that port's `protocol`. `<name>` is a Service the document declares or, in a Job Template, requires; for a declared Service, available to the Service itself and to the Steps and Services that list `service:<name>` in their `dependencies` (and to Job Environments) |
 | `Service.<name>.<port>.bindAddress` | `string` | The interface address the service process binds. Available within the declaring Service only, never for a required Service |
-| `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address entities in the Service's scope use to reach the Service |
+| `Service.<name>.<port>.connectAddress` | `string` | The hostname or IP address entities that depend on the Service use to reach it; same availability as `port` |
 
 #### 1.2.3. Implicit Type Coercion
 

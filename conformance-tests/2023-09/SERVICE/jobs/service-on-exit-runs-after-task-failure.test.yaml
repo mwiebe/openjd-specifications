@@ -24,6 +24,8 @@ template:
           args: ["-c", "print('STORE_EXIT_RAN')"]
   steps:
   - name: Failing
+    dependencies:
+    - dependsOn: service:Store
     script:
       actions:
         onRun:

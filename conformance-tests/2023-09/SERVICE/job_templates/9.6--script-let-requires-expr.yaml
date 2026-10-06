@@ -19,6 +19,8 @@ services:
         args: ["-c", "print()", "{{ endpoint }}", "{{ here }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
   script:
     actions:
       onRun:

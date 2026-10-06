@@ -16,6 +16,8 @@ services:
         args: ["-c", "print()", "{{ Service.Store.main.bindAddress }}", "{{ Service.Store.main.port }}", "{{ Service.Store.main.connectAddress }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
   script:
     actions:
       onRun:

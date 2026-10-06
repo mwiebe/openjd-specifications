@@ -1,12 +1,14 @@
-# Section 1.2 item 6 constraint 4 / Section 9.1 rule 3 (RFC 0009): list order
+# Section 1.2 item 6 constraint 5 / Section 9.1 rule 2 (RFC 0009): list order
 # carries no meaning in an Environment Template's `services` either. Front
-# may reference Back although Back is listed after it.
+# may depend on, and reference, Back although Back is listed after it.
 specificationVersion: environment-2023-09
 extensions:
 - SERVICE
 - EXPR
 services:
 - name: Front
+  dependencies:
+  - dependsOn: service:Back
   ports:
   - name: main
   script:

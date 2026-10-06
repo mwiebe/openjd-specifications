@@ -1,10 +1,10 @@
-# Template Schemas §9 item 4 / How Jobs Are Run constraint 2: a Service with
-# `dependencies` starts only after the listed Step has completed. Prepare's
-# Task writes a file in the host's temp directory keyed by Job.Name and
-# records whether the Indexer was already up (it must not be); the Indexer's
-# onRun reads the file and serves its content; Use's Task, which references
-# the Indexer and depends on Prepare, receives it. The Indexer's onExit
-# deletes the file.
+# Template Schemas §9 item 4 / How Jobs Are Run constraint 2: a Service whose
+# `dependencies` list a Step starts only after that Step has completed; the
+# graph Prepare -> Indexer -> Use (Use depends on service:Indexer and on
+# Prepare) has edges of both kinds. Prepare's Task writes a file in the host's
+# temp directory keyed by Job.Name and records whether the Indexer was already
+# up (it must not be); the Indexer's onRun reads the file and serves its
+# content; Use's Task receives it. The Indexer's onExit deletes the file.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
@@ -67,6 +67,7 @@ template:
   - name: Use
     dependencies:
     - dependsOn: Prepare
+    - dependsOn: service:Indexer
     script:
       actions:
         onRun:

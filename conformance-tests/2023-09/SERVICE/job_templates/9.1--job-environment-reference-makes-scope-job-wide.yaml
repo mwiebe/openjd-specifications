@@ -1,6 +1,8 @@
-# Section 9.1 rule 2 (RFC 0009): a Job Environment that references a Service
-# puts every Step in the Service's scope, including Steps whose scripts never
-# mention it. The Environment's runScope defaults to [TASK] (Section 4 item 3).
+# Section 9.1 rule 3 (RFC 0009): a Job Environment that references a Service
+# puts every Step in the Service's scope, including Steps that neither list
+# the Service in `dependencies` nor mention it; this is the one way a Step
+# enters a scope without a dependency. The Environment's runScope defaults to
+# [TASK] (Section 4 item 3).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE

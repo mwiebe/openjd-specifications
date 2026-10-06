@@ -1,7 +1,8 @@
-# Section 4 item 3 / Section 9.1 rule 1 (RFC 0009): a Step Environment that
-# references a Service and gives no runScope defaults to [TASK], so it is
-# never entered in the Service's Session and the reference is valid. The
-# reference puts its Step in the Service's scope.
+# Section 4 item 3 / Section 9 scope rule 3 (RFC 0009): a Step Environment
+# that references a Service and gives no runScope defaults to [TASK], so it is
+# never entered in the Service's Session and the reference is valid. The Step
+# lists the Service in `dependencies`, which is what lets its Step Environment
+# reference it.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -18,6 +19,8 @@ services:
         args: ["-c", "print()", ]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Coordinator
   stepEnvironments:
   - name: Client
     variables:

@@ -34,6 +34,8 @@ services:
         timeout: 30
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
   script:
     actions:
       onRun:

@@ -1,11 +1,11 @@
 # RFC 0009 lifecycle constraint 6 (a Service Session ends when the Service's
 # scope completes: no Step in the scope has a Task that could still run) and
-# Template Schemas §9.1 rule 1: a Service referenced by one Step is stopped
-# when that Step completes, before a dependent Step runs. Step Count's Task
-# records the Counter's endpoint; Step After, which depends on Count and does
-# not reference Service.Counter.* (so it is outside the scope), connects to
-# the recorded endpoint and finds it refused, and the Counter's onExit has
-# already printed.
+# Template Schemas §9.1 rule 1: a Service that one Step lists in its
+# `dependencies` is stopped when that Step completes, before a dependent Step
+# runs. Step Count's Task records the Counter's endpoint; Step After, which
+# depends on Count but not on service:Counter (so it is outside the scope and
+# may not reference Service.Counter.*), connects to the recorded endpoint and
+# finds it refused, and the Counter's onExit has already printed.
 #
 # The endpoint is handed between Steps through a file in the host's temp
 # directory keyed by Job.Name, which assumes both Steps' Tasks run on the same
@@ -52,6 +52,8 @@ template:
               c.close()
   steps:
   - name: Count
+    dependencies:
+    - dependsOn: service:Counter
     script:
       actions:
         onRun:

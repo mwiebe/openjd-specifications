@@ -32,6 +32,8 @@ services:
         args: ["-c", "print()", "{{ label }}", "{{ cpus }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
   script:
     actions:
       onRun:

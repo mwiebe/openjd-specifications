@@ -66,6 +66,8 @@ services:
         port {{ Service.Store.main.port }}
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
   script:
     actions:
       onRun:

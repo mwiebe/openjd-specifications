@@ -19,6 +19,8 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Metrics
   script:
     actions:
       onRun:

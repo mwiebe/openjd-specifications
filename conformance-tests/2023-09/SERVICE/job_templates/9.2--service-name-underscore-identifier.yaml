@@ -16,6 +16,8 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:_key_store2
   script:
     actions:
       onRun:

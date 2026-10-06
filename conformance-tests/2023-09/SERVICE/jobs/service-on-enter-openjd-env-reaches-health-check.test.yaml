@@ -35,6 +35,8 @@ template:
           args: ["-c", "import os; print('CHECK_DECL=' + os.environ.get('DECL', 'unset')); print('CHECK_PLAIN=' + os.environ.get('PLAIN', 'unset')); print('CHECK_OVERRIDE=' + os.environ.get('OVERRIDE_ME', 'unset'))"]
   steps:
   - name: Use
+    dependencies:
+    - dependsOn: service:Store
     script:
       actions:
         onRun:

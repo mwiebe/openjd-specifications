@@ -1,7 +1,7 @@
 # Section 9 scope rule 3 (RFC 0009): a Step Environment whose explicit
 # runScope excludes SERVICE may reference the `port` and `connectAddress` of
-# any Service the document declares; each reference puts the Step in that
-# Service's scope (Section 9.1 rule 1).
+# every Service its Step lists in `dependencies`; a Step Environment follows
+# its Step's dependencies (Section 9.1 rule 1).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -26,6 +26,9 @@ services:
         args: ["-c", "print()", ]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
+  - dependsOn: service:Coordinator
   stepEnvironments:
   - name: Client
     runScope: [TASK]

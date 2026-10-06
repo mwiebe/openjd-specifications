@@ -46,6 +46,8 @@ template:
               c.close()
   steps:
   - name: Process
+    dependencies:
+    - dependsOn: service:Cache
     parameterSpace:
       taskParameterDefinitions:
       - name: Frame

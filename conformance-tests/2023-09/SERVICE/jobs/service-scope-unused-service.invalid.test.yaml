@@ -1,10 +1,7 @@
-# Template Schemas §9.1 rule 4 / How Jobs Are Run constraint 6: a Service
-# that nothing references has every Step in its scope. It is READY before the
-# first Task and still running when the last Step's Task runs; onExit runs
-# once, after the Job. The Service's onRun records its presence in a file in
-# the host's temp directory keyed by Job.Name (assuming the Service Session and
-# the Task Sessions share a host, as the reference runner's do), and its onExit
-# removes it; the last Task checks the file exists and leaves it for onExit.
+# Template Schemas §9.1 rule 4 / §1.1 item 8 constraint 6 / §9.9 item 11: a
+# Service that no Step or Service lists in `dependencies`, and that no Job
+# Environment references, has an empty scope and is rejected before the Job
+# is created; neither Step runs and the Service is never started.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
@@ -50,10 +47,3 @@ template:
           command: python
           args: ["-c", "import os,tempfile; print('LAST_SEES_SIDECAR', os.path.exists(os.path.join(tempfile.gettempdir(), 'openjd-' + '{{ Job.Name }}' + '.up')))"]
 
-expected:
-  output:
-  - FIRST_SEES_SIDECAR True
-  - LAST_SEES_SIDECAR True
-  - SIDECAR_EXIT
-  forbidden:
-  - SEES_SIDECAR False

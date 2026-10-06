@@ -1,6 +1,8 @@
-# Section 9 item 4 constraint 3 / Section 9.9 item 10 (RFC 0009): a Step in
-# the Service's own scope cannot be a dependency. Prepare references Indexer,
-# so Prepare is in Indexer's scope; Indexer depending on Prepare is a cycle.
+# Section 3.2 constraint 3 / Section 9 item 4 constraint 3 / Section 9.9 item
+# 10 (RFC 0009): the `dependencies` of a template's Steps and Services form one
+# graph, which must be acyclic. Prepare depends on service:Indexer and Indexer
+# depends on Prepare: Prepare could not run until Indexer was READY, and
+# Indexer could not start until Prepare completed.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -19,6 +21,8 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Prepare
+  dependencies:
+  - dependsOn: service:Indexer
   script:
     actions:
       onRun:

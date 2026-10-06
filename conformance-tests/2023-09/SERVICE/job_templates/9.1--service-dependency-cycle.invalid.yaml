@@ -1,6 +1,7 @@
-# Section 1.1 item 8 constraint 4 / Section 9.1 rule 3 / Section 9.9 item 9:
-# the Service.* references among a document's Services must be acyclic.
-# Front references Back and Back references Front; neither could start first.
+# Section 1.1 item 8 constraint 4 / Section 3.2 constraint 3 / Section 9.9
+# item 10: the dependency graph of a document's Services must be acyclic.
+# Front depends on service:Back and Back on service:Front; neither could start
+# first. Each also references the other's endpoint, as the dependency permits.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -8,6 +9,8 @@ extensions:
 name: TestJob
 services:
 - name: Front
+  dependencies:
+  - dependsOn: service:Back
   ports:
   - name: main
   script:
@@ -16,6 +19,8 @@ services:
         command: python
         args: ["-c", "print()", "{{ Service.Back.main.port }}"]
 - name: Back
+  dependencies:
+  - dependsOn: service:Front
   ports:
   - name: main
   script:
@@ -25,6 +30,8 @@ services:
         args: ["-c", "print()", "{{ Service.Front.main.port }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Front
   script:
     actions:
       onRun:

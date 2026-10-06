@@ -88,6 +88,17 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Svc1
+  - dependsOn: service:Svc2
+  - dependsOn: service:Svc3
+  - dependsOn: service:Svc4
+  - dependsOn: service:Svc5
+  - dependsOn: service:Svc6
+  - dependsOn: service:Svc7
+  - dependsOn: service:Svc8
+  - dependsOn: service:Svc9
+  - dependsOn: service:Svc10
   script:
     actions:
       onRun:

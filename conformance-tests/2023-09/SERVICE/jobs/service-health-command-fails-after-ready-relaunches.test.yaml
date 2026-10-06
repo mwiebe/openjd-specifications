@@ -86,6 +86,8 @@ template:
               c.close()
   steps:
   - name: Work
+    dependencies:
+    - dependsOn: service:Store
     parameterSpace:
       taskParameterDefinitions:
       - name: N

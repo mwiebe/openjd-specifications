@@ -56,6 +56,8 @@ template:
                   print("STORE_HEARTBEAT_STOPPED", flush=True)
   steps:
   - name: Work
+    dependencies:
+    - dependsOn: service:Store
     parameterSpace:
       taskParameterDefinitions:
       - name: N

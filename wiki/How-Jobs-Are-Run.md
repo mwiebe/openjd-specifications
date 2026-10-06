@@ -87,13 +87,14 @@ When the SERVICE extension is in use (introduced in
 [RFC 0009](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0009-service.md)), a Job can
 additionally declare **Services**. A **Service** is a long-lived process that the scheduler starts *before* scheduling
 any Task in its scope, keeps running for the lifetime of its scope, and stops once the scope no longer needs it. The
-**scope** of a **Service** is the set of Steps whose Tasks depend on it, determined from the template's `Service.*`
-references (see [Section 9.1](2023-09-Template-Schemas#91-service-scope)): a Step that references the **Service** is
-in its scope, a Job **Environment** that references it puts every Step in its scope, a **Service** that references it
-contributes its own scope, and a **Service** that nothing references serves every Step. A **Service** supplied by an
-Environment Template has every Step of the Job in its scope. A **Service** publishes one or more named ports; the
-scheduler allocates a concrete address and port on the **Service**'s host and makes them available to every entity in
-the scope through the `Service.*` format-string scope, so that a Task on any Worker Host knows where to connect.
+**scope** of a **Service** is the set of Steps whose Tasks depend on it, declared in the template's `dependencies`
+lists (see [Section 9.1](2023-09-Template-Schemas#91-service-scope)): a Step that lists `service:<name>` in its
+`dependencies` is in the **Service**'s scope, a **Service** that lists it contributes its own scope, and a Job
+**Environment** that references it puts every Step in its scope; a **Service** that no Step depends on is rejected at
+template validation. A **Service** supplied by an Environment Template has every Step of the Job in its scope. A
+**Service** publishes one or more named ports; the scheduler allocates a concrete address and port on the
+**Service**'s host and makes them available to every entity that depends on it through the `Service.*` format-string
+scope, so that a Task on any Worker Host knows where to connect.
 
 Unlike an **Environment**, a **Service** is not tied to the host that runs Tasks. It runs in a **Session** of its own,
 the **Service Session**, on a **Service host** chosen by the scheduler subject to the **Service**'s host requirements,
@@ -138,14 +139,14 @@ A scheduler must satisfy the following constraints; how it satisfies them is its
 1. All of a **Service**'s ports are allocated, and its `bindAddress` and `connectAddress` values determined, before any
    **Action** of its **Service Session** runs.
 2. No **Action** of a **Service Session** (including the `onEnter` of an **Environment** it enters) begins until every
-   **Service** it references through `Service.*` is **READY** and every Step in its `dependencies` has completed. A
-   referenced **Service** is therefore **READY** before the referencing **Service**'s **Session** starts, and
-   **Services** that do not reference one another may start concurrently.
+   entry in the **Service**'s `dependencies` is satisfied: every listed Step has completed and every listed **Service**
+   is **READY**. A **Service** is therefore **READY** before any **Service** that depends on it starts its **Session**,
+   and **Services** neither of which depends on the other, directly or transitively, may start concurrently.
 3. No Task of a Step is scheduled until every **Service** whose scope includes that Step is **READY**. Once they are,
    Tasks are scheduled exactly as described above, with no change to how **Sessions** are formed; **Services** do not
    affect which Tasks may share a **Session**.
-4. A **Service** is stopped before any **Service** it references. The reference graph is acyclic, so stopping
-   **Services** in reverse topological order satisfies this; **Services** that do not reference one another may be
+4. A **Service** is stopped before any **Service** it depends on. The dependency graph is acyclic, so stopping
+   **Services** in reverse topological order satisfies this; **Services** neither of which depends on the other may be
    stopped concurrently. **Services** whose scopes complete at different times are stopped independently, each when its
    own scope completes, and a **Service** whose scope lies inside another's is always stopped no later than that one.
 5. A **Service** has at most one live **Service Session** at a time, and at most one running `onRun` within it. Before
@@ -218,7 +219,7 @@ returns to a pending state; a Step that depends on a returned Step, directly or 
 well, and Step dependencies are resolved again from scratch. A **Service** that had been stopped because its scope
 completed, and whose scope includes a returned Step, is started again, in a new **Service Session**, when that Step
 next becomes schedulable. A **Service** cannot fail after its own scope completes, so a **Service** whose scope is one
-Step never affects a Step outside it unless that Step depends on it.
+Step never affects a Step outside it unless that Step depends on a Step in it.
 
 A Task failure never fails a **Service**. A Task that fails because it could not reach a **Service** that the scheduler
 still considers **READY** is an ordinary Task failure.

@@ -23,6 +23,8 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Telemetry
   script:
     actions:
       onRun:

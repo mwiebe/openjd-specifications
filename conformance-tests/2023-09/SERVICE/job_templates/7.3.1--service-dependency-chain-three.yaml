@@ -1,7 +1,8 @@
-# Section 9 scope rule 2 / Section 9.1 rule 3 (RFC 0009): Services may
-# reference one another freely as long as the reference graph is acyclic.
-# Back references Store, Front references Back and Store, and the Step
-# references all three; Store starts first, then Back, then Front.
+# Section 9 item 4 / Section 9.1 rule 2 (RFC 0009): Services may depend on one
+# another freely as long as the dependency graph is acyclic, and each may
+# reference the endpoint of every Service it lists. Back depends on Store,
+# Front on Back and Store, and the Step on all three; Store starts first,
+# then Back, then Front.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -9,6 +10,9 @@ extensions:
 name: TestJob
 services:
 - name: Front
+  dependencies:
+  - dependsOn: service:Back
+  - dependsOn: service:Store
   ports:
   - name: main
   script:
@@ -17,6 +21,8 @@ services:
         command: python
         args: ["-c", "print()", "{{ Service.Back.main.port }}", "{{ Service.Store.main.connectAddress }}"]
 - name: Back
+  dependencies:
+  - dependsOn: service:Store
   ports:
   - name: main
   script:
@@ -34,6 +40,10 @@ services:
         args: ["-c", "print()", ]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Front
+  - dependsOn: service:Back
+  - dependsOn: service:Store
   script:
     actions:
       onRun:

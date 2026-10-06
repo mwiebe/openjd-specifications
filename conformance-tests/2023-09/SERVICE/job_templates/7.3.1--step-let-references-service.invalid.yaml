@@ -17,6 +17,8 @@ services:
         args: ["-c", "print()", ]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
   let:
   - Port = Service.Store.main.port
   script:

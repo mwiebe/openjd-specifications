@@ -1,8 +1,8 @@
 # Template Schemas §9.1 rule 1 / How Jobs Are Run constraints 3, 4, and 6:
-# two Services, each referenced by one Step. Each has that Step as its scope:
-# it is started for the Step and stopped, with its onExit run, when the Step
-# completes, and each Step's Tasks reach their own Service. Beta's Task, which
-# depends on Alpha, finds Alpha's Coordinator already gone.
+# two Services, each listed in one Step's `dependencies`. Each has that Step
+# as its scope: it is started for the Step and stopped, with its onExit run,
+# when the Step completes, and each Step's Tasks reach their own Service.
+# Beta's Task, which depends on Alpha, finds Alpha's Coordinator already gone.
 #
 # Alpha's Task records its Coordinator's endpoint in a file in the host's temp
 # directory keyed by Job.Name (assuming both Steps' Tasks run on one host, as
@@ -71,6 +71,8 @@ template:
               c.close()
   steps:
   - name: Alpha
+    dependencies:
+    - dependsOn: service:AlphaCoordinator
     script:
       actions:
         onRun:
@@ -90,6 +92,7 @@ template:
   - name: Beta
     dependencies:
     - dependsOn: Alpha
+    - dependsOn: service:BetaCoordinator
     script:
       actions:
         onRun:

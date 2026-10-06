@@ -18,6 +18,8 @@ services:
         args: ["-c", "print()", "{{ Dir }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Store
   script:
     actions:
       onRun:

@@ -1,6 +1,7 @@
-# Section 9.1 rule 1 (RFC 0009): any Step may reference a Service, including
-# a Step that depends on another Step referencing it. Both Steps are in the
-# Service's scope, and the Service lives from the first to the last of them.
+# Section 9.1 rule 1 (RFC 0009): any Step may depend on a Service, including
+# a Step that depends on another Step that depends on it. Both Steps are in
+# the Service's scope, and the Service lives from the first to the last of
+# them.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -17,6 +18,8 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Coordinator
   script:
     actions:
       onRun:
@@ -25,6 +28,7 @@ steps:
 - name: Step2
   dependencies:
   - dependsOn: Step1
+  - dependsOn: service:Coordinator
   script:
     actions:
       onRun:

@@ -1,6 +1,8 @@
-# Section 9 scope rule 2 / Section 9.1 rule 3 (RFC 0009): a Service may
-# reference any other Service in the same list. The reference guarantees Back
-# is READY before Front starts, and puts Front's scope inside Back's.
+# Section 9 item 4 / Section 9 scope rule 2 / Section 9.1 rule 2 (RFC 0009):
+# a Service may depend on another Service in the same list with
+# `dependsOn: service:<name>`, which lets it reference that Service's `port`
+# and `connectAddress`, guarantees Back is READY before Front starts, and puts
+# Front's scope inside Back's.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -16,6 +18,8 @@ services:
         command: python
         args: ["-c", "print()", ]
 - name: Front
+  dependencies:
+  - dependsOn: service:Back
   ports:
   - name: main
   script:
@@ -25,6 +29,8 @@ services:
         args: ["-c", "print()", "{{ Service.Back.main.connectAddress }}", "{{ Service.Back.main.port }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Front
   script:
     actions:
       onRun:

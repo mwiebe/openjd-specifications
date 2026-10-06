@@ -19,10 +19,14 @@
 #   - may be relaunched once if it exits (restartPolicy.maxAttempts: 1); the
 #     assets are static, so completed Tasks are kept (completedTasks: KEEP).
 #
-# The Tasks of the "Fetch" Step reach the Service through
-# Service.AssetServer.http.connectAddress and .port. They build the URL with
-# join_host_port(), which brackets an IPv6 address correctly, download one
-# asset each with urllib, and print its contents.
+# The "Fetch" Step declares that it depends on the Service with
+# `dependsOn: service:AssetServer`, beside where it would list the Steps it
+# depends on. That dependency puts Fetch in the Service's scope, so the
+# Service is READY before any Fetch Task runs and stopped once the last one
+# completes, and it is what lets Fetch's script read
+# Service.AssetServer.http.connectAddress and .port. The Tasks build the URL
+# with join_host_port(), which brackets an IPv6 address correctly, download
+# one asset each with urllib, and print its contents.
 #
 # Run it locally with the openjd CLI:
 #
@@ -62,12 +66,12 @@ services:
   description: Serves generated assets over HTTP to every Task of the Job.
   ports:
   - name: http
-  # The default readiness check: READY once a TCP connection to every port
-  # succeeds. Use STDOUT or COMMAND when connecting is not enough to know
-  # the service can do useful work.
-  readinessCheck:
+  # The default health check: READY once a TCP connection to every TCP port
+  # succeeds, then probed the same way to stay READY. Use STDOUT or COMMAND
+  # when connecting is not enough to know the service can do useful work.
+  healthCheck:
     type: TCP_CONNECT
-    timeoutSeconds: 60
+    readinessTimeoutSeconds: 60
   restartPolicy:
     maxAttempts: 1
     completedTasks: KEEP
@@ -127,6 +131,10 @@ services:
 
 steps:
 - name: Fetch
+  # A Step depends on a Service as it depends on a Step; the `service:` prefix
+  # names a Service. Fetch's Tasks are scheduled only once AssetServer is READY.
+  dependencies:
+  - dependsOn: service:AssetServer
   parameterSpace:
     taskParameterDefinitions:
     - name: Index

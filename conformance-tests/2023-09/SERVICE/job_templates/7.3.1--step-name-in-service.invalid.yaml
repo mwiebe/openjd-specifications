@@ -1,5 +1,5 @@
 # Section 9 (RFC 0009): a Service belongs to no Step, so `Step.Name` is not
-# available within it, even when exactly one Step references it.
+# available within it, even when exactly one Step depends on it.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -16,6 +16,8 @@ services:
         args: ["-c", "print()", "{{ Step.Name }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Coordinator
   script:
     actions:
       onRun:

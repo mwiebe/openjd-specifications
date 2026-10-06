@@ -1,16 +1,18 @@
-# Template Schemas §9.1 rule 3 / How Jobs Are Run constraints 2, 4, and 6:
-# Front references Back, and only Step Use references Front. Back's scope is
-# therefore Use, transitively, although Use never names Back: Back is READY
-# before Front starts (Front's onRun connects to it), both are stopped when
-# Use completes, Front before Back, and Step After finds both endpoints
-# refused. Use's Task records the endpoints in a file in the host's temp
-# directory keyed by Job.Name; After's Task deletes it.
+# Template Schemas §9.1 rule 2 / How Jobs Are Run constraints 2, 4, and 6:
+# Front depends on service:Back, and only Step Use depends on service:Front.
+# Back's scope is therefore Use, transitively, although Use never names Back:
+# Back is READY before Front starts (Front's onRun connects to it), both are
+# stopped when Use completes, Front before Back, and Step After finds both
+# endpoints refused. Use's Task records the endpoints in a file in the host's
+# temp directory keyed by Job.Name; After's Task deletes it.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]
   name: TransitiveScope
   services:
   - name: Front
+    dependencies:
+    - dependsOn: service:Back
     ports:
     - name: api
     healthCheck:
@@ -76,6 +78,8 @@ template:
               c.close()
   steps:
   - name: Use
+    dependencies:
+    - dependsOn: service:Front
     script:
       actions:
         onRun:

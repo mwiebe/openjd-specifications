@@ -1,6 +1,7 @@
-# Section 9.8 item 2 / Section 9 scope rule (RFC 0009): an inline Service may
-# reference a required Service's `port` and `connectAddress`. The requirement
-# is not part of the inline reference graph, so no cycle is possible.
+# Section 9.8 item 2 / Section 9 scope rules (RFC 0009): an inline Service may
+# reference a required Service's `port` and `connectAddress` without listing
+# it in `dependencies`; a required Service is READY before any Task runs. Use
+# depends on service:Proxy, which puts Use in Proxy's scope.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -21,6 +22,8 @@ services:
         args: ["-c", "print()", "{{ Service.Ext.main.connectAddress }}", "{{ Service.Ext.main.port }}"]
 steps:
 - name: Use
+  dependencies:
+  - dependsOn: service:Proxy
   script:
     actions:
       onRun:

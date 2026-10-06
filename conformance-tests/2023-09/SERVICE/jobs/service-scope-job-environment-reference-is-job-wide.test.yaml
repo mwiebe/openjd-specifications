@@ -1,8 +1,9 @@
-# Template Schemas §9.1 rule 2 / How Jobs Are Run constraint 6: a Service
+# Template Schemas §9.1 rule 3 / How Jobs Are Run constraint 6: a Service
 # referenced only by a Job Environment (whose runScope defaults to [TASK]) has
-# every Step in its scope. Neither Step's script mentions the Service; both
-# Tasks reach it through the Environment's variables, and the second, which
-# depends on the first, still finds it up. onExit runs once, after both.
+# every Step in its scope, with no Step listing it in `dependencies`. Neither
+# Step's script mentions the Service; both Tasks reach it through the
+# Environment's variables, and the second, which depends on the first, still
+# finds it up. onExit runs once, after both.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [SERVICE, EXPR]

@@ -1,6 +1,7 @@
 # Section 3 (RFC 0009): a <StepTemplate> has no Service list; `stepServices`
 # is an unknown property and is rejected. A Service is declared in the Job
-# Template's `services` and scoped to the Step by reference (Section 9.1).
+# Template's `services` and a Step depends on it through `dependencies`
+# (Section 3.2).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE

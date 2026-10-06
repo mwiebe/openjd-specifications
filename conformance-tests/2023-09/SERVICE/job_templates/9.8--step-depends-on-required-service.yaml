@@ -1,0 +1,29 @@
+# Section 3.2 / Section 9.8 (RFC 0009): a Step may list a required external
+# Service in its `dependencies`. The dependency is satisfied when the Service
+# is READY, which the scheduler guarantees before any Task runs; it documents
+# the dependency and does not change the Service's scope, which is every Step.
+# Other reads the same Service without listing it, as a requirement permits.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- SERVICE
+- EXPR
+name: TestJob
+requiresServices:
+- name: Cache
+  ports:
+  - name: main
+steps:
+- name: Use
+  dependencies:
+  - dependsOn: service:Cache
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Service.Cache.main.connectAddress }}"]
+- name: Other
+  script:
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{ Service.Cache.main.port }}"]

@@ -28,6 +28,9 @@ services:
         args: ["-c", "print()", "{{ Service.File.Serve }}"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Back
+  - dependsOn: service:Front
   script:
     actions:
       onRun:

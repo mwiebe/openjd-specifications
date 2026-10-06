@@ -1,6 +1,7 @@
-# Section 9.1 rule 3 (RFC 0009): Front references Back, and only Step1
-# references Front. Step1 is therefore in Back's scope transitively, and Back
-# is READY before Front starts. Step2 is in neither scope.
+# Section 9.1 rule 2 (RFC 0009): Front depends on service:Back, and only Step1
+# depends on service:Front. Step1 is therefore in Back's scope transitively,
+# although it never names Back, and Back is READY before Front starts. Step2
+# is in neither scope.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -8,6 +9,8 @@ extensions:
 name: TestJob
 services:
 - name: Front
+  dependencies:
+  - dependsOn: service:Back
   ports:
   - name: api
   script:
@@ -25,6 +28,8 @@ services:
         args: ["-c", "print()"]
 steps:
 - name: Step1
+  dependencies:
+  - dependsOn: service:Front
   script:
     actions:
       onRun:
