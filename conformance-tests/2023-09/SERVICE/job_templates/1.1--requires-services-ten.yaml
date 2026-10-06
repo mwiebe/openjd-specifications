@@ -38,6 +38,8 @@ requiresServices:
   - name: main
 steps:
 - name: Use
+  dependencies:
+  - dependsOn: service:Ext10
   script:
     actions:
       onRun:

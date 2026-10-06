@@ -15,6 +15,8 @@ requiresServices:
     protocol: TCP
 steps:
 - name: Use
+  dependencies:
+  - dependsOn: service:Metrics
   script:
     actions:
       onRun:

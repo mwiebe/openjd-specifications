@@ -12,6 +12,8 @@ template:
       protocol: UDP
   steps:
   - name: Use
+    dependencies:
+    - dependsOn: service:Ext
     script:
       actions:
         onRun:

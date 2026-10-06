@@ -67,7 +67,7 @@ acyclic, and a Step's `name` may not contain `:` when SERVICE is declared.
 
 | Value | Type | In scope |
 |---|---|---|
-| `Service.<name>.<port>.port` | `int` | the declaring Service; Services and Steps (script and Step Environments) that list `service:<name>` in `dependencies`; Job Environments whose `runScope` excludes `SERVICE`; for a required Service, everywhere but `hostRequirements` and `let`, with or without a dependency |
+| `Service.<name>.<port>.port` | `int` | the declaring Service; Services and Steps (script and Step Environments) that list `service:<name>` in `dependencies`; Job Environments whose `runScope` excludes `SERVICE`; a required Service follows the same rule, minus the declaring Service |
 | `Service.<name>.<port>.connectAddress` | `string` | as `port` |
 | `Service.<name>.<port>.bindAddress` | `string` | the declaring Service **only**; never for a required Service |
 | `Service.File.<name>` | `path` | the declaring Service's script |
@@ -89,7 +89,8 @@ acyclic, and a Step's `name` may not contain `:` when SERVICE is declared.
   Step's `dependencies` may name Steps and Services in one list; a `service:`
   name must name a Service in `services` or `requiresServices` (an unknown
   one is rejected), may not repeat within a list, and may name a required
-  Service (satisfied when it is READY, scope unchanged). When SERVICE is
+  Service (satisfied when it is READY, scope unchanged; the listing is what
+  lets the Step reference the required Service). When SERVICE is
   declared a Step's `name` may not contain `:`; in a template without SERVICE
   `service:Store` is an ordinary Step name and `dependsOn: service:Store`
   names it (the gating is pinned here, in the SERVICE suite).
@@ -102,8 +103,8 @@ acyclic, and a Step's `name` may not contain `:` when SERVICE is declared.
   listed after it.
 - **Reference without dependency** (§9 scope rules 2–3, §9.9 item 1): a
   Step script, a Step Environment, or a Service that references
-  `Service.X.*` without listing `service:X` is rejected; the reference is not
-  an implicit dependency.
+  `Service.X.*` without listing `service:X` is rejected, whether `X` is an
+  inline or a required Service; the reference is not an implicit dependency.
 - **One acyclic graph** (§3.2 constraint 3, §9.9 item 10): cycles through
   Services only (two and three), through a Step and a Service (Step →
   service:X → Step), through a Step and two Services, and a Service that
@@ -114,12 +115,16 @@ acyclic, and a Step's `name` may not contain `:` when SERVICE is declared.
   template or a Service other than itself; in an Environment Template every
   entry uses the `service:` form and names a Service of the same document (a
   Step name is rejected); not empty.
-- **`requiresServices`** (§1.1 item 9, §9.8, §9.8.1): a requirement puts the
-  listed ports' `port` and `connectAddress` in scope in Steps, Environments
-  (default `runScope` `[TASK]`), and inline Services, never `bindAddress` or
-  an unlisted port; `ports` is required, 1–10, unique, names not `File`, with
-  a `protocol` of `TCP` (default) or `UDP` and no port number; no other
-  property; Job Template only.
+- **`requiresServices`** (§1.1 item 9, §9.8, §9.8.1): a requirement makes the
+  listed ports' `port` and `connectAddress` available under the inline rule:
+  to Steps (script and Step Environments) and inline Services that list
+  `service:<name>` in `dependencies`, and to Job Environments (default
+  `runScope` `[TASK]`), which need no dependency; a Step or inline Service
+  that references a required Service without listing it is rejected; never
+  `bindAddress` or an unlisted port; a requirement that nothing lists or
+  references is accepted (unlike an unused inline Service); `ports` is
+  required, 1–10, unique, names not `File`, with a `protocol` of `TCP`
+  (default) or `UDP` and no port number; no other property; Job Template only.
 - **Environment Template root** (§1.2): `$schema` and `extensions` accepted,
   `environment` optional, at least one of `environment` or `services`.
 - **`runScope`** (§4 item 3): recognized names only, no duplicates, not empty;
@@ -132,9 +137,10 @@ acyclic, and a Step's `name` may not contain `:` when SERVICE is declared.
   and all four `onWrapService*` hooks iff `SERVICE`; a hook the `runScope` does
   not call for is rejected. A Service Session's stack (the scope's
   `SERVICE`-scoped Environments) holds at most one wrap layer.
-- **Scope rules** (§7.3.1, §9, §9.9 items 1–2): a Service visible to the
-  scripts and Step Environments of the Steps that list it, to the Services
-  that list it, and to Job Environments whose `runScope` excludes `SERVICE`;
+- **Scope rules** (§7.3.1, §9, §9.9 items 1–2): a Service, inline or
+  required, visible to the scripts and Step Environments of the Steps that
+  list it, to the Services that list it, and to Job Environments whose
+  `runScope` excludes `SERVICE`;
   `bindAddress` only in the declaring Service; no `Service.*`
   in `hostRequirements`, `<Service>.let`, a Step's `let`, or an action
   `timeout`; `Task.*`, `Step.Name`, and a Step's `let` bindings never inside a
@@ -442,6 +448,8 @@ SERVICE/
 │   ├── 9.8--required-port-protocol-udp.yaml
 │   ├── 9.8--required-service-in-inline-service.yaml
 │   ├── 9.8--required-service-in-job-environment.yaml
+│   ├── 9.8--job-environment-references-required-service.yaml
+│   ├── 9.8--required-service-unused.yaml
 │   ├── 9.8--step-depends-on-required-service.yaml
 │   ├── 9.8--required-name-also-declared-inline.invalid.yaml
 │   ├── 9.8--required-name-file.invalid.yaml
@@ -456,7 +464,9 @@ SERVICE/
 │   ├── 9.8--required-service-bind-address.invalid.yaml
 │   ├── 9.8--required-service-in-host-requirements.invalid.yaml
 │   ├── 9.8--required-service-undeclared-port.invalid.yaml
-│   └── 9.8--required-service-unknown-field.invalid.yaml
+│   ├── 9.8--required-service-unknown-field.invalid.yaml
+│   ├── 9.8--service-references-required-service-without-dependency.invalid.yaml
+│   └── 9.8--step-references-required-service-without-dependency.invalid.yaml
 ├── env_templates/                  # Environment template validation tests
 │   │  # §1.2 root, §1.2.2 Services from Environment Templates
 │   ├── 1.2--environment-default-run-scope-references-service.yaml
@@ -693,9 +703,10 @@ SERVICE/
   (`service-external-same-name-both-consumed`).
 - **`requiresServices`** (§1.1 item 9, §1.2.2 item 2, §9.8): a requirement
   satisfied by one attachment makes `Service.Ext.main.port` and
-  `.connectAddress` resolve in the Task, and in a Job Environment of the Job
-  Template whose `runScope` defaults to `[TASK]`, to the attached Service's
-  endpoint (`service-required-satisfied-by-attachment`,
+  `.connectAddress` resolve in the Task of a Step that lists `service:Ext`,
+  and in a Job Environment of the Job Template whose `runScope` defaults to
+  `[TASK]` with no dependency, to the attached Service's endpoint
+  (`service-required-satisfied-by-attachment`,
   `service-required-in-job-environment`); a Job whose requirement has no
   provider, two providers, a provider lacking the port, or a provider with the
   other protocol is rejected at submission (`service-required-no-provider`,

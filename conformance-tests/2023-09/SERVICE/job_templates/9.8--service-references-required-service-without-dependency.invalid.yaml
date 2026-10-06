@@ -1,8 +1,8 @@
-# Section 9.8 item 2 / Section 9 scope rule 2 (RFC 0009): an inline Service may
-# reference a required Service's `port` and `connectAddress` when it lists
-# `service:<name>` in its `dependencies`, as it would for another inline
-# Service; a required Service is READY before any Service or Task that lists
-# it starts. Use depends on service:Proxy, which puts Use in Proxy's scope.
+# Section 9 scope rule 2 / Section 9.8 item 2 / Section 9.9 item 1 (RFC 0009):
+# an inline Service may reference a required Service's `port` and
+# `connectAddress` only when it lists `service:<name>` in its `dependencies`.
+# Proxy references Service.Ext.main without depending on Ext and is rejected.
+# Use depends on service:Proxy, so Proxy is not unused.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -14,8 +14,6 @@ requiresServices:
   - name: main
 services:
 - name: Proxy
-  dependencies:
-  - dependsOn: service:Ext
   ports:
   - name: main
   script:

@@ -92,12 +92,14 @@ Where:
          Service, or some `jobEnvironments` entry references it.
 9. *requiresServices* — The external Services (see
    [Services from Environment Templates](#122-services-from-environment-templates)) whose endpoints this Job Template
-   reads directly, each with the ports it uses. A requirement puts `Service.<name>.<port>.port` and
-   `Service.<name>.<port>.connectAddress` in scope throughout the Job Template for each port it declares, and the
-   scheduler matches it at submission to exactly one Service of that name among the attached Environment Templates'
-   `services`. A Job Template that uses an external Service only through the effects of the Environment defined
-   alongside it declares nothing. This property is permitted only in a Job Template. Available only when using the
-   `SERVICE` extension. See: [&lt;ServiceRequirement&gt;](#98-servicerequirement). Constraints:
+   reads directly, each with the ports it uses. A requirement makes `Service.<name>.<port>.port` and
+   `Service.<name>.<port>.connectAddress` available, for each port it declares, under the same rule as an inline
+   Service's: to the Steps and Services that list `service:<name>` in their `dependencies`, and to `jobEnvironments`
+   entries whose `runScope` excludes `SERVICE` (see [Value References](#731-value-references)). The scheduler matches it
+   at submission to exactly one Service of that name among the attached Environment Templates' `services`. A Job
+   Template that uses an external Service only through the effects of the Environment defined alongside it declares
+   nothing. This property is permitted only in a Job Template. Available only when using the `SERVICE` extension. See:
+   [&lt;ServiceRequirement&gt;](#98-servicerequirement). Constraints:
       1. Minimum number of elements: If provided, then this list must contain at least one element.
       2. Maximum number of elements: The list must not contain more than 10 elements.
       3. No two requirements in this list may have the same value for the `name` property.
@@ -1033,9 +1035,10 @@ Where:
    Template declares in `services` or requires in `requiresServices`; such a dependency is satisfied when the Service is
    READY, and the Step's Tasks are not scheduled (or the dependent Service is not started) until it is (see [How Jobs
    Are Run](How-Jobs-Are-Run#service-lifecycle)). A Step that depends on a Service is in that Service's scope (see
-   [Service scope](#91-service-scope)). A dependency on a required external Service is permitted; it is satisfied when
-   that Service is READY, which the scheduler guarantees before any Task of the Job runs, and does not change the
-   Service's scope, which is every Step. Constraints (with the `SERVICE` extension):
+   [Service scope](#91-service-scope)). A dependency on a required external Service is satisfied when that Service is
+   READY, which the scheduler guarantees before any Task of the Job runs, and does not change the Service's scope,
+   which is every Step; listing it is nonetheless how the Step or Service gains access to the required Service's
+   `Service.<name>.*` values, as it is for an inline Service. Constraints (with the `SERVICE` extension):
       1. A Step name must name a Step of the same Job Template other than the entity listing it. A `service:` name must
          name a Service of the same Job Template's `services` or `requiresServices`, other than the entity listing it.
       2. No two entries of one *dependencies* list may name the same Step or the same Service.
@@ -2235,7 +2238,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Task.File.<name>`|The filesystem location to which the Task Embedded File with key `<name>` has been written.| Available within the Step Script Actions and Embedded Files.|
 |`Env.File.<name>`|The filesystem location to which the Environment Attachment with key `<name>` has been written.|Available within the Environment Script Actions and Embedded Files.|
 |`Service.File.<name>`|The filesystem location to which the Service Embedded File with key `<name>` has been written. Requires the `SERVICE` extension.|Available within the Service Script Actions and Embedded Files of the declaring Service.|
-|`Service.<name>.<port>.port`|The port number allocated (or requested) for port `<port>` of Service `<name>`, in the space of that port's `protocol`. This is an `int` type. Requires the `SERVICE` extension.|Available within the declaring Service; within every Service and Step whose `dependencies` list `service:<name>` (a Step's Script and its Step Environments whose `runScope` excludes `SERVICE`); and within every Job Environment whose `runScope` excludes `SERVICE`, which puts every Step in the Service's scope. For a Service a Job Template requires, available everywhere in the Job Template except `hostRequirements` and `let`, with or without a dependency. See [&lt;Service&gt;](#9-service-extension-service) for the scoping rules.|
+|`Service.<name>.<port>.port`|The port number allocated (or requested) for port `<port>` of Service `<name>`, in the space of that port's `protocol`. This is an `int` type. Requires the `SERVICE` extension.|Available within the declaring Service; within every Service and Step whose `dependencies` list `service:<name>` (a Step's Script and its Step Environments whose `runScope` excludes `SERVICE`); and within every Job Environment whose `runScope` excludes `SERVICE`, which puts every Step in an inline Service's scope. A Service a Job Template requires follows the same rule: available to the Steps and Services that list `service:<name>`, and to Job Environments whose `runScope` excludes `SERVICE`. See [&lt;Service&gt;](#9-service-extension-service) for the scoping rules.|
 |`Service.<name>.<port>.bindAddress`|The interface address that the service process must bind to so that entities in the Service's scope can reach it: a hostname, an IPv4 literal, or an unbracketed IPv6 literal. This is a `string` type. Requires the `SERVICE` extension.|Available within the declaring Service only; never for a required external Service.|
 |`Service.<name>.<port>.connectAddress`|The hostname or IP address that entities in the Service's scope use to reach port `<port>` of Service `<name>`: a hostname, an IPv4 literal, or an unbracketed IPv6 literal. Join it with a port using `join_host_port` (see [Expression Language](2026-02-Expression-Language#224-string-functions)), which adds the brackets an IPv6 literal needs in a URL. This is a `string` type. Requires the `SERVICE` extension.|As `Service.<name>.<port>.port`.|
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, all Step Script Actions and Embedded Files, and, with the `SERVICE` extension, all Service Script Actions and Embedded Files.|
@@ -2584,38 +2587,39 @@ The format string scopes available to format strings within a `<Service>` are:
    Session receives path mapping rules like any Session; `Session.HasPathMappingRules` and
    `Session.PathMappingRulesFile` describe the rules for the service host.
 3. `Service.File.*` — The filesystem location of embedded files defined within this Service's *script*.
-4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports, of any Service this Service lists in its
-   *dependencies*, and, in a Job Template, of any required external Service (`port` and `connectAddress` only for the
-   latter two). A reference to a Service this Service does not list, other than a required one, is invalid; see
-   [Service scope](#91-service-scope) and [Value References](#731-value-references).
+4. `Service.<name>.<port>.*` — The endpoint of this Service's own ports and of any Service this Service lists in its
+   *dependencies*, inline or, in a Job Template, required (`port` and `connectAddress` only for a listed Service). A
+   reference to a Service this Service does not list is invalid; see [Service scope](#91-service-scope) and
+   [Value References](#731-value-references).
 5. `Job.Name`.
 6. Names bound by `let` in the `<Service>` and in the `<ServiceScript>`.
 
 `Task.*` and `Step.*` values are never available within a Service, since a Service belongs to no Task and to no Step.
 
-The `Service.<name>.<port>.*` values of a Service `<name>` declared in the document's `services` are in scope in:
+The `Service.<name>.<port>.*` values of a Service `<name>` declared in the document's `services` or, in a Job Template,
+declared by an entry of `requiresServices`, are in scope in:
 
-1. The Service `<name>` itself (all three values).
+1. The Service `<name>` itself (all three values), when it is declared in `services`.
 2. Any Service in the same `services` list that lists `service:<name>` in its `dependencies` (`port` and
    `connectAddress` only): its actions, *variables*, embedded files, and `<ServiceScript>.let`.
 3. In a Job Template, any Step that lists `service:<name>` in its `dependencies`: its `script` (actions, embedded
    files, `let`) and each of its `stepEnvironments` entries whose `runScope` excludes `SERVICE` (*variables*, actions,
    embedded files, `let`). A Step Environment follows its Step's dependencies.
 4. In a Job Template, every `jobEnvironments` entry whose `runScope` excludes `SERVICE` (the default for an
-   Environment that references `Service.*`). A Job Environment has no `dependencies`; a reference from one puts every
-   Step in the Service's scope (see [Service scope](#91-service-scope)).
+   Environment that references `Service.*`), whether `<name>` is inline or required. This is the one exception to the
+   dependency rule: a Job Environment has no `dependencies` in which to list a Service. A reference from one to an
+   inline Service puts every Step in that Service's scope (see [Service scope](#91-service-scope)).
 5. In an Environment Template: the document's `environment` when its `runScope` excludes `SERVICE`.
 
-A reference from a Step or Service that does not list the dependency is a validation error, and the message should
-name the fix: for example, *Step 'Render' references `Service.Cache.main.port` but does not list `service:Cache` in
-`dependencies`*. The dependency is the author's statement that the Step needs the Service; the reference alone is not
-taken as one.
+A reference from a Step or Service that does not list the dependency is a validation error, whether the Service is
+inline or required, and the message should name the fix: for example, *Step 'Render' references
+`Service.Cache.main.port` but does not list `service:Cache` in `dependencies`*. The dependency is the author's statement
+that the Step needs the Service; the reference alone is not taken as one.
 
-The `Service.<name>.<port>.port` and `Service.<name>.<port>.connectAddress` values of a Service `<name>` and port
-`<port>` that a Job Template's `requiresServices` declares are in scope in every inline Service, every
-`jobEnvironments` and `stepEnvironments` entry whose `runScope` excludes `SERVICE`, and every Step's `script`,
-whether or not the entity lists `service:<name>` in its `dependencies`: a required Service has every Step in its scope
-and is READY before any Task runs. `bindAddress` of a required Service is never in scope.
+For a Service `<name>` and port `<port>` that a Job Template's `requiresServices` declares, only `port` and
+`connectAddress` are in scope; `bindAddress` of a required Service is never in scope. Listing a required Service in
+`dependencies` is what grants a Step or Service access to its values, and nothing more: the Service has every Step in
+its scope and is READY before any Task runs whether or not any entity lists it.
 
 An Environment whose `runScope` includes `SERVICE` is never in scope for any `Service.*` value; see
 [&lt;Environment&gt;](#4-environment).
@@ -2649,11 +2653,12 @@ depend on it, so a format string that references a Service the enclosing Step or
 error, not an implicit dependency (see [Value References](#731-value-references)).
 
 An external Service (see [Services from Environment Templates](#122-services-from-environment-templates)) has every
-Step of the Job in its scope, whether or not any Step lists it. A Service is started before any Task of a Step in its
-scope is scheduled, and stopped once no Task of a Step in its scope remains to be run (see
-[How Jobs Are Run](How-Jobs-Are-Run#service-lifecycle)); a Service whose scope is one Step therefore lives as long as
-that Step, and one whose scope is every Step lives as long as the Job. A Service belongs to no Step: its Session enters
-the Job's `jobEnvironments` and never a Step's `stepEnvironments`.
+Step of the Job in its scope, whether or not any Step lists it; listing a required Service does not change its scope,
+only which Steps and Services may reference it (see [Value References](#731-value-references)). A Service is started
+before any Task of a Step in its scope is scheduled, and stopped once no Task of a Step in its scope remains to be run
+(see [How Jobs Are Run](How-Jobs-Are-Run#service-lifecycle)); a Service whose scope is one Step therefore lives as long
+as that Step, and one whose scope is every Step lives as long as the Job. A Service belongs to no Step: its Session
+enters the Job's `jobEnvironments` and never a Step's `stepEnvironments`.
 
 ### 9.2. `<ServiceName>`
 
@@ -2939,9 +2944,11 @@ Where:
 
 1. *name* — The `name` of the external Service required. It must not equal the `name` of any Service in the Job
    Template's `services`. See: [&lt;ServiceName&gt;](#92-servicename).
-2. *ports* — The ports of the Service that the Job Template uses. Each puts `Service.<name>.<port>.port` and
-   `Service.<name>.<port>.connectAddress` in scope throughout the Job Template: in every `jobEnvironments` and
-   `stepEnvironments` entry whose `runScope` excludes `SERVICE`, in every Step's `script`, and in every inline Service.
+2. *ports* — The ports of the Service that the Job Template uses. Each makes `Service.<name>.<port>.port` and
+   `Service.<name>.<port>.connectAddress` available under the same rule as an inline Service's ports: in the `script`
+   and `stepEnvironments` of a Step that lists `service:<name>` in its `dependencies`, in an inline Service that lists
+   it, and in every `jobEnvironments` entry whose `runScope` excludes `SERVICE`. A reference from a Step or Service
+   that does not list the dependency is a validation error (see [Value References](#731-value-references)).
    `bindAddress` of a required Service is never in scope. See:
    [&lt;ServiceRequirementPort&gt;](#981-servicerequirementport). Constraints:
     1. Minimum number of elements: 1.
@@ -2951,7 +2958,10 @@ Where:
 At submission, the scheduler matches each requirement to exactly one attached Service with the same `name`, which must
 declare every listed port with the same `protocol`; see
 [Services from Environment Templates](#122-services-from-environment-templates) item 2 for the rule and the rejections.
-A required Service has every Step of the Job in its scope, as every external Service does.
+A required Service has every Step of the Job in its scope, as every external Service does. A requirement that no Step,
+Service, or Job Environment uses is not an error, unlike an inline Service that nothing depends on (see
+[Service scope](#91-service-scope) rule 4): the requirement may exist to be matched for a consumer that reaches the
+Service by other means.
 
 #### 9.8.1. `<ServiceRequirementPort>`
 
@@ -2978,8 +2988,8 @@ validation, an implementation must check:
 1. Every `Service.*` reference resolves to a Service and port declared in the same document's `services` or, in a Job
    Template, to a port declared by an entry of `requiresServices`, and is used only where the scope rules in
    [Section 9](#9-service-extension-service) permit; in particular `bindAddress` is referenced only by the declaring
-   Service, and a Step or Service that references an inline Service other than itself lists `service:<name>` in its
-   `dependencies`, the message otherwise naming the missing entry.
+   Service, and a Step or Service that references an inline or required Service other than itself lists
+   `service:<name>` in its `dependencies`, the message otherwise naming the missing entry.
 2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s or a `<StepTemplate>`'s `let`, or in an
    Environment whose explicit `runScope` includes `SERVICE`.
 3. `runScope` contains only recognized names, without duplicates.

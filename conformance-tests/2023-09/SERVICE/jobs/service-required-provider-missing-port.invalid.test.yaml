@@ -10,6 +10,8 @@ template:
     - name: main
   steps:
   - name: Use
+    dependencies:
+    - dependsOn: service:Ext
     script:
       actions:
         onRun:
