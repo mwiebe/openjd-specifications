@@ -153,7 +153,9 @@ values. The rule has no exceptions.
   an Environment whose explicit `runScope` includes `SERVICE` neither lists
   nor references a Service; an Environment that lists a Service and gives no
   `runScope` defaults to `[TASK]` and is valid, and one that lists nothing
-  defaults to every kind of Session.
+  defaults to every kind of Session. A `stepEnvironments` entry's
+  `runScope` must not include `SERVICE` (constraint 4): no Service Session
+  enters a Step Environment.
 - **Hooks follow `runScope`** (§4.3 constraint 6): a wrapping Environment
   defines `onWrapEnvEnter`/`onWrapEnvExit` always, `onWrapTaskRun` iff `TASK`,
   and all four `onWrapService*` hooks iff `SERVICE`; a hook the `runScope` does
@@ -297,6 +299,8 @@ SERVICE/
 │   ├── 4--run-scope-default-references-service-value.yaml
 │   ├── 4--run-scope-default-step-environment-references-service.yaml
 │   ├── 4--run-scope-on-step-environment.yaml
+│   ├── 4--run-scope-service-on-step-environment.invalid.yaml
+│   ├── 4--run-scope-task-and-service-on-step-environment.invalid.yaml
 │   ├── 4--run-scope-service.yaml
 │   ├── 4--run-scope-task-references-service-value.yaml
 │   ├── 4--run-scope-task.yaml

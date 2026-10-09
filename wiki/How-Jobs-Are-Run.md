@@ -158,9 +158,11 @@ A scheduler must satisfy the following constraints; how it satisfies them is its
    relocated, or when the **Session** fails to start. A **Service** whose scope completes must have its **Session**
    ended whatever its state, including **UNREADY**, **UNHEALTHY**, and **FAILED**, so that partial state is cleaned up.
 7. Before a **Service Session** ends: any running **Action** is canceled with its own cancelation method; `onExit` runs
-   if it is defined and any **Action** of the **Service** has run; and every **Environment** entered is exited in reverse
-   order, as at the end of any **Session**. Then the working directory is deleted and the host's allocated amounts and
-   ports are released.
+   if it is defined and any **Action** of the **Service** has run; and every **Environment** entered is exited in
+   reverse order, as at the end of any **Session**. Then the working directory is deleted and the host's allocated
+   amounts and ports are released. Nothing orders a **Step** outside the scope after this: a **Step** that depends on a
+   **Step** in the scope, but not on the **Service**, may be scheduled while `onExit` is still running or before it
+   begins, and whether such a **Step** can see files the **Service** wrote is implementation-defined.
 8. Constraint 7 does not apply to a host the scheduler has lost. Nothing is run or awaited there.
 9. A **Service** that is started again after its **Session** has ended begins a new **Service Session**: new host
    selection, new ports, new working directory, **Environments** re-entered, `onEnter` re-run.

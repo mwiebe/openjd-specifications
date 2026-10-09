@@ -767,7 +767,11 @@ constraint:
   completed successfully and every Service it depends on is READY. Listing a Service puts the Step
   in that Service's scope, and is what makes `Service.<name>.*` available to the Step's `script` and
   `stepEnvironments`; see [Service scope](#service-scope) and
-  [`<StepDependency>`](#stepdependency).
+  [`<StepDependency>`](#stepdependency). A Step that reaches a Service without referencing
+  `Service.*` (through a file, a wrapper, or an environment variable set elsewhere) MUST list it all
+  the same; otherwise the Service may be stopped before the Step runs. A Step need not repeat a Step
+  dependency that a Service it lists already carries: the Service cannot start, and so the Step
+  cannot be scheduled, until that Step has completed.
 * *name* — When the Job Template declares `SERVICE`, a Step's `name` MUST NOT contain `:`, so that
   a `dependsOn` value beginning `service:` can only name a Service. The definition of
   `<StepName>` is otherwise unchanged, and this constraint applies only to templates that declare
@@ -879,6 +883,9 @@ New properties:
        and its own endpoint is not meaningful to an Environment that provisions it. An Environment
        that lists a Service in *dependencies* and gives an explicit *runScope* must therefore
        exclude `SERVICE`.
+    3. The *runScope* of a `stepEnvironments` entry MUST NOT include `SERVICE`: a Step Environment
+       is entered only by the Task Sessions of its Step, and no Service Session enters one, so the
+       name would select no Session.
 
 > A modification to [`4.3. <EnvironmentActions>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#43-environmentactions)
 
@@ -1086,8 +1093,9 @@ Job Template it is determined at template validation from the template's `depend
 3. When any `jobEnvironments` entry lists `service:X` in its `dependencies`, every Step is in `X`'s
    scope: a Job Environment is entered by every Step's Session, so a Service it depends on is one
    every Step depends on.
-4. A Service in whose scope no Step falls — one that no Step, Service, or Job Environment lists — is
-   unused, and the template MUST be rejected at template validation, naming the Service.
+4. A Service in whose scope no Step falls is unused, and the template MUST be rejected at template
+   validation, naming the Service. A Service listed only by Services that are themselves unused is
+   unused.
 
 The `dependencies` lists of a template's Steps and Services together form one dependency graph, with
 Step-to-Step, Step-to-Service, Service-to-Step, and Service-to-Service edges, which MUST be acyclic
@@ -1636,7 +1644,10 @@ A scheduler MUST satisfy the following constraints; how it satisfies them is its
 7. Before a Service Session ends: any running action is canceled with its own `cancelation`
    method; *onExit* runs if it is defined and any action of the Service has run; and every
    Environment entered is exited in reverse order, as at the end of any Session. Then the working
-   directory is deleted and the host's allocated amounts and ports are released.
+   directory is deleted and the host's allocated amounts and ports are released. Nothing orders a
+   Step outside the scope after this: a Step that depends on a Step in the scope, but not on the
+   Service, MAY be scheduled while *onExit* is still running or before it begins, and whether such a
+   Step can see files the Service wrote is implementation-defined.
 8. Constraint 7 does not apply to a host the scheduler has lost (see below). Nothing is run or
    awaited there.
 9. A Service that is started again after its Session has ended — after relocation, after a start
@@ -1769,7 +1780,8 @@ checks that need the combined Job (below). At template validation, an implementa
    `dependencies`, the message otherwise naming the missing entry.
 2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s or a
    `<StepTemplate>`'s `let`, or in an Environment whose explicit `runScope` includes `SERVICE`.
-3. `runScope` contains only recognized names, without duplicates.
+3. `runScope` contains only recognized names, without duplicates, and does not include `SERVICE` on
+   a `stepEnvironments` entry.
 4. `healthCheck` is consistent with `<ServiceActions>`, with `ports`, and with its own `type`:
    `onHealthCheck` is defined if and only if the type is `COMMAND`; every port a `TCP_CONNECT`
    check names is declared and has `protocol: TCP`; a Service none of whose ports is TCP has a
@@ -2223,9 +2235,12 @@ Of the cases the Step model would cover, this RFC covers a Service shared by som
 others (declared dependencies, which give a Service its scope), a Service that starts only after a
 batch Step has finished (a Service's `dependencies` on a Step), and the queue case (`services` in
 an Environment Template with `requiresServices` in the Job Template). It does not cover a Step that
-runs after a Service's *onExit*, for example to collect a report the Service wrote on shutdown; a
+runs after a Service's *onExit*, for example to collect a report the Service wrote on shutdown. A
 Step's dependency on a Service is satisfied by the Service being READY, not by its having stopped,
-and the Service's *onExit* must do that work itself.
+and there is no modeled data dependency between a Service and any Step: whether a Step can see what
+a Service's actions wrote is implementation-defined, so a template that relies on *onExit*'s effects
+reaching a later Step is not guaranteed to work and the practice is discouraged. A Service that must
+hand something to the Job's Steps does so while it is READY, over its endpoint.
 
 ### Scope inferred from `Service.*` references
 

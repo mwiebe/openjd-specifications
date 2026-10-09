@@ -1008,7 +1008,10 @@ With the `SERVICE` extension, a Step that lists `service:<name>` in its *depende
 `<name>` (see [Service scope](#91-service-scope)): the Service is started before any Task of the Step is scheduled and
 kept running until no Task of a Step in its scope remains to be run. A Step's *script* and *stepEnvironments* may
 reference `Service.<name>.*` only for a Service the Step lists in *dependencies*, whether declared in `services` or
-required in `requiresServices`.
+required in `requiresServices`. A Step that reaches a Service without referencing `Service.*` (through a file, a
+wrapper, or an environment variable set elsewhere) must list it all the same; otherwise the Service may be stopped
+before the Step runs. A Step need not repeat a Step dependency that a Service it lists already carries: the Service
+cannot start, and so the Step cannot be scheduled, until that Step has completed.
 
 ### 3.1. `<StepName>`
 
@@ -1697,6 +1700,8 @@ Where:
       2. An Environment whose *runScope* includes `SERVICE` must not depend on or reference any Service; an Environment
          that lists a Service in *dependencies* and gives an explicit *runScope* must therefore exclude `SERVICE`.
       3. Implementations must reject a `<RunScopeName>` they do not recognize.
+      4. The *runScope* of a `stepEnvironments` entry must not include `SERVICE`: a Step Environment is entered only by
+         the Task Sessions of its Step, and no Service Session enters one, so the name would select no Session.
 5. *script* — The action that is taken by this Environment when it is run on a Worker host.
 6. *variables* — A set of environment variable name/value pairs, with the values being
    [Format Strings](#73-format-strings) that are resolved when entering the environment. The specified variables must be
@@ -2674,8 +2679,8 @@ determined at template validation from the template's `dependencies` lists:
    in `X`'s scope when it depends on `X` through any chain of Services.
 3. When any `jobEnvironments` entry lists `service:X` in its `dependencies`, every Step is in `X`'s scope: a Job
    Environment is entered by every Step's Session, so a Service it depends on is one every Step depends on.
-4. A Service in whose scope no Step falls — one that no Step, Service, or Job Environment lists — is unused, and the
-   template must be rejected at template validation, naming the Service.
+4. A Service in whose scope no Step falls is unused, and the template must be rejected at template validation, naming
+   the Service. A Service listed only by Services that are themselves unused is unused.
 
 The `dependencies` lists of a template's Steps and Services together form one dependency graph, with Step-to-Step,
 Step-to-Service, Service-to-Step, and Service-to-Service edges, which must be acyclic (see
@@ -3024,7 +3029,8 @@ validation, an implementation must check:
    lists `service:<name>` in its `dependencies`, the message otherwise naming the missing entry.
 2. No `Service.*` value appears in any `hostRequirements`, in a `<Service>`'s or a `<StepTemplate>`'s `let`, or in an
    Environment whose explicit `runScope` includes `SERVICE`.
-3. `runScope` contains only recognized names, without duplicates.
+3. `runScope` contains only recognized names, without duplicates, and does not include `SERVICE` on a `stepEnvironments`
+   entry.
 4. `healthCheck` is consistent with `<ServiceActions>`, with `ports`, and with its own `type`: `onHealthCheck` is
    defined if and only if the type is `COMMAND`; every port a `TCP_CONNECT` check names is declared and has
    `protocol: TCP`; a Service none of whose ports is TCP has a `healthCheck` of type `STDOUT` or `COMMAND`; and a
