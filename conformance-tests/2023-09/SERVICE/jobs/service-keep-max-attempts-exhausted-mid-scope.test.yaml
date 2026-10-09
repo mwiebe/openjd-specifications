@@ -1,5 +1,5 @@
 # RFC 0009 "Failure and restart" step 4 and Template Schemas §9.5 ("If
-# maxAttempts is exhausted, an onRun exit fails the scope regardless of
+# maxAttempts is exhausted, an instance failure fails the scope regardless of
 # completedTasks"), lifecycle constraints 6-7: the same shape as
 # service-keep-relaunch, but with the default maxAttempts of 0. The instance
 # exits shortly after answering Task 1, while the scope still has Tasks 2 and

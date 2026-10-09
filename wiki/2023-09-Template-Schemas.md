@@ -1007,7 +1007,8 @@ Where:
 With the `SERVICE` extension, a Step that lists `service:<name>` in its *dependencies* is in the scope of Service
 `<name>` (see [Service scope](#91-service-scope)): the Service is started before any Task of the Step is scheduled and
 kept running until no Task of a Step in its scope remains to be run. A Step's *script* and *stepEnvironments* may
-reference `Service.<name>.*` only for a Service the Step lists, or one the Job Template requires.
+reference `Service.<name>.*` only for a Service the Step lists in *dependencies*, whether declared in `services` or
+required in `requiresServices`.
 
 ### 3.1. `<StepName>`
 

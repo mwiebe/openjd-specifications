@@ -1,6 +1,6 @@
 # RFC 0009 "Services run inside Environments" / Template Schemas §4 item 4: a
-# Service Session enters the Environments of its scope whose runScope
-# includes SERVICE. The default-runScope Environment is entered for both the
+# Service Session enters the Job Environments whose runScope includes
+# SERVICE. The default-runScope Environment is entered for both the
 # Service and the Task; the TASK-scoped one only for the Task (it lists the
 # Service in `dependencies` and reads its endpoint); the SERVICE-scoped one
 # only for the Service. An Environment's `variables` reach the Service's

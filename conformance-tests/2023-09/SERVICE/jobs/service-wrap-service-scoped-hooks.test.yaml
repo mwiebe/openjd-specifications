@@ -3,7 +3,7 @@
 # defines onWrapEnvEnter, onWrapEnvExit, and the four onWrapService* hooks.
 # Each Service hook runs in place of the Service's action, receives the
 # wrapped action through WrappedAction.* and the Service's identity and ports
-# through WrappedService.* (three parallel lists), and forwards the wrapped
+# through WrappedService.* (four parallel lists), and forwards the wrapped
 # process's stdout verbatim -- which is how the wrapped onRun's
 # `openjd_service_ready` and the health check's exit status are honored.
 # onWrapServiceHealthCheck runs concurrently with onWrapServiceRun. The
@@ -82,9 +82,9 @@ environments:
           command: bash
           args:
           - "-c"
-          # The three lists are parallel: index i of each describes port i.
+          # The four lists are parallel: index i of each describes port i.
           # WrappedService.Ports is list[int], so convert before quoting.
-          - "echo WRAP_SERVICE_RUN_PORTNAMES={{ repr_sh(WrappedService.PortNames) }}; echo WRAP_SERVICE_RUN_PORTCOUNT={{ len(WrappedService.Ports) }}; echo WRAP_SERVICE_RUN_MAIN={{ join_host_port(WrappedService.BindAddresses[0], WrappedService.Ports[0]) }}; echo WRAP_SERVICE_RUN_FORWARD={{ repr_sh(flatten([['-p', string(p) + ':' + string(p)] for p in WrappedService.Ports])) }}; exec {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"
+          - "echo WRAP_SERVICE_RUN_PORTNAMES={{ repr_sh(WrappedService.PortNames) }}; echo WRAP_SERVICE_RUN_PORTCOUNT={{ len(WrappedService.Ports) }}; echo WRAP_SERVICE_RUN_PROTOCOLS={{ repr_sh(WrappedService.Protocols) }}; echo WRAP_SERVICE_RUN_MAIN={{ join_host_port(WrappedService.BindAddresses[0], WrappedService.Ports[0]) }}; echo WRAP_SERVICE_RUN_FORWARD={{ repr_sh(flatten([['-p', string(p) + ':' + string(p)] for p in WrappedService.Ports])) }}; exec {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"
         onWrapServiceHealthCheck:
           command: bash
           args: ["-c", "echo WRAP_SERVICE_CHECK={{ WrappedService.Name }}; exec {{ repr_sh(WrappedAction.Command) }} {{ repr_sh(WrappedAction.Args) }}"]
@@ -101,6 +101,7 @@ expected:
   - SERVICE_ENTER_ORIGINAL
   - WRAP_SERVICE_RUN_PORTNAMES=main admin
   - WRAP_SERVICE_RUN_PORTCOUNT=2
+  - WRAP_SERVICE_RUN_PROTOCOLS=TCP TCP
   - "WRAP_SERVICE_RUN_MAIN=127.0.0.1:"
   - "WRAP_SERVICE_RUN_FORWARD=-p "
   - STORE_LISTENING

@@ -7,13 +7,13 @@
 # starts before any Task of its scope runs, keeps READY for the lifetime of
 # the scope, and stops once no Task remains.
 #
-# This Job declares one Job Service, "AssetServer": a Python http.server that
+# This Job declares one Service, "AssetServer": a Python http.server that
 # serves a small asset directory. The Service:
 #   - publishes one named port ("http") whose number the runtime allocates;
 #   - binds Service.AssetServer.http.bindAddress (only the Service itself may
 #     read bindAddress);
-#   - uses the default readiness check, TCP_CONNECT, so it is READY once the
-#     runtime can connect to the port;
+#   - uses a TCP_CONNECT health check (the default type), so it is READY once
+#     the runtime can connect to the port;
 #   - prepares its asset directory once in onEnter, hands the directory name to
 #     onRun with openjd_env, and cleans up in onExit;
 #   - may be relaunched once if it exits (restartPolicy.maxAttempts: 1); the

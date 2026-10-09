@@ -54,7 +54,7 @@ environments:
           args: ["{{ Env.File.Launch }}", "WRAP_SERVICE_ENTER={{ WrappedService.Name }}", "{{ WrappedAction.Command }}", "{{ repr_py(WrappedAction.Args) }}"]
         onWrapServiceRun:
           command: python
-          args: ["{{ Env.File.Launch }}", "WRAP_SERVICE_RUN={{ WrappedService.Name }} ports={{ repr_py(WrappedService.PortNames) }} count={{ len(WrappedService.Ports) }}", "{{ WrappedAction.Command }}", "{{ repr_py(WrappedAction.Args) }}"]
+          args: ["{{ Env.File.Launch }}", "WRAP_SERVICE_RUN={{ WrappedService.Name }} ports={{ repr_py(WrappedService.PortNames) }} count={{ len(WrappedService.Ports) }} protocols={{ repr_py(WrappedService.Protocols) }}", "{{ WrappedAction.Command }}", "{{ repr_py(WrappedAction.Args) }}"]
         onWrapServiceHealthCheck:
           command: python
           args: ["{{ Env.File.Launch }}", "WRAP_SERVICE_CHECK", "{{ WrappedAction.Command }}", "{{ repr_py(WrappedAction.Args) }}"]
@@ -74,7 +74,7 @@ expected:
   output:
   - WRAP_SERVICE_ENTER=Store
   - SERVICE_ENTER_ORIGINAL
-  - "WRAP_SERVICE_RUN=Store ports=['main'] count=1"
+  - "WRAP_SERVICE_RUN=Store ports=['main'] count=1 protocols=['TCP']"
   - TASK_RAN True
   - WRAP_SERVICE_EXIT=Store
   - SERVICE_EXIT_ORIGINAL

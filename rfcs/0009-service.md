@@ -177,12 +177,12 @@ steps:
 This Job prepares a scene in one Step and renders it as tiles in a second, where a work-distribution
 service hands tiles to the render Tasks. `RenderTiles` lists two dependencies: the Step
 `PrepareScene`, which must complete first, and `service:Coordinator`, which must be READY. Only
-`RenderTiles` depends on the coordinator, so its scope is that one Step: the scheduler starts it
-when `RenderTiles` becomes schedulable, not while `PrepareScene` is running, and stops it when the
-last tile is done. The coordinator keeps the assignment state in memory, so if it dies and is
-relaunched, the Tasks that already completed cannot be trusted: `completedTasks: RERUN` tells the
-scheduler to requeue them. The service signals readiness itself on stdout, and does its one-time
-database initialization in `onEnter` so that a restart of `onRun` does not wipe the schema.
+`RenderTiles` depends on the coordinator, so its scope is that one Step: the scheduler need not
+start it until `RenderTiles` becomes schedulable, and stops it when the last tile is done. The
+coordinator keeps the assignment state in memory, so if it dies and is relaunched, the Tasks that
+already completed cannot be trusted: `completedTasks: RERUN` tells the scheduler to requeue them.
+The service signals readiness itself on stdout, and does its one-time database initialization in
+`onEnter` so that a restart of `onRun` does not wipe the schema.
 
 ```yaml
 specificationVersion: "jobtemplate-2023-09"
@@ -392,8 +392,9 @@ three values as a TCP port, and the Tasks use `connectAddress` and `port` withou
 is. The proxy depends on the sink (`dependsOn: service:Metrics`), which is what lets it reference
 `Service.Metrics.api.*`: it starts only once the sink is READY and is stopped before it. `Report`
 depends on the proxy, so by the transitive rule it is in the sink's scope too, and the sink is
-stopped only after `Report` has read the summary; `RenderFrames` depends on the sink directly. Both
-Services therefore live for the whole Job.
+stopped only after `Report` has read the summary; `RenderFrames` depends on the sink directly. The
+sink therefore lives for the whole Job; the proxy, whose scope is `Report` alone, is needed only
+once `RenderFrames` has completed.
 
 ```yaml
 specificationVersion: "jobtemplate-2023-09"
@@ -745,6 +746,10 @@ When a submission combines a Job Template with one or more Environment Templates
    Template's own Environment and Services reference only that document's *services*. A scheduler
    MUST keep same-named Services from different documents distinct (for example, by qualifying each
    with its document).
+4. A wrapping Environment from a document that does not declare `SERVICE` MUST NOT end up in the
+   `jobEnvironments` of a combined Job that has any Service; the submission check in
+   [Validation](#validation) rejects such a submission, naming the document that defines the
+   Environment.
 
 #### `<StepTemplate>`
 
@@ -1753,8 +1758,8 @@ is not a sufficient indicator that the service can do useful work.
 #### Validation
 
 Everything this RFC adds is checkable when a template is validated on its own, except the
-`@fmtstring` numeric fields, which are checked when resolved at job creation (item 8), and one check
-that needs the combined Job (below). At template validation, an implementation MUST check:
+`@fmtstring` numeric fields, which are checked when resolved at job creation (item 8), and two
+checks that need the combined Job (below). At template validation, an implementation MUST check:
 
 1. Every `Service.*` reference resolves to a Service and port declared in the same document's
    `services` or, in a Job Template, to a port declared by an entry of `requiresServices`, and is

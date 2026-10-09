@@ -157,8 +157,8 @@ values. The rule has no exceptions.
 - **Hooks follow `runScope`** (§4.3 constraint 6): a wrapping Environment
   defines `onWrapEnvEnter`/`onWrapEnvExit` always, `onWrapTaskRun` iff `TASK`,
   and all four `onWrapService*` hooks iff `SERVICE`; a hook the `runScope` does
-  not call for is rejected. A Service Session's stack (the scope's
-  `SERVICE`-scoped Environments) holds at most one wrap layer.
+  not call for is rejected. A Service Session's stack (the Job Environments
+  whose `runScope` includes `SERVICE`) holds at most one wrap layer.
 - **Scope rules** (§7.3.1, §9, §9.9 items 1–2): a Service, inline or
   required, visible to the scripts and Step Environments of the Steps that
   list it, to the Services that list it, and to the Job Environments that
@@ -279,7 +279,7 @@ SERVICE/
 │   ├── 1.1--services-empty-list.invalid.yaml
 │   ├── 1.1--services-more-than-ten.invalid.yaml
 │   ├── 1.1--services-without-service-extension.invalid.yaml
-│   │  # §3 no Step Service list; §3.1 `:` in Step names; §3.2 dependsOn: service:
+│   │  # §3 no Service list on a Step; §3.1 `:` in Step names; §3.2 dependsOn: service:
 │   │  # §3.3.2 attr.worker.preemptible
 │   ├── 3.1--step-name-with-colon-without-service-extension.yaml
 │   ├── 3.2--step-depends-on-step-and-service.yaml
@@ -576,7 +576,7 @@ SERVICE/
     ├── service-scope-transitive-via-dependent-service.test.yaml
     ├── service-dependency-without-reference.test.yaml
     ├── service-dependencies-starts-after-step.test.yaml
-    ├── service-run-scope-default-follows-reference.test.yaml
+    ├── service-run-scope-default-follows-dependency.test.yaml
     │  # The Service Session
     ├── service-session-is-its-own-session.test.yaml
     ├── service-environments-follow-run-scope.test.yaml
@@ -677,7 +677,7 @@ SERVICE/
 - **`runScope` default** (§4 item 4): an Environment that lists a Service in
   `dependencies` without a `runScope` is entered in Task Sessions only, while
   one that lists nothing is entered in the Service Session too
-  (`service-run-scope-default-follows-reference`).
+  (`service-run-scope-default-follows-dependency`).
 - **`Service.File.*` and `let`**: embedded files materialize into the Service
   Session and resolve through `<ServiceScript>.let`; `<Service>.let` resolves
   `Param.*` and `Job.Name` (`service-file-embedded`,
@@ -698,7 +698,7 @@ SERVICE/
   `SERVICE`;
   Environment `variables` reach the Service's actions with the Service's own
   `variables` taking precedence (`service-environments-follow-run-scope`).
-- **`openjd_env` within a Service** (§9.6): variables set by `onEnter` reach
+- **`openjd_env` within a Service** (§9.7): variables set by `onEnter` reach
   `onRun` and `onExit`, override declarative `variables`, and never propagate to
   Tasks (`service-on-enter-openjd-env-reaches-on-run`); they reach every
   `onHealthCheck` invocation of a `COMMAND` check too
@@ -763,7 +763,7 @@ SERVICE/
   attempt and the relaunch begins a new Service Session with a new working
   directory, re-entering the Environments and re-running `onEnter`
   (`service-start-failure-relaunches-in-new-session`).
-- **Health after READY** (§9.3, *How Jobs Are Run* constraint 11): the probe
+- **Health after READY** (§9.4, *How Jobs Are Run* constraint 11): the probe
   that proved readiness keeps running every `healthIntervalSeconds`, and
   `failureThreshold` consecutive failures make the instance UNHEALTHY, an
   instance failure that takes the ordinary restart decision. A `COMMAND` probe

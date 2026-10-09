@@ -326,12 +326,13 @@ Variables](#session-environment-variables), currently `OPENJD_SESSION_WORKING_DI
 **Service Session** with their usual meanings.
 
 When the WRAP_ACTIONS extension is in use, schedulers must scan the stdout of the wrap script (`onWrapEnvEnter`,
-`onWrapTaskRun`, or `onWrapEnvExit`) for these macros, not the stdout of the wrapped process. Wrap scripts must
-forward the wrapped process's stdout and stderr verbatim — without buffering, filtering, or transformation —
-which causes macros emitted by the wrapped process to be recognized identically to macros emitted by the wrap
-script itself. A wrap script may also emit these macros directly. The `WrappedAction.Environment` template
-variable includes every `openjd_env`-defined variable emitted by any earlier **Action** in the same
-**Session**, regardless of whether that **Action** ran normally or via a wrap hook.
+`onWrapTaskRun`, `onWrapEnvExit`, and, with the `SERVICE` extension, the `onWrapService*` hooks) for these macros,
+not the stdout of the wrapped process. Wrap scripts must forward the wrapped process's stdout and stderr verbatim —
+without buffering, filtering, or transformation — which causes macros emitted by the wrapped process to be
+recognized identically to macros emitted by the wrap script itself. A wrap script may also emit these macros
+directly. The `WrappedAction.Environment` template variable includes every `openjd_env`-defined variable emitted by
+any earlier **Action** in the same **Session**, regardless of whether that **Action** ran normally or via a wrap
+hook.
 
 ## Path Mapping
 

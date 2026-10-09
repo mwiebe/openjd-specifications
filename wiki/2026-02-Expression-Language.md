@@ -1563,6 +1563,7 @@ Examples:
 - `zfill(3.14, 8)` returns `"00003.14"`
 
 Note: The `sep` argument to `split` and `rsplit` must be non-empty. An empty separator is an error.
+To split a string into individual characters, use `[s[i] for i in range(len(s))]`.
 
 `join_host_port("cache.example", 6379)` returns `"cache.example:6379"`, and
 `join_host_port("2001:db8::5", 6379)` returns `"[2001:db8::5]:6379"`, as does
@@ -1574,7 +1575,6 @@ Malformed brackets such as `"[::1"` or `"[::1]x:80"` are an error. A zone identi
 through verbatim: `join_host_port("fe80::1%eth0", 80)` returns `"[fe80::1%eth0]:80"`, and
 `split_host_port` returns the host with the zone attached. `is_ipv6("::1")`, `is_ipv6("[::1]")`, and
 `is_ipv6("fe80::1%eth0")` are all `true`; `is_ipv4("10.0.0.1")` is `true`.
-To split a string into individual characters, use `[s[i] for i in range(len(s))]`.
 
 Note: Splitting an empty string returns a list containing one empty string, not an empty list
 (e.g., `''.split(',')` returns `['']`). This matches Python's `str.split()` behavior.

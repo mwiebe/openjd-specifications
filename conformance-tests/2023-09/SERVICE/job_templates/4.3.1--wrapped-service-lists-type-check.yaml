@@ -1,6 +1,7 @@
 # Section 4.3.1 (RFC 0009): WrappedService.PortNames is list[string],
-# .Ports is list[int], and .BindAddresses is list[string]; the three lists
-# are parallel. The RFC's port-forwarding idiom type-checks.
+# .Ports is list[int], .BindAddresses is list[string], and .Protocols is
+# list[string]; the four lists are parallel. The RFC's port-forwarding idiom
+# type-checks.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - WRAP_ACTIONS
@@ -32,7 +33,7 @@ jobEnvironments:
         args:
         - "-c"
         - "print()"
-        - "{{ repr_py(flatten([['-p', join_host_port(WrappedService.BindAddresses[i], WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i])] for i in range(len(WrappedService.Ports))])) }}"
+        - "{{ repr_py(flatten([['-p', join_host_port(WrappedService.BindAddresses[i], WrappedService.Ports[i]) + ':' + string(WrappedService.Ports[i]) + '/' + lower(WrappedService.Protocols[i])] for i in range(len(WrappedService.Ports))])) }}"
         - "{{ WrappedService.Ports[0] + 1 }}"
         - "{{ WrappedService.PortNames[0].upper() }}"
 services:
