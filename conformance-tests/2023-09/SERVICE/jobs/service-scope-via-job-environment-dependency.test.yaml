@@ -12,7 +12,7 @@ template:
   jobEnvironments:
   - name: Client
     dependencies:
-    - dependsOn: service:Store
+    - service: Store
     variables:
       STORE_HOST: "{{ Service.Store.main.connectAddress }}"
       STORE_PORT: "{{ Service.Store.main.port }}"

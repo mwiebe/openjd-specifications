@@ -39,7 +39,7 @@ template:
   steps:
   - name: Never
     dependencies:
-    - dependsOn: service:Slow
+    - service: Slow
     script:
       actions:
         onRun:

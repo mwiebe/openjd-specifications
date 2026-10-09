@@ -20,8 +20,8 @@
 #     assets are static, so completed Tasks are kept (completedTasks: KEEP).
 #
 # The "Fetch" Step declares that it depends on the Service with
-# `dependsOn: service:AssetServer`, beside where it would list the Steps it
-# depends on. That dependency puts Fetch in the Service's scope, so the
+# `service: AssetServer` in its `dependencies`, beside where it would list the
+# Steps it depends on. That dependency puts Fetch in the Service's scope, so the
 # Service is READY before any Fetch Task runs and stopped once the last one
 # completes, and it is what lets Fetch's script read
 # Service.AssetServer.http.connectAddress and .port. The Tasks build the URL
@@ -131,10 +131,11 @@ services:
 
 steps:
 - name: Fetch
-  # A Step depends on a Service as it depends on a Step; the `service:` prefix
-  # names a Service. Fetch's Tasks are scheduled only once AssetServer is READY.
+  # A Step depends on a Service as it depends on a Step; `service` names a
+  # Service as `dependsOn` names a Step. Fetch's Tasks are scheduled only once
+  # AssetServer is READY.
   dependencies:
-  - dependsOn: service:AssetServer
+  - service: AssetServer
   parameterSpace:
     taskParameterDefinitions:
     - name: Index

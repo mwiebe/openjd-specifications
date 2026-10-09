@@ -97,17 +97,17 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Svc1
-  - dependsOn: service:Svc2
-  - dependsOn: service:Svc3
-  - dependsOn: service:Svc4
-  - dependsOn: service:Svc5
-  - dependsOn: service:Svc6
-  - dependsOn: service:Svc7
-  - dependsOn: service:Svc8
-  - dependsOn: service:Svc9
-  - dependsOn: service:Svc10
-  - dependsOn: service:Svc11
+  - service: Svc1
+  - service: Svc2
+  - service: Svc3
+  - service: Svc4
+  - service: Svc5
+  - service: Svc6
+  - service: Svc7
+  - service: Svc8
+  - service: Svc9
+  - service: Svc10
+  - service: Svc11
   script:
     actions:
       onRun:

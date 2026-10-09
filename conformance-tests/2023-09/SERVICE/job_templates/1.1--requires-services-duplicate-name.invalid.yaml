@@ -15,7 +15,7 @@ requiresServices:
 steps:
 - name: Use
   dependencies:
-  - dependsOn: service:Ext
+  - service: Ext
   script:
     actions:
       onRun:

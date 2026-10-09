@@ -1,5 +1,5 @@
 # Template Schemas §9.1 rule 2 / How Jobs Are Run constraints 2, 4, and 6:
-# Front depends on service:Back, and only Step Use depends on service:Front.
+# Front depends on Service Back, and only Step Use depends on Service Front.
 # Back's scope is therefore Use, transitively, although Use never names Back:
 # Back is READY before Front starts (Front's onRun connects to it), both are
 # stopped when Use completes, Front before Back, and Step After finds both
@@ -12,7 +12,7 @@ template:
   services:
   - name: Front
     dependencies:
-    - dependsOn: service:Back
+    - service: Back
     ports:
     - name: api
     healthCheck:
@@ -79,7 +79,7 @@ template:
   steps:
   - name: Use
     dependencies:
-    - dependsOn: service:Front
+    - service: Front
     script:
       actions:
         onRun:

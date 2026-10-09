@@ -22,7 +22,7 @@ services:
 environment:
   name: CacheClient
   dependencies:
-  - dependsOn: service:Cache
+  - service: Cache
   runScope: [TASK]
   variables:
     CACHE_HOST: "{{ Service.Cache.main.connectAddress }}"

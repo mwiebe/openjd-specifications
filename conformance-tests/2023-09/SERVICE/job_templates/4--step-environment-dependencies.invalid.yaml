@@ -19,11 +19,11 @@ services:
 steps:
 - name: Use
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   stepEnvironments:
   - name: Client
     dependencies:
-    - dependsOn: service:Store
+    - service: Store
     variables:
       STORE_PORT: "{{ Service.Store.main.port }}"
   script:

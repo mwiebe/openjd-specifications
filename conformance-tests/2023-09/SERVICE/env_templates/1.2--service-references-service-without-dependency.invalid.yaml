@@ -1,6 +1,6 @@
 # Section 9 scope rule 2 / Section 9.9 item 1 (RFC 0009): in an Environment
 # Template too, a Service may reference another's endpoint only when it lists
-# `service:<name>` in its `dependencies`. Front references Service.Back.main
+# `service: <name>` in its `dependencies`. Front references Service.Back.main
 # without depending on Back and is rejected.
 specificationVersion: environment-2023-09
 extensions:

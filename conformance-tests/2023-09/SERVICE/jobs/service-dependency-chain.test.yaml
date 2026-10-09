@@ -1,5 +1,5 @@
 # RFC 0009 "Service lifecycle" ordering constraint 2 / Template Schemas §9
-# item 4: Front lists service:Back in its `dependencies`, so Front's Session
+# item 4: Front lists Service Back in its `dependencies`, so Front's Session
 # does not start until Back is READY, and Front may reference Back's endpoint.
 # Front connects to Back as it starts (a refused connection would exit before
 # READY and fail the run), then serves what Back told it to the Task.
@@ -37,7 +37,7 @@ template:
               c.close()
   - name: Front
     dependencies:
-    - dependsOn: service:Back
+    - service: Back
     ports:
     - name: main
     healthCheck:
@@ -71,7 +71,7 @@ template:
   steps:
   - name: Use
     dependencies:
-    - dependsOn: service:Front
+    - service: Front
     script:
       actions:
         onRun:

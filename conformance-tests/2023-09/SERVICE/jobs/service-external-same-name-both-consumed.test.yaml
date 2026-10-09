@@ -1,7 +1,7 @@
 # Template Schemas §1.2.2 item 3, both Services consumed: the RFC's shared
 # Valkey Job Template (inline Service `Cache`) is submitted alongside the RFC's
 # queue-cache Environment Template (external Service `Cache`, published to
-# Tasks by a TASK-scoped client Environment that lists `service:Cache` and
+# Tasks by a TASK-scoped client Environment that lists `service: Cache` and
 # sets VALKEY_HOST / VALKEY_PORT). A scheduler must keep the two distinct: the
 # Task's Service.Cache.* resolves to the Job Template's Cache (which answers
 # JOB_CACHE), the client Environment's variables to the queue's (which
@@ -47,7 +47,7 @@ template:
   steps:
   - name: Process
     dependencies:
-    - dependsOn: service:Cache
+    - service: Cache
     parameterSpace:
       taskParameterDefinitions:
       - name: Frame
@@ -115,7 +115,7 @@ environments:
   environment:
     name: CacheClient
     dependencies:
-    - dependsOn: service:Cache
+    - service: Cache
     runScope: [TASK]
     variables:
       VALKEY_HOST: "{{ Service.Cache.main.connectAddress }}"

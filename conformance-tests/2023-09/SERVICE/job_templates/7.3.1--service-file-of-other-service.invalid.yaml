@@ -29,8 +29,8 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Back
-  - dependsOn: service:Front
+  - service: Back
+  - service: Front
   script:
     actions:
       onRun:

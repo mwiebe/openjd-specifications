@@ -52,7 +52,7 @@ template:
   steps:
   - name: Scatter
     dependencies:
-    - dependsOn: service:Coord
+    - service: Coord
     parameterSpace:
       taskParameterDefinitions:
       - name: N
@@ -66,7 +66,7 @@ template:
   - name: Gather
     dependencies:
     - dependsOn: Scatter
-    - dependsOn: service:Coord
+    - service: Coord
     script:
       actions:
         onRun:

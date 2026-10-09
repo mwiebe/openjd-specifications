@@ -18,7 +18,7 @@ services:
 steps:
 - name: Use
   dependencies:
-  - dependsOn: service:Indexer
+  - service: Indexer
   script:
     actions:
       onRun:

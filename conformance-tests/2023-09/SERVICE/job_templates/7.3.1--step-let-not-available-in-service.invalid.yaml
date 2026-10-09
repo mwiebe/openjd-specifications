@@ -18,7 +18,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Coordinator
+  - service: Coordinator
   let:
   - threads = 4
   script:

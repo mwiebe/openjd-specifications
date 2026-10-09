@@ -51,7 +51,7 @@ template:
   steps:
   - name: Use
     dependencies:
-    - dependsOn: service:Slow
+    - service: Slow
     script:
       actions:
         onRun:

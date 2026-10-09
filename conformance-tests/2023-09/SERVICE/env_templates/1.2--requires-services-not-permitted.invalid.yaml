@@ -12,6 +12,6 @@ requiresServices:
 environment:
   name: Client
   dependencies:
-  - dependsOn: service:Ext
+  - service: Ext
   variables:
     EXT_PORT: "{{ Service.Ext.main.port }}"

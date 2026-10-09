@@ -1,7 +1,7 @@
 # Section 1.1 item 8 / Section 9 (RFC 0009): a minimal Service. Only
 # `name`, `ports`, and `script.actions.onRun` are required; healthCheck
 # defaults to TCP_CONNECT on every TCP port and restartPolicy to
-# { maxAttempts: 0, completedTasks: RERUN }.
+# { maxAttempts: 0 }, which needs no completedTasks.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - SERVICE
@@ -19,7 +19,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   script:
     actions:
       onRun:

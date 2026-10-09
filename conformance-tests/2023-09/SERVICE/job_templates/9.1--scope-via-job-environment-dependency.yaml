@@ -1,4 +1,4 @@
-# Section 9.1 rule 3 (RFC 0009): a Job Environment that lists `service:X` in
+# Section 9.1 rule 3 (RFC 0009): a Job Environment that lists `service: X` in
 # its `dependencies` puts every Step in X's scope, including Steps that neither
 # list the Service nor mention it, because every Step's Session enters the Job
 # Environment. The Service is listed by no Step, yet is not unused (rule 4).
@@ -11,7 +11,7 @@ name: TestJob
 jobEnvironments:
 - name: Client
   dependencies:
-  - dependsOn: service:Coordinator
+  - service: Coordinator
   variables:
     COORD_PORT: "{{ Service.Coordinator.main.port }}"
 services:

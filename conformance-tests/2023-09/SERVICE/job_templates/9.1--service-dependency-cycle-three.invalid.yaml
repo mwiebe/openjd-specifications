@@ -9,7 +9,7 @@ name: TestJob
 services:
 - name: A
   dependencies:
-  - dependsOn: service:B
+  - service: B
   ports:
   - name: main
   script:
@@ -19,7 +19,7 @@ services:
         args: ["-c", "print()", "{{ Service.B.main.connectAddress }}"]
 - name: B
   dependencies:
-  - dependsOn: service:C
+  - service: C
   ports:
   - name: main
   script:
@@ -29,7 +29,7 @@ services:
         args: ["-c", "print()", "{{ Service.C.main.connectAddress }}"]
 - name: C
   dependencies:
-  - dependsOn: service:A
+  - service: A
   ports:
   - name: main
   script:
@@ -40,7 +40,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:A
+  - service: A
   script:
     actions:
       onRun:

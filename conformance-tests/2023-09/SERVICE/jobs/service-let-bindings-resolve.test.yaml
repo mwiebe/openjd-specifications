@@ -39,7 +39,7 @@ template:
   steps:
   - name: Render
     dependencies:
-    - dependsOn: service:Coordinator
+    - service: Coordinator
     let:
     - threads = Param.Workers * 2
     script:

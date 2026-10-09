@@ -9,8 +9,8 @@ name: TestJob
 jobEnvironments:
 - name: Client
   dependencies:
-  - dependsOn: service:Store
-  - dependsOn: service:Store
+  - service: Store
+  - service: Store
   variables:
     STORE_PORT: "{{ Service.Store.main.port }}"
 services:

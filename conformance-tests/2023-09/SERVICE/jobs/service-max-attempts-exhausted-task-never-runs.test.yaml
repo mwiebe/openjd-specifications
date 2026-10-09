@@ -28,7 +28,7 @@ template:
   steps:
   - name: Never
     dependencies:
-    - dependsOn: service:Broken
+    - service: Broken
     script:
       actions:
         onRun:

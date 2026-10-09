@@ -62,7 +62,7 @@ template:
   steps:
   - name: Work
     dependencies:
-    - dependsOn: service:Store
+    - service: Store
     parameterSpace:
       taskParameterDefinitions:
       - name: N

@@ -34,7 +34,7 @@ steps:
   dependencies:
   - dependsOn: PrepareA
   - dependsOn: PrepareB
-  - dependsOn: service:Indexer
+  - service: Indexer
   script:
     actions:
       onRun:

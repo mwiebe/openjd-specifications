@@ -1,6 +1,6 @@
 # RFC 0009 lifecycle constraint 4 ("A Service is stopped before any Service
 # it depends on is stopped"), How Jobs Are Run § Services: Front depends on
-# service:Back and reads Back's endpoint through its `variables`, so Front is
+# Service Back and reads Back's endpoint through its `variables`, so Front is
 # started after Back is READY (constraint 2) and stopped before Back. Front's
 # onExit connects to Back again and reports whether it was still reachable:
 # Back is still listening while Front's Session ends, so cleanup that must
@@ -40,7 +40,7 @@ template:
               c.close()
   - name: Front
     dependencies:
-    - dependsOn: service:Back
+    - service: Back
     ports:
     - name: main
     healthCheck:
@@ -92,7 +92,7 @@ template:
   steps:
   - name: Use
     dependencies:
-    - dependsOn: service:Front
+    - service: Front
     script:
       actions:
         onRun:

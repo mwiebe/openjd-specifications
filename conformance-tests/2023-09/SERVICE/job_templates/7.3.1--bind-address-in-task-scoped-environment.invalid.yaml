@@ -9,7 +9,7 @@ name: TestJob
 jobEnvironments:
 - name: Client
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   runScope: [TASK]
   variables:
     STORE_BIND: "{{ Service.Store.main.bindAddress }}"

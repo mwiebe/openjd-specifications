@@ -11,7 +11,7 @@ name: TestJob
 jobEnvironments:
 - name: Client
   dependencies:
-  - dependsOn: service:Ext
+  - service: Ext
   variables:
     EXT_HOST: "{{ Service.Ext.main.connectAddress }}"
     EXT_PORT: "{{ Service.Ext.main.port }}"

@@ -22,7 +22,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Resolver
+  - service: Resolver
   script:
     actions:
       onRun:

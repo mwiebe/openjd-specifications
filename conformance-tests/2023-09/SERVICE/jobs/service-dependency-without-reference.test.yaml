@@ -1,5 +1,5 @@
 # Template Schemas §9.1 rule 1 / How Jobs Are Run constraints 3 and 6: a Step
-# that lists `service:Sidecar` in its `dependencies` without referencing
+# that lists `service: Sidecar` in its `dependencies` without referencing
 # Service.Sidecar.* is in the Sidecar's scope. The Sidecar is READY before the
 # Step's Task runs, and is stopped, with onExit run, once the Task completes;
 # the dependency alone, not a format-string reference, is what puts the Step
@@ -39,7 +39,7 @@ template:
   steps:
   - name: Use
     dependencies:
-    - dependsOn: service:Sidecar
+    - service: Sidecar
     script:
       actions:
         onRun:

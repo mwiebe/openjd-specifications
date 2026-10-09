@@ -39,7 +39,7 @@ template:
   steps:
   - name: Fetch
     dependencies:
-    - dependsOn: service:Web
+    - service: Web
     script:
       actions:
         onRun:

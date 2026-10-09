@@ -17,7 +17,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:File
+  - service: File
   script:
     actions:
       onRun:

@@ -1,6 +1,6 @@
 # Section 9 scope rule 2 / Section 9.9 item 1 (RFC 0009): a Service may
 # reference another Service's `port` and `connectAddress` only when it lists
-# `service:<name>` in its `dependencies`. Front references Service.Back.main
+# `service: <name>` in its `dependencies`. Front references Service.Back.main
 # without depending on Back and is rejected.
 specificationVersion: jobtemplate-2023-09
 extensions:
@@ -27,8 +27,8 @@ services:
 steps:
 - name: Use
   dependencies:
-  - dependsOn: service:Front
-  - dependsOn: service:Back
+  - service: Front
+  - service: Back
   script:
     actions:
       onRun:

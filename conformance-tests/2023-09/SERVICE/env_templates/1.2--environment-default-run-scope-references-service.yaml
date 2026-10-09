@@ -17,6 +17,6 @@ services:
 environment:
   name: CacheClient
   dependencies:
-  - dependsOn: service:Cache
+  - service: Cache
   variables:
     CACHE_PORT: "{{ Service.Cache.main.port }}"

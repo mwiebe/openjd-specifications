@@ -62,7 +62,7 @@ template:
   steps:
   - name: Work
     dependencies:
-    - dependsOn: service:Flaky
+    - service: Flaky
     parameterSpace:
       taskParameterDefinitions:
       - name: N

@@ -1,7 +1,7 @@
 # RFC 0009 "Service lifecycle" constraints 1-3 / Template Schemas §3.2, §9.4:
 # a Service with the default TCP_CONNECT health check (a python TCP echo
 # listener standing in for valkey-server) is READY before any Task of a Step
-# that lists `dependsOn: service:Store` runs, and the Tasks of two such Steps
+# that lists `service: Store` runs, and the Tasks of two such Steps
 # reach it through Service.Store.main.connectAddress and .port. The Service
 # binds Service.Store.main.bindAddress, which only it may reference.
 template:
@@ -47,7 +47,7 @@ template:
   steps:
   - name: First
     dependencies:
-    - dependsOn: service:Store
+    - service: Store
     parameterSpace:
       taskParameterDefinitions:
       - name: N
@@ -71,7 +71,7 @@ template:
   - name: Second
     dependencies:
     - dependsOn: First
-    - dependsOn: service:Store
+    - service: Store
     script:
       actions:
         onRun:

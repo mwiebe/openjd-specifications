@@ -11,8 +11,8 @@ name: TestJob
 services:
 - name: Front
   dependencies:
-  - dependsOn: service:Back
-  - dependsOn: service:Store
+  - service: Back
+  - service: Store
   ports:
   - name: main
   script:
@@ -22,7 +22,7 @@ services:
         args: ["-c", "print()", "{{ Service.Back.main.port }}", "{{ Service.Store.main.connectAddress }}"]
 - name: Back
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   ports:
   - name: main
   script:
@@ -41,9 +41,9 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Front
-  - dependsOn: service:Back
-  - dependsOn: service:Store
+  - service: Front
+  - service: Back
+  - service: Store
   script:
     actions:
       onRun:

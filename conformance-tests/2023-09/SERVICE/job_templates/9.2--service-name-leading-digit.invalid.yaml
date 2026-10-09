@@ -16,7 +16,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:1store
+  - service: 1store
   script:
     actions:
       onRun:

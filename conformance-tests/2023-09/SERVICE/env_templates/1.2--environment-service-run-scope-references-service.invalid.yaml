@@ -18,7 +18,7 @@ services:
 environment:
   name: ServiceSide
   dependencies:
-  - dependsOn: service:Cache
+  - service: Cache
   runScope: [SERVICE]
   variables:
     CACHE_PORT: "{{ Service.Cache.main.port }}"

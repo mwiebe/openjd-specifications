@@ -1,6 +1,6 @@
 # Section 3 item 4 / Section 3.2 (RFC 0009): one `dependencies` list names
 # both kinds of dependency. Use's Tasks are scheduled only once Prepare has
-# completed and Store is READY; the `service:` entry puts Use in Store's scope
+# completed and Store is READY; the `service` entry puts Use in Store's scope
 # and is what lets Use's script reference Service.Store.*.
 specificationVersion: jobtemplate-2023-09
 extensions:
@@ -26,7 +26,7 @@ steps:
 - name: Use
   dependencies:
   - dependsOn: Prepare
-  - dependsOn: service:Store
+  - service: Store
   script:
     actions:
       onRun:

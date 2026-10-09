@@ -39,7 +39,7 @@ template:
   steps:
   - name: Ping
     dependencies:
-    - dependsOn: service:Udp
+    - service: Udp
     parameterSpace:
       taskParameterDefinitions:
       - name: N

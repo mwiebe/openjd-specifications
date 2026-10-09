@@ -28,6 +28,7 @@ services:
     readinessTimeoutSeconds: "{{ Param.Patience }}"
   restartPolicy:
     maxAttempts: "{{ attempts }}"
+    completedTasks: KEEP
   script:
     actions:
       onRun:
@@ -39,7 +40,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   script:
     actions:
       onRun:

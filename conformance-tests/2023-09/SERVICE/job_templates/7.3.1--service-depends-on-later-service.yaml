@@ -9,7 +9,7 @@ name: TestJob
 services:
 - name: Front
   dependencies:
-  - dependsOn: service:Back
+  - service: Back
   ports:
   - name: main
   script:
@@ -28,7 +28,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Front
+  - service: Front
   script:
     actions:
       onRun:

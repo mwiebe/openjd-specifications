@@ -21,7 +21,7 @@ services:
 steps:
 - name: Use
   dependencies:
-  - dependsOn: service:Cache
+  - service: Cache
   script:
     actions:
       onRun:

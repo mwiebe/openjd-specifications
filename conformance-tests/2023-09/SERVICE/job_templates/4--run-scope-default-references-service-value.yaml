@@ -10,7 +10,7 @@ name: TestJob
 jobEnvironments:
 - name: Env1
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   variables:
     STORE_PORT: "{{ Service.Store.main.port }}"
 services:

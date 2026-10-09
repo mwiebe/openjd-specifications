@@ -19,7 +19,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Telemetry
+  - service: Telemetry
   script:
     actions:
       onRun:

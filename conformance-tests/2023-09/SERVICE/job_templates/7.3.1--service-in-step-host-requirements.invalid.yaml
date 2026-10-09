@@ -18,7 +18,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   hostRequirements:
     attributes:
     - name: attr.worker.os.family

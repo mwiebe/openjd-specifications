@@ -25,7 +25,7 @@ template:
   steps:
   - name: Failing
     dependencies:
-    - dependsOn: service:Store
+    - service: Store
     script:
       actions:
         onRun:

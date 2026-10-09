@@ -72,7 +72,7 @@ template:
   steps:
   - name: Alpha
     dependencies:
-    - dependsOn: service:AlphaCoordinator
+    - service: AlphaCoordinator
     script:
       actions:
         onRun:
@@ -92,7 +92,7 @@ template:
   - name: Beta
     dependencies:
     - dependsOn: Alpha
-    - dependsOn: service:BetaCoordinator
+    - service: BetaCoordinator
     script:
       actions:
         onRun:

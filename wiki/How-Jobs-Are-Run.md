@@ -88,7 +88,7 @@ When the SERVICE extension is in use (introduced in
 additionally declare **Services**. A **Service** is a long-lived process that the scheduler starts *before* scheduling
 any Task in its scope, keeps running for the lifetime of its scope, and stops once the scope no longer needs it. The
 **scope** of a **Service** is the set of Steps whose Tasks depend on it, declared in the template's `dependencies`
-lists (see [Section 9.1](2023-09-Template-Schemas#91-service-scope)): a Step that lists `service:<name>` in its
+lists (see [Section 9.1](2023-09-Template-Schemas#91-service-scope)): a Step that lists `service: <name>` in its
 `dependencies` is in the **Service**'s scope, a **Service** that lists it contributes its own scope, and a Job
 **Environment** that lists it puts every Step in its scope; a **Service** that no Step, **Service**, or Job
 **Environment** lists is rejected at template validation. A **Service** supplied by an Environment Template has every
@@ -105,7 +105,7 @@ Step's **Environments**. Later **Environments** take precedence over earlier one
 **Service**'s own `variables` over all of them. Which kinds of **Session** an **Environment** is entered in is declared
 by its `runScope`: by default every kind, so existing **Environments** apply to **Services** unchanged, and only an
 **Environment** whose `runScope` includes `SERVICE` is entered in a **Service Session**. An **Environment** that
-configures Tasks to use a **Service** lists `service:<name>` in its `dependencies`, which is what lets it reference
+configures Tasks to use a **Service** lists `service: <name>` in its `dependencies`, which is what lets it reference
 `Service.*`, and is entered in Task **Sessions** only; that is its default `runScope`, and an explicit `runScope` on it
 must exclude `SERVICE`. Under the WRAP_ACTIONS extension, a
 wrapping **Environment** whose `runScope` includes `SERVICE` wraps the **Service**'s `onEnter`, `onRun`,
@@ -168,12 +168,17 @@ A scheduler must satisfy the following constraints; how it satisfies them is its
    selection, new ports, new working directory, **Environments** re-entered, `onEnter` re-run.
 10. A scheduler may start a **Service** at any time consistent with these constraints, including lazily, when it is
     first prepared to schedule a Task in the **Service**'s scope, and may decline to start a **Service** whose scope
-    will schedule no Task. Once started, a **Service** is kept **READY** until its scope completes or it fails, with one
-    exception. A scheduler may **suspend** a **Service** whose `completedTasks` is `KEEP` while no Task in its scope is
-    running or can be scheduled. A suspension is not a failure: the **Service Session** ends as constraint 7 requires,
-    the **Service** becomes **UNREADY**, no restart attempt is consumed, completed Tasks keep their results, and the
-    **Service** is started again in a new **Service Session** (constraint 9) when the scheduler is next prepared to
-    schedule a Task in its scope. A **Service** whose `completedTasks` is `RERUN` must not be suspended.
+    will schedule no Task. When a **Service** starts, between the satisfaction of its `dependencies` and the first Task
+    of its scope, is the scheduler's choice; a **Service**'s lifetime is bounded by the constraints, not fixed by them.
+    Once started, a **Service** is kept **READY** until its scope completes or it fails, with one
+    exception. A scheduler may **suspend** a **Service** while no Task in its scope is running or can be scheduled. A
+    suspension is not a failure: the **Service Session** ends as constraint 7 requires, the **Service** becomes
+    **UNREADY**, no restart attempt is consumed, completed Tasks keep their results, and the **Service** is started
+    again in a new **Service Session** (constraint 9) when the scheduler is next prepared to schedule a Task in its
+    scope. A **Service** may be suspended only if its `completedTasks` is `KEEP`; a **Service** whose `completedTasks`
+    is `RERUN`, or that gives none, must not be suspended. A **Service** must not be suspended while any **Service**
+    that lists it has a **Service Session**; a **Service** that other **Services** depend on is therefore suspended
+    only after they are, which requires them to be `KEEP` **Services** too.
 11. A health-check probe in flight when `onRun` exits is canceled, with its cancelation method when it is an
     **Action**, and its result is discarded, whether the instance was **READY** or not. No probe result observed after
     `onRun` has exited makes an instance **READY** or keeps it **READY**; the instance has failed. An instance that
@@ -208,6 +213,17 @@ ever becoming **READY**); or it may relocate. If the policy's `completedTasks` i
 had completed successfully is also returned to the queue, because the **Service** held state that made those results
 depend on the lost instance; with `KEEP`, completed Tasks keep their results. If no attempts remain, the **Service**
 becomes **FAILED** and its scope fails: every Step in the scope fails, and with it the Job when the scope is every Step.
+
+When a **Service** begins a new **Service Session** (after a start failure, host loss, suspected port conflict,
+suspension, or relocation), every **Service** that lists it, directly or transitively, holds endpoint values that are no
+longer valid. The scheduler must stop each such dependent in the order of constraint 4 (dependents before the
+**Services** they list) and start each again in a new **Service Session** once every **Service** it lists is **READY**.
+This stop does not consume the dependent's restart attempts, and the dependent's `completedTasks` applies to its own
+scope exactly as for any instance that is stopped and started again (its Tasks that completed against the old instance
+are returned under `RERUN`, kept under `KEEP`). A relaunch within the same **Service Session** keeps the same ports and
+requires nothing of dependents. A dependent whose restart policy gives no `completedTasks` (permitted when its
+`maxAttempts` is 0) is stopped and started again as a `RERUN` **Service** here; one that wants its completed Tasks kept
+gives `completedTasks: KEEP` whatever its `maxAttempts`.
 
 Relaunching in a new **Service Session** on a different host is relocation. It counts as one relaunch, is governed by
 the same restart policy, and changes every `Service.<name>.*` value. Because entities in the scope resolve `Service.*`
@@ -313,9 +329,11 @@ messages to convey information about the **Action** to the render management sys
 * `openjd_service_ready: <message>` where `<message>` is any string. Requires the SERVICE extension. This is interpreted
   only when emitted by the `onRun` **Action** of a **Service** whose health check type is `STDOUT`. Before the instance
   is **READY** it indicates that the service is accepting traffic on all of its declared ports, and makes the instance
-  **READY**. After **READY** it is a heartbeat when the health check gives `healthIntervalSeconds`: the **Service** must
-  emit it at least once per interval, and `failureThreshold` consecutive intervals without it make the instance
-  **UNHEALTHY**. When no `healthIntervalSeconds` is given, further lines have no additional effect. Emitting it from any
+  **READY**. After **READY** it is a heartbeat when the health check gives `healthIntervalSeconds`: the runtime arms a
+  deadline `healthIntervalSeconds` after the later of **READY** and the most recent line, a line before the deadline
+  re-arms it, a deadline that passes without a line is a failed probe that arms the next, and `failureThreshold`
+  consecutive failed probes make the instance **UNHEALTHY**. When no `healthIntervalSeconds` is given, further lines
+  have no additional effect. Emitting it from any
   other **Action** is ignored. When `onRun` is wrapped by `onWrapServiceRun`, the line is recognized on the wrap
   script's stdout, as for every `openjd_*` message under WRAP_ACTIONS.
 

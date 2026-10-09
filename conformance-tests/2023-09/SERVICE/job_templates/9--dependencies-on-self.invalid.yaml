@@ -8,7 +8,7 @@ name: TestJob
 services:
 - name: Store
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   ports:
   - name: main
   script:
@@ -19,7 +19,7 @@ services:
 steps:
 - name: Use
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   script:
     actions:
       onRun:

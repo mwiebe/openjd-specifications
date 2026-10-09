@@ -20,7 +20,7 @@ services:
 steps:
 - name: Step1
   dependencies:
-  - dependsOn: service:Metrics
+  - service: Metrics
   script:
     actions:
       onRun:

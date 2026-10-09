@@ -10,7 +10,7 @@ name: TestJob
 jobEnvironments:
 - name: Client
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   runScope: [TASK]
   variables:
     STORE_HOST: "{{ Service.Store.main.connectAddress }}"

@@ -8,7 +8,7 @@ extensions:
 environment:
   name: Client
   dependencies:
-  - dependsOn: service:Store
+  - service: Store
   runScope: [TASK]
   variables:
     STORE_PORT: "{{ Service.Store.main.port }}"
