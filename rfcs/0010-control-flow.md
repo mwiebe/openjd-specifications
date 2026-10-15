@@ -35,12 +35,14 @@ sweep, or whether a quality check found a problem. Today that data reaches a Job
 which job bundle submitters cannot run, or through files and conventions that no scheduler or tool can see.
 
 This RFC proposes a `CONTROL_FLOW` extension that lets a Step declare typed **output variables**, lets a Task report
-them through a session-supplied **output file**, and lets the Steps that depend on it use those values in EXPR
-expressions through a new `Steps.<Name>.Output.<Var>` symbol class. With those values a dependent Step can compute
+them with an **`openjd_output_var:` stdout directive** (with an `@<file>` form for large values), and lets the Steps
+that depend on it use those values in EXPR expressions through a new `Steps.<Name>.Output.<Var>` symbol class. With those values a dependent Step can compute
 its parameter space (**dynamic fan-out**), decide whether it runs at all (**conditional execution** with `enableIf`),
 and reduce the values of every Task of a multi-Task Step (**fan-in**) with the existing EXPR function library. The
 Job's Steps and their dependencies stay fixed and are validated before submission; only Task counts, Task parameter
-values, and enablement are late-bound, in one new evaluation stage called **step input binding**.
+values, and enablement are late-bound, in one new evaluation stage called **step input binding**. Output variables
+are also how a Task reports **metrics**, such as an error score or a frame rate, for a scheduler to show beside the
+Task's parameters: a metric is an output variable that no Step reads.
 
 ## Overview
 
@@ -49,9 +51,10 @@ values, and enablement are late-bound, in one new evaluation stage called **step
 The `CONTROL_FLOW` extension adds the following, each specified in the section linked:
 
 * **Declaring outputs.** An `outputVariables` list on `<StepTemplate>`, typed with the job parameter type vocabulary
-  and constrained with the same properties: [`<OutputVariableDefinition>`](#outputvariabledefinition).
-* **Writing outputs.** A per-Task output file, `Task.OutputFile` / `OPENJD_TASK_OUTPUT_FILE`, with a strict
-  `<Name>=<JSON>` line grammar, read and validated when the Task's `onRun` succeeds:
+  and constrained with the same properties, with an optional display `unit` and a `collect` mode (`ONCE`, `LAST`, or
+  `APPEND`) for repeated reports: [`<OutputVariableDefinition>`](#outputvariabledefinition).
+* **Reporting outputs.** An `openjd_output_var: <Name>=<JSON>` stdout directive, or `openjd_output_var: <Name>=@<Path>`
+  to take the value from a file, printed by a Task's `onRun` and validated strictly as soon as it is read:
   [Output emission](#output-emission).
 * **Reading outputs.** The `Steps.<StepName>.Output.<VarName>` and `Steps.<StepName>.TaskParam.<ParamName>` symbols,
   available in Steps that depend directly on the producer: [The `Steps.*` scope](#the-steps-scope).
@@ -75,6 +78,10 @@ runs. Steps never create new Steps.
 
 **Output variables are control data.** An output is a small typed value that shapes the rest of the Job: a count, a
 list of keys, a score, an adjacency list. Bulk data keeps flowing through files and `PATH` job parameters.
+
+**Metrics are outputs too.** A scheduler stores and can show every Task's committed outputs, whether or not a Step
+reads them, so a Step that reports measurements declares them as output variables like any other. There is one
+reporting mechanism with one set of rules.
 
 **One new stage, two new states.** EXPR evaluates format strings at template validation, Job creation, and Task
 execution. CONTROL_FLOW inserts a fourth stage per Step, between Job creation and Task execution, at which the Step's
@@ -105,8 +112,8 @@ RFC 0005 defines three stages. CONTROL_FLOW adds step input binding, which runs 
   ► Type-check        ► Evaluate static    ► Evaluate the Step's       ► Evaluate all
     all exprs,          enableIf and         materialization             remaining
     check Steps.*       TEMPLATE scope;      expressions; Step           expressions;
-    references          Steps that read      becomes READY,              read the output
-                        outputs enter        SKIPPED, or FAILED          file after onRun
+    references          Steps that read      becomes READY,              collect onRun's
+                        outputs enter        SKIPPED, or FAILED          output directives
                         PENDING_INPUTS
 ```
 
@@ -137,18 +144,22 @@ These examples use EXPR as specified in the [Expression Language](../wiki/2026-0
 schema in [Specification](#specification). Application command lines (`ffmpeg`, `stylize`, `bake-node`, ...) are
 illustrative.
 
-The examples were tested as far as is possible without an implementation of CONTROL_FLOW. For each one, a proxy
-template replaced every `Steps.P.Output.X` and `Steps.P.TaskParam.Y` with a job parameter of the type this RFC
-assigns, and `Task.OutputFile` with a path under `Session.WorkingDirectory`. It dropped `outputVariables`, `enableIf`,
-and `dependsOnSubspace`, moving their expressions into `let` bindings. The proxies, generated mechanically from the
-YAML below, pass `openjd check` in the openjd-rs CLI, and hand-written copies pass `openjd run` with mock values,
-including empty upstream lists, the `fail(...)` paths, and a `null` output from a skipped Step. The proxies cannot
-test the CONTROL_FLOW semantics themselves (binding, skipping, the output file).
+An earlier revision of these examples was tested as far as is possible without an implementation of CONTROL_FLOW.
+For each one, a proxy template replaced every `Steps.P.Output.X` and `Steps.P.TaskParam.Y` with a job parameter of
+the type this RFC assigns, and dropped `outputVariables`, `enableIf`, and `dependsOnSubspace`, moving their
+expressions into `let` bindings. The proxies passed `openjd check` in the openjd-rs CLI, and hand-written copies passed
+`openjd run` with mock values, including empty upstream lists, the `fail(...)` paths, and a `null` output from a
+skipped Step. That revision wrote outputs to a file. The examples now print `openjd_output_var:` directives instead,
+and [Task metrics from a parameter sweep](#task-metrics-from-a-parameter-sweep) is new; neither change has been
+re-run through the proxies. Without `CONTROL_FLOW`, a directive is ordinary output, so it does not affect what the
+proxies test. The proxies cannot test the CONTROL_FLOW semantics themselves (binding, skipping, collecting
+directives).
 
 | Example | Use case | Data flow | Fan-out | `enableIf` | Task DAG | Fan-in |
 |---|---|---|---|---|---|---|
 | [Video frame count](#video-frame-count) | U1 | ✔ | ✔ | | | |
 | [S3 prefix fan-out with a manifest](#s3-prefix-fan-out-with-a-manifest) | U3 | ✔ | ✔ | | | ✔ |
+| [Task metrics from a parameter sweep](#task-metrics-from-a-parameter-sweep) | U16 | (no consumer) | | | | |
 | [Parameter sweep, then run the winner](#parameter-sweep-then-run-the-winner) | U4 + U3 | ✔ | ✔ | | | ✔ |
 | [Scene-graph DAG](#scene-graph-dag) | U2 | ✔ | ✔ | | ✔ (`TASK_DEPENDENCIES`) | |
 | [Render, quality check, and optional steps](#render-quality-check-and-optional-steps) | U5 + dynamic | ✔ | ✔ (may be empty) | ✔ static and dynamic | | |
@@ -193,8 +204,8 @@ steps:
         count=$(find "$frames" -name 'in_*.png' | wc -l)
         rate=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate \
                  -of default=noprint_wrappers=1:nokey=1 {{repr_sh(Param.InputVideo)}})
-        echo "FrameCount=$count" >> {{repr_sh(Task.OutputFile)}}
-        echo "FrameRate=\"$rate\"" >> {{repr_sh(Task.OutputFile)}}
+        echo "openjd_output_var: FrameCount=$count"
+        echo "openjd_output_var: FrameRate=\"$rate\""
 
   - name: StylizeFrame
     dependencies:
@@ -264,8 +275,10 @@ steps:
             Bucket={{repr_py(Param.Bucket)}}, Prefix={{repr_py(Param.Prefix)}})
         for page in pages:
             keys += [o["Key"] for o in page.get("Contents", []) if o["Key"].endswith(".mov")]
-        with open({{repr_py(Task.OutputFile)}}, "a") as f:
-            f.write("Keys=" + json.dumps(keys) + "\n")
+        # 5000 keys can exceed one stdout line, so write the value to a file and name it.
+        with open("keys.json", "w", encoding="utf-8") as f:
+            json.dump(keys, f)
+        print("openjd_output_var: Keys=@keys.json", flush=True)
 
   - name: Transcode
     dependencies:
@@ -289,8 +302,7 @@ steps:
         subprocess.run(["ffmpeg", "-nostdin", "-i", "in.mov", "out.mp4"], check=True)
         s3.upload_file("out.mp4", {{repr_py(Param.Bucket)}}, {{repr_py(out_key)}})
         size = s3.head_object(Bucket={{repr_py(Param.Bucket)}}, Key={{repr_py(out_key)}})["ContentLength"]
-        with open({{repr_py(Task.OutputFile)}}, "a") as f:
-            f.write(f"OutputBytes={size}\n")
+        print(f"openjd_output_var: OutputBytes={size}")
 
   - name: Manifest
     dependencies:
@@ -312,7 +324,98 @@ steps:
   `Steps.Transcode.Output.OutputBytes`, so it needs no dependency on `Discover`.
 * If the prefix holds no `.mov` objects, `Transcode` is a zero-Task success and `Manifest` writes an empty manifest
   with `totalBytes` 0.
-* Python's `json.dumps` writes a list on one line, which the output file grammar requires.
+* `Discover` writes `keys.json` in the Session's Working Directory, where an Action starts, and names it relative
+  to that directory. The runtime reads the file as soon as it reads the directive, so the file must be complete and
+  closed first. A short list could be printed inline instead: `print("openjd_output_var: Keys=" + json.dumps(keys))`.
+
+### Task metrics from a parameter sweep
+
+From the use case folouiseAWS posted on #111 and the Task metrics proposal that preceded this RFC: a hand-tracking
+pipeline is swept over 27 configurations and 10 benchmark episodes, 270 Tasks, and judged by three numbers. No Step
+reads them. The scheduler stores each Task's outputs and can show them as sortable columns beside the Task parameters,
+which is the whole point. The example uses each of the three `collect` modes.
+
+```yaml
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+name: hand-tracking-sweep-01
+steps:
+  - name: ExtractHandActions
+    parameterSpace:
+      taskParameterDefinitions:
+        - {name: Video,   type: STRING, range: [P0001_a68, P0002_273c, P0003_c701, P0009_02511, P0010_0ecbf,
+                                                P0011_76ea6, P0012_915e71, P0014_8254f, P0015_42b8b, P0020_ef4d6]}
+        - {name: Window,  type: INT,    range: [120, 150, 200]}
+        - {name: Overlap, type: INT,    range: [20, 30, 40]}
+        - {name: DetConf, type: FLOAT,  range: [0.5, 0.7, 0.75]}
+    outputVariables:
+      - name: mpjpe_mm
+        type: FLOAT
+        unit: mm
+        description: Mean per-joint position error over one-second action chunks.
+        minValue: 0
+      - name: coverage_pct
+        type: FLOAT
+        unit: "%"
+        description: Share of visible-hand frames with a direct prediction.
+        minValue: 0
+        maxValue: 100
+      - name: fps
+        type: FLOAT
+        unit: frames/s
+        description: End-to-end throughput.
+      - name: frames_done
+        type: INT
+        collect: LAST           # a running count, updated as the Task works
+        unit: frames
+      - name: chunk_error_mm
+        type: LIST[FLOAT]
+        collect: APPEND         # one directive per one-second segment
+        unit: mm
+        description: Error of each one-second segment, in order.
+        maxLength: 20000        # keeps the list well under the guaranteed 1 MiB per Task
+    python:
+      script: |
+        from pipeline import extract_hand_actions, score_against_hot3d
+
+        def on_progress(frames):
+            print(f"openjd_output_var: frames_done={frames}", flush=True)
+
+        on_progress(0)           # LAST needs at least one directive
+        trajectory = extract_hand_actions({{repr_py(Task.Param.Video)}}, window={{Task.Param.Window}},
+                                          overlap={{Task.Param.Overlap}}, det_conf={{Task.Param.DetConf}},
+                                          on_progress=on_progress)
+        score = score_against_hot3d(trajectory)
+        for err in score.chunk_errors_mm:
+            print(f"openjd_output_var: chunk_error_mm={err}")
+        print(f"openjd_output_var: mpjpe_mm={score.mpjpe_mm}")
+        print(f"openjd_output_var: coverage_pct={min(score.coverage * 100, 100.0)}")
+        print(f"openjd_output_var: fps={score.fps}")
+```
+
+The Task's log contains the directives, which stay in the log as other stdout messages do:
+
+```
+0:00:00.812004  openjd_output_var: frames_done=0
+0:00:41.102233  openjd_output_var: frames_done=1200
+0:01:52.408115  openjd_output_var: chunk_error_mm=48.1
+0:01:52.408190  openjd_output_var: chunk_error_mm=57.3
+0:01:52.410211  openjd_output_var: mpjpe_mm=52.6
+0:01:52.410305  openjd_output_var: coverage_pct=81.44
+0:01:52.410371  openjd_output_var: fps=15.6
+```
+
+* The runtime validates each directive as it reads it and can forward the value to the scheduler right away. A
+  scheduler may show `frames_done` while the Task runs, marked as not yet committed; the values are committed when the
+  Task succeeds.
+* `mpjpe_mm`, `coverage_pct`, and `fps` use the default `collect: ONCE`, so printing one of them twice fails the Task.
+  `chunk_error_mm` collects its directives into a list, which is `[]` if none is printed.
+* A value that isn't a number (including Python's `nan`), a misspelled name, or a `coverage_pct` over 100 fails the
+  Task. In a sweep, a bad measurement is a bad result.
+* `unit` and `description` are for display only. How to rank the results (lower or higher is better), thresholds such
+  as "coverage at least 75", and grouping over `Video` describe how a person reads the results, and stay out of the
+  template.
+* A later Step could read the same outputs as lists and pick the winner, as in the next example.
 
 ### Parameter sweep, then run the winner
 
@@ -373,9 +476,8 @@ steps:
         score = benchmark({{repr_py(Param.BenchmarkDir)}}, episode={{Task.Param.Episode}},
                           window={{Task.Param.Window}}, overlap={{Task.Param.Overlap}},
                           det_conf={{Task.Param.DetConf}})
-        with open({{repr_py(Task.OutputFile)}}, "a") as f:
-            f.write(f"mpjpe_mm={score.mpjpe_mm}\n")
-            f.write(f"fps={score.fps}\n")
+        print(f"openjd_output_var: mpjpe_mm={score.mpjpe_mm}")
+        print(f"openjd_output_var: fps={score.fps}")
 
   - name: Discover
     outputVariables:
@@ -389,8 +491,9 @@ steps:
         pages = boto3.client("s3").get_paginator("list_objects_v2").paginate(
             Bucket={{repr_py(Param.DatasetBucket)}}, Prefix={{repr_py(Param.DatasetPrefix)}})
         keys = [o["Key"] for p in pages for o in p.get("Contents", []) if o["Key"].endswith(".mp4")]
-        with open({{repr_py(Task.OutputFile)}}, "a") as f:
-            f.write("Videos=" + json.dumps(keys) + "\n")
+        with open("videos.json", "w", encoding="utf-8") as f:
+            json.dump(keys, f)
+        print("openjd_output_var: Videos=@videos.json", flush=True)
 
   - name: RunWinner
     dependencies:
@@ -428,7 +531,8 @@ steps:
   configuration `c` occupy indices `c*n` to `c*n + n - 1` of every `Steps.Sweep.*` list. This index arithmetic is the
   clearest readability cost of the design; see [Open Questions](#open-questions) item 5.
 * If no configuration is fast enough, `RunWinner` fails at binding with the `fail(...)` message and runs no Tasks.
-* The `Sweep` Step alone is useful: a scheduler can show all 270 Tasks' `mpjpe_mm` and `fps` with no consumer.
+* The `Sweep` Step alone is useful: a scheduler can show all 270 Tasks' `mpjpe_mm` and `fps` with no consumer (see
+  [Task metrics from a parameter sweep](#task-metrics-from-a-parameter-sweep)).
 
 ### Scene-graph DAG
 
@@ -464,9 +568,11 @@ steps:
         import json
         from scenetools import load_graph
         g = load_graph({{repr_py(Param.Scene)}})
-        with open({{repr_py(Task.OutputFile)}}, "a") as f:
-            f.write("Children=" + json.dumps([n.child_indices for n in g.nodes]) + "\n")
-            f.write("NodeNames=" + json.dumps([n.name for n in g.nodes]) + "\n")
+        for name, value in [("Children", [n.child_indices for n in g.nodes]),
+                            ("NodeNames", [n.name for n in g.nodes])]:
+            with open(f"{name}.json", "w", encoding="utf-8") as f:
+                json.dump(value, f)
+            print(f"openjd_output_var: {name}=@{name}.json", flush=True)
 
   - name: BakeNode
     dependencies:
@@ -566,9 +672,8 @@ steps:
         import json
         from qc import check_frames
         report = check_frames({{repr_py(Param.OutputPattern)}}, {{repr_py(list(Param.Frames))}})
-        with open({{repr_py(Task.OutputFile)}}, "a") as f:
-            f.write("BadFrames=" + json.dumps(report.bad_frames) + "\n")
-            f.write(f"MeanNoise={report.mean_noise}\n")
+        print("openjd_output_var: BadFrames=" + json.dumps(report.bad_frames))
+        print(f"openjd_output_var: MeanNoise={report.mean_noise}")
 
   - name: Rerender
     dependencies:
@@ -610,7 +715,7 @@ steps:
         set -euo pipefail
         ffmpeg -nostdin -start_number {{min(Param.Frames)}} -i {{repr_sh(Param.OutputPattern)}} \
                {{repr_sh(Param.OutputVideo)}}
-        echo "VideoBytes=$(stat -c %s {{repr_sh(Param.OutputVideo)}})" >> {{repr_sh(Task.OutputFile)}}
+        echo "openjd_output_var: VideoBytes=$(stat -c %s {{repr_sh(Param.OutputVideo)}})"
 
   - name: Publish
     dependencies:
@@ -663,15 +768,18 @@ because the input lives on the farm or in a bucket the workstation can't reach.
 | U7 | **CPU-only vs. GPU host requirements** chosen by a parameter. | #81 | Nothing | Already expressible with EXPR (see [Future Work](#future-work)) |
 | U8–U14 | **Static task-task dependencies**: export→render per frame, simulation chains, temporal offsets, static DAGs, fan-in by frame. | #82, #79 | Nothing | `TASK_DEPENDENCIES` (separate extension) |
 | U15 | **Fully dynamic work items** such as Houdini PDG. | #22 | Number and shape of the work | Out of scope |
+| U16 | **Task metrics.** Each Task reports measurements (error, coverage, frames per second, render time, peak memory) that a scheduler shows as sortable columns beside the Task's parameters. | folouiseAWS, #111; the Task metrics proposal | Nothing; the values are the result | Outputs with no consumer, `unit`, `collect` |
 
 U1–U4 need a value from a running Task and are the core of this RFC. U5 and U6 need no run-time data, but their hard
 questions (what happens to a disabled Step's outputs and dependents) are data-flow questions, so they are answered
 here too. U8–U14 need per-Task scheduling and nothing else from this RFC; they belong to a separate extension (see
-[Task-task dependencies are a separate extension](#10-task-task-dependencies-are-a-separate-extension)). U15 is the
+[Task-task dependencies are a separate extension](#12-task-task-dependencies-are-a-separate-extension)). U15 is the
 territory of the standalone StepTemplate mechanism discussed in #22, and CONTROL_FLOW does not replace it.
 
-U4 also shows that outputs are useful with no consumer at all. A scheduler or UI that shows each Task's metrics next
-to its parameters replaces the workarounds users reach for today.
+U4 also shows that outputs are useful with no consumer at all, which is U16. A scheduler or UI that shows each
+Task's metrics next to its parameters replaces the workarounds users reach for today. U16 was first proposed as a
+separate `TASK_METRICS` extension with its own `openjd_metric:` directive; this RFC covers it with output variables
+instead (see [Design Choices](#4-task-metrics-are-output-variables)).
 
 ### Workarounds in use today
 
@@ -724,12 +832,15 @@ This RFC is additive and gated by the `CONTROL_FLOW` extension name declared und
    ran or finished. A Job run twice on the same data has the same structure.
 7. **Bounded.** Output values have a size limit with a guaranteed minimum, a computed parameter space can be bounded
    by a scheduler limit, and reductions are evaluated under EXPR's existing memory and operation limits.
-8. **Safe emission channel.** Text that a Task's tools print, which may include file names, object keys, or log lines
-   from third-party software, cannot set an output value.
+8. **Strict emission.** An output value is set only by a directive that names a declared output and is well formed
+   and well typed. Anything else that looks like a directive fails the Task rather than being ignored, truncated, or
+   silently overriding a value, so a script bug or a stray log line is caught where it happens.
 9. **Implementation strategy is the scheduler's choice.** A scheduler may create a waiting Step's Tasks only once its
    inputs are known, or create the Step first and fill it in. The specification states the observable contract.
 10. **Composable.** The design composes with `TASK_CHUNKING`, `WRAP_ACTIONS`, and a future `TASK_DEPENDENCIES`
     extension without special cases in either direction.
+11. **Prompt delivery.** A runtime can validate and forward each value as soon as the Task reports it, so the values
+    are at the scheduler when the Task ends, and figures such as metrics can be shown while it runs.
 
 ## Design Choices
 
@@ -757,35 +868,86 @@ extension, for three reasons.
 Static `enableIf` alone (U5, U6) is cheap and would close issue #80 sooner. It stays here because its semantics are
 data-flow semantics, and because nothing in its syntax would change if it later had to be split out.
 
-### 2. Outputs go to a session-supplied file, not a stdout directive
+### 2. Outputs are reported with a stdout directive, with `@file` for large values
 
-Discussion #111 proposed an `openjd_output_var: <Name>=<JSON>` line on stdout, modeled on `openjd_env`. This RFC
-instead gives each Task a file, `Task.OutputFile` (also exported as `OPENJD_TASK_OUTPUT_FILE`), to which the Task
-appends `<Name>=<JSON>` lines.
+A Task reports an output by printing `openjd_output_var: <Name>=<JSON>`, as discussion #111 proposed, or
+`openjd_output_var: <Name>=@<Path>` to take the value from a file. For three reasons:
 
-The reason is what a forged value can do. `openjd_progress`, `openjd_status`, and `openjd_fail` affect only the
-reporting of the action that printed them. `openjd_env` has high impact, but only an Environment's `onEnter` may emit
-it, and that action is usually short setup code under the Environment author's control. An output variable comes
-from `onRun`, where a Job's heaviest third-party code runs (DCC applications, renderers, plugins, `aws s3 ls`
-listings of user-named objects), and its value decides how many Tasks run downstream, what they receive, and whether
-Steps run at all. An S3 object key may contain a newline, so a discovery script that logs the keys it found could
-inject an output line without any intent to do so. GitHub Actions deprecated its `::set-output` stdout command for
-exactly this reason and replaced it with the `$GITHUB_OUTPUT` file.
+* **One protocol.** Every way an Action talks to the runtime is already a stdout message: `openjd_progress`,
+  `openjd_status`, `openjd_fail`, `openjd_env`. Runtimes already scan for them, `WRAP_ACTIONS` already forwards them,
+  and logs already record them. A file channel would add a second contract: a file per attempt that the runtime must
+  create, place, let the Job's user write, expose inside a container, and clean up.
+* **Values arrive while the Task runs.** The runtime processes each directive when it reads the line, including
+  reading an `@` file, so it can validate the value at once and may forward it to the scheduler. The values can be at
+  the scheduler when the Task ends, with nothing left to read after it exits, which shortens the time between a producer
+  finishing and its consumers being bound. A scheduler can also show a running figure, such as a metric, live.
+* **`@file` removes the line-length limit.** Stdout lines are bounded (64 KiB in openjd-rs's `openjd-sessions`). A value of any
+  size up to the per-Task limit goes through a file, and the directive that names it is short.
 
-The file also removes three problems a stdout directive has:
+An earlier draft of this RFC used a session-supplied output file instead (`Task.OutputFile`, like GitHub Actions'
+`$GITHUB_OUTPUT`), on the grounds that text printed by third-party tools could forge an output. That argument does
+not carry over to OpenJD. Code in `onRun` already runs as the Job's user, with everything that user can do, so a value
+it prints grants no capability it didn't have. GitHub's case differs: untrusted pull-request text in a log could steer
+workflows that hold more privilege than its author. What remains is a correctness problem. A tool that echoes data,
+such as an object key, at the start of a line might print something shaped like a directive. The rules in
+[Output emission](#output-emission) handle it: a directive must name a declared output and be well formed and well
+typed, and by default may appear only once per output (see
+[Design Choices](#3-repeated-reports-follow-a-declared-collect-mode)). An accidental directive therefore fails the
+Task instead of silently changing a value.
 
-* Stdout lines are capped (64 KiB in `openjd-sessions`), which would cap every output. A file has no per-line cap, so
-  the limit can be set where it belongs (see [Limits](#limits)).
-* Under `WRAP_ACTIONS`, the wrap script's stdout is scanned and must forward the wrapped process's output verbatim.
-  With a file, the wrapped process needs only the path, which a wrap script forwards like any other environment
-  variable.
-* A future per-Task report from a `TASK_CHUNKING` chunk is easier to express as a file format than as one stdout line
-  per value.
+`@file` has one security rule. The runtime may run as a different operating-system user from the Action, with access
+the Action's user lacks, so it must read the file with no more access than the Action's user has. Otherwise a Task
+could copy a file it can't read into outputs that are stored and displayed. Separately, for portability, a `@` path
+must resolve inside the Session's Working Directory, which also makes relative paths work the same inside a container
+under `WRAP_ACTIONS`.
 
-The cost to authors is small: `echo "openjd_output_var: N=3"` becomes `echo "N=3" >> {{repr_sh(Task.OutputFile)}}`.
-The line grammar, last-write-wins, and type coercion that a stdout design would have used carry over unchanged.
+### 3. Repeated reports follow a declared collect mode
 
-### 3. A new `Steps` root, with `Output` and `TaskParam` levels
+A Task can print a directive for the same output more than once, by design or by mistake. Each output declares which
+it expects, with `collect`:
+
+* **`ONCE`**, the default: exactly one directive. Most outputs are computed once, and a second directive means a
+  print inside a loop, two code paths that both report, or a stray line. It fails the Task.
+* **`LAST`**: one or more directives, and the last is the value. A long Task can update a running figure, such as the
+  frames done or the current loss, which a scheduler can show as it changes.
+* **`APPEND`**: zero or more directives, collected into a list in the order printed. The output's type is `LIST[T]`,
+  and each directive supplies one `T`. A Task that evaluates 10 episodes or renders 50 frames reports one value per
+  item as it goes.
+
+`APPEND` adds one element per directive, so a list printed under `APPEND` becomes one element of a list of lists,
+never a batch to splice in. A mode that concatenated list values would make a `LIST[LIST[INT]]` output ambiguous, and
+is not needed: a Task with a batch of values can print one directive per value, or report the whole list once.
+
+No mode reduces values at the producer (a sum, minimum, or count). Consumers reduce with EXPR (see
+[Design Choices](#10-reductions-are-ordinary-expr-over-ordered-lists)), and keeping every value is what a Task that
+reports measurements wants. A reducing mode can be added later if the size of collected lists becomes a problem.
+
+### 4. Task metrics are output variables
+
+Reporting per-Task measurements, such as an error score, coverage, frames per second, or render time, was first
+proposed as a separate extension with its own directive, `openjd_metric: <name>=<number>`. In this RFC a metric is an
+output variable that no Step reads. It is declared with a type and constraints, has an optional `unit` and
+`description` for display, and is reported with `openjd_output_var:`. A scheduler stores and can show every Task's
+committed outputs whether or not a Step reads them (see [Committing values](#committing-values)), so the same
+declaration gives a UI its columns and, if a later Step needs it, gives that Step its input (see the sweep examples).
+
+One mechanism instead of two means one directive, one set of validation rules, and one way of storing values per Task.
+A metric that later feeds a Step needs no change to the producer. The costs:
+
+* **Metrics follow the strict rules.** An undeclared name or a malformed value fails the Task, where the metrics
+  proposal ignored it with a warning. A Task whose result is a measurement, as in a sweep, has produced a bad result
+  if its measurement is bad, and the author fixes the script once. A lenient mode for outputs that no Step reads would
+  be a second set of rules.
+* **Metrics need the whole extension.** A scheduler that wants only metrics must still accept `CONTROL_FLOW`, which
+  also brings step input binding. As
+  [Design Choices](#1-variable-data-flow-is-part-of-control_flow-not-a-standalone-extension) notes, it can build output
+  collection and display first and advertise `CONTROL_FLOW` once binding works.
+
+How results are read, such as whether lower or higher is better, a threshold such as "coverage at least 75", or
+averaging over one Task parameter, stays out of the template. Those choices describe how a person reads the results,
+often change after the Job has run, and may reasonably differ between schedulers.
+
+### 5. A new `Steps` root, with `Output` and `TaskParam` levels
 
 #111 wrote references as `Step.<StepName>.<VarName>`. `Step` already means "the current Step" in EXPR
 (`Step.Name`), so reusing it would make a Step named `Name` unreachable and turn every future `Step.<Property>` into a
@@ -801,7 +963,7 @@ risk of collision with user-chosen output names.
 Dotted access can't name a Step called `Render Frames`, so a Step referenced through `Steps.` must have an
 `<Identifier>` name. That is a validation error on the referencing expression, not a new rule for every Step name.
 
-### 4. Only direct dependents may read a Step's outputs
+### 6. Only direct dependents may read a Step's outputs
 
 A Step may read `Steps.P.*` only if it lists `P` in its own `dependencies`. Transitive access would save a line in a
 long chain, but it would hide data flow from a reader and from tools, which would have to compute reachability to know
@@ -810,7 +972,7 @@ Steps. A reference does not create an edge: a missing edge is a validation error
 (`needs`) and Argo make the same choice, and it keeps the template's explicit `dependencies` the only source of
 edges.
 
-### 5. Output shape is determined by the template
+### 7. Output shape is determined by the template
 
 `Steps.P.Output.X` has the declared type `T` if `P` has no `parameterSpace`, and `list[T]` in iteration order if it
 has one, even if that space happens to contain one Task or none. The type is therefore known at template validation,
@@ -818,7 +980,7 @@ which EXPR's static type checking requires, and a reader can tell the shape of a
 alone. #111 Example 1 (a scalar `FrameCount` from a single-Task Step) and the sweep's per-Task lists both fall out of
 this rule.
 
-### 6. A skipped Step satisfies ordering and yields `null` data
+### 8. A skipped Step satisfies ordering and yields `null` data
 
 A Step whose `enableIf` is false is `SKIPPED`. It satisfies `dependsOn`, so its dependents run, and every
 `Steps.<It>.*` symbol is `null`. If a Step has an `enableIf`, its `Steps.*` symbols are typed `T?` everywhere, so a
@@ -843,7 +1005,7 @@ places where EXPR discards a `null` by design: text interpolation, where it beco
 optional field, which is omitted. This RFC requires a validation warning for each, and makes *enableIf* treat `null`
 as an error rather than as an omitted field, so that a skipped producer can never silently enable a Step.
 
-### 7. An empty computed parameter space is a zero-Task success
+### 9. An empty computed parameter space is a zero-Task success
 
 If a Step's computed parameter space is empty, the Step succeeds with zero Tasks and its `Output` lists are `[]`.
 Treating it as skipped instead (as Airflow and Argo do) would make every Step with a computed parameter space
@@ -851,10 +1013,11 @@ potentially skipped, so all of its `Steps.*` symbols would have to be typed `T?`
 into every reduction. As a success, `sum([])` is `0` and the empty manifest is just empty. An author who considers
 emptiness an error says so with `minLength: 1` on the producer's output or a `fail(...)` in the range expression.
 
-### 8. Reductions are ordinary EXPR over ordered lists
+### 10. Reductions are ordinary EXPR over ordered lists
 
 There are no declared reductions (`reduce: MAX` on an output, for example). A multi-Task producer's output is the full
-list in parameter-space iteration order, and the consumer reduces it with RFC 0006 functions. Keeping the full list
+list in parameter-space iteration order, and the consumer reduces it with RFC 0006 functions. (`collect: APPEND`
+collects the values one Task reports into that Task's value; it doesn't reduce across Tasks.) Keeping the full list
 loses nothing, lets one consumer take the `max` while another takes the `sum`, and lets the sweep correlate three
 metrics with the configuration that produced them, which no scalar reduction can do. `Steps.P.TaskParam.*` provides
 the configuration side of that correlation without any new EXPR type.
@@ -862,14 +1025,14 @@ the configuration side of that correlation without any new EXPR type.
 The order is the iteration order the producer's `combination` defines, not the order in which Tasks finished, so the
 result is deterministic.
 
-### 9. Limits are enforced at the producer
+### 11. Limits are enforced at the producer
 
 Output values are bounded per Task, and a producer's declared constraints (`maxLength: 5000`, `minValue: 1`) are
-checked when its output file is read. A discovery Step that finds a million keys fails itself, next to the cause, with
+checked as its Tasks report values. A discovery Step that finds a million keys fails itself, next to the cause, with
 a message naming the constraint, rather than producing a consumer that fails later with a less obvious error.
 Airflow's `max_map_length`, which fails the producing task, is the precedent.
 
-### 10. Task-task dependencies are a separate extension
+### 12. Task-task dependencies are a separate extension
 
 Per-Task dependencies (#82 `dependsOnSubspace`, self-dependencies, `anyOf`) go in their own extension, provisionally
 `TASK_DEPENDENCIES`, which neither depends on CONTROL_FLOW nor is required by it. Seven of the eight task-task use cases
@@ -882,10 +1045,12 @@ Composition needs no new syntax. A subspace range is a TEMPLATE-scope field of t
 rules it is evaluated at binding and may read `Steps.*`, which is all the computed DAG of U2 requires (see
 [Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies)).
 
-### 11. Design tenets
+### 13. Design tenets
 
 * **Portable.** A scheduler that doesn't implement the extension rejects the template rather than mis-running it. The
-  output file works the same on Linux, macOS, and Windows, and through `WRAP_ACTIONS`. The observable contract of
+  directive is the stdout protocol every runtime already implements, on Linux, macOS, and Windows and through
+  `WRAP_ACTIONS`, and a relative `@` path resolves against the Session's Working Directory wherever the Action runs.
+  The observable contract of
   binding allows both deferred-creation and create-then-update schedulers. The tension is that this is the most
   demanding extension for schedulers so far (persisted values, a new stage, two new states); keeping task-task
   dependencies and chunked outputs out of it keeps the minimum smaller.
@@ -894,12 +1059,12 @@ rules it is evaluated at binding and may read `Steps.*`, which is all the comput
   by design, as #22 accepted.
 * **Human readable and writable.** `outputVariables` declares what flows, and `Steps.P.Output.X` reads plainly. The
   tensions: correlating results with configurations needs index arithmetic until `argmin`/`argmax` or similar land;
-  `Steps.P.Output.X` is longer than #111's `Step.P.X`; appending to a file is slightly less obvious than printing a
-  directive; `"1-{{N}}"` and `"{{range(1, N + 1)}}"` behave differently for `N = 0`; and EXPR silently discards a
+  `Steps.P.Output.X` is longer than #111's `Step.P.X`; a directive's value must be JSON, so a shell script that
+  reports arbitrary text needs a JSON encoder such as `jq`; `"1-{{N}}"` and `"{{range(1, N + 1)}}"` behave differently for `N = 0`; and EXPR silently discards a
   skipped Step's `null` in text interpolation, list items, and optional fields, which the validation warning
   mitigates.
 * **Tooling parseable.** Outputs and their types are declared, references and edges are explicit and checked before
-  submission, and the output file has a strict grammar. This replaces opaque workarounds. The tension is that a Job's
+  submission, and the directive has a strict grammar. This replaces opaque workarounds. The tension is that a Job's
   Task count is no longer always known at submission, which #22 warned about. The fixed step graph, declared
   constraints that bound fan-out, and the requirement to report pending Steps explicitly limit the loss.
 
@@ -922,8 +1087,9 @@ Template whose `extensions` list includes `CONTROL_FLOW`.
 |------|------------|
 | **Producer** | A Step whose `Steps.*` symbols another Step reads. A Step that declares `outputVariables` is a producer of `Steps.*.Output`; any Step with a `parameterSpace` can be a producer of `Steps.*.TaskParam`. |
 | **Consumer** | A Step that reads a producer's `Steps.*` symbols. It must list the producer directly in its `dependencies`. |
-| **Output variable** | A typed value declared in a producer's `outputVariables` and written by each of its Tasks to the Task's output file. |
-| **Output file** | A file the runtime creates for each attempt of a Task of a producer, at the path `Task.OutputFile`, which the Task appends `<Name>=<JSON>` lines to. |
+| **Output variable** | A typed value declared in a Step's `outputVariables` and reported by each of its Tasks. A **metric** is an output variable that no Step reads. |
+| **Output directive** | A line `openjd_output_var: <Name>=<JSON>` or `openjd_output_var: <Name>=@<Path>` that a Task's `onRun` action prints to stdout or stderr to report an output value. |
+| **Collect mode** | The `collect` property of an output variable, `ONCE`, `LAST`, or `APPEND`, which says how a Task's directives for that name become its value. |
 | **Materialization expressions** | The format strings of a Step that the scheduler must evaluate to know whether the Step runs and what its Tasks are. See [Step input binding](#step-input-binding). |
 | **Step input binding** | The evaluation stage, once per Step, at which the Step's materialization expressions are evaluated with every `Steps.*` symbol they reference concrete. |
 | **Conditional Step** | A Step that has an `enableIf`. |
@@ -969,15 +1135,15 @@ New properties:
        `RawParam.*`, `Job.Name`, `Step.Name`, and the `Steps.*` symbols of the Step's direct dependencies (see
        [The `Steps.*` scope](#the-steps-scope)).
     2. It may not reference names bound by the Step's own `let`, `Task.*`, or `Session.*`.
-* *outputVariables* — The output variables that every Task of the Step writes to its output file. See
-  [`<OutputVariableDefinition>`](#outputvariabledefinition) and [Output emission](#output-emission). Constraints:
+* *outputVariables* — The output variables that every Task of the Step reports with `openjd_output_var:` directives.
+  See [`<OutputVariableDefinition>`](#outputvariabledefinition) and [Output emission](#output-emission). Constraints:
     1. Minimum number of elements: If provided, then this list must contain at least one element.
     2. Maximum number of elements: 32.
     3. No two elements in this list may have the same value for the `name` property.
     4. A Step whose parameter space contains a `CHUNK[INT]` Task parameter may not declare *outputVariables*.
 
 > **TODO (deferred): outputs from chunked Steps.** One `onRun` of a `TASK_CHUNKING` Step runs a whole chunk, so the
-> output file needs a per-Task record format before a chunked Step can produce per-Task outputs. That format should
+> directive needs a way to name the Task within the chunk before a chunked Step can produce per-Task outputs. That format should
 > be designed together with the per-Task progress report proposed in discussion #169 (checkpointing). Lifting
 > constraint 4 later is backward compatible.
 
@@ -990,7 +1156,6 @@ Changed semantics of existing properties:
   symbols of the Step's direct dependencies. A format string among them that is resolved at Job creation (not
   annotated `@fmtstring[host]`) and references `Steps.*` is evaluated at step input binding instead. See
   [Step input binding](#step-input-binding).
-* *script* — May also reference `Task.OutputFile` if the Step declares *outputVariables*.
 
 ##### `<OutputVariableDefinition>`
 
@@ -999,7 +1164,9 @@ An `<OutputVariableDefinition>` is the object:
 ```yaml
 name: <Identifier>
 type: <OutputVariableType>
+collect: <OutputCollectMode> # @optional
 description: <Description> # @optional
+unit: <OutputVariableUnit> # @optional
 # Constraint properties, @optional. The same names and meanings as the
 # <JobParameterDefinition> of the same type: see the table below.
 ```
@@ -1008,13 +1175,14 @@ description: <Description> # @optional
 <OutputVariableType> ::= "INT" | "FLOAT" | "STRING" | "BOOL" | "RANGE_EXPR" |
                          "LIST[INT]" | "LIST[FLOAT]" | "LIST[STRING]" | "LIST[BOOL]" |
                          "LIST[LIST[INT]]"
+<OutputCollectMode>  ::= "ONCE" | "LAST" | "APPEND"
 ```
 
 Where:
 
-1. *name* — The name by which the output is written to the output file and referenced as
+1. *name* — The name by which the output is reported in an `openjd_output_var:` directive and referenced as
    `Steps.<StepName>.Output.<name>`. See [`<Identifier>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#71-identifier).
-2. *type* — The type of the value each Task writes. Type names are case-insensitive, as job parameter type names are
+2. *type* — The type of the value each Task reports. Type names are case-insensitive, as job parameter type names are
    with `EXPR` enabled, and each maps to the expression type of the job parameter type of the same name (RFC 0007):
 
    | `<OutputVariableType>` | Expression type of one Task's value | Constraint properties, as on |
@@ -1030,10 +1198,19 @@ Where:
    | `LIST[BOOL]` | `list[bool]` | `<JobListBoolParameterDefinition>`: `minLength`, `maxLength` |
    | `LIST[LIST[INT]]` | `list[list[int]]` | `<JobListListIntParameterDefinition>`: `minLength`, `maxLength`, `item` |
 
-3. *description* — A description of the output. It has no functional purpose, but may appear in UI elements.
-4. Constraint properties — Checked against each Task's value when its output file is read. A value that violates
-   one fails the Task (see [Reading the output file](#reading-the-output-file)). Only the properties the definition
-   declares are checked: a default that a job parameter definition implies when a property is omitted (such as the
+3. *collect* — How the directives a Task prints for this output become the Task's value. Default `ONCE`. See
+   [Collect modes](#collect-modes).
+    * `ONCE` — Exactly one directive.
+    * `LAST` — One or more directives; the last one is the value.
+    * `APPEND` — Zero or more directives, each supplying one element of the declared `LIST[T]` type, in the order
+      printed.
+4. *description* — A description of the output. It has no functional purpose, but may appear in UI elements.
+5. *unit* — The unit of the output's values, such as `mm`, `%`, or `frames/s`, for display. It has no functional
+   purpose: values are not converted. A string of 1 to 32 characters, none of which is in the Unicode Cc (control)
+   category.
+6. Constraint properties — Checked against each Task's value as the Task reports it (see
+   [Processing a directive](#processing-a-directive)). A value that violates one fails the Task. Only the properties
+   the definition declares are checked: a default that a job parameter definition implies when a property is omitted (such as the
    1024-character default `maxLength` of a `RANGE_EXPR` parameter) does not apply. The `default` and `userInterface`
    properties of job parameter definitions are not available.
 
@@ -1043,13 +1220,14 @@ Constraints:
    nesting, and a multi-Task producer's outputs are collected into a list (see [Reductions](#reductions)).
 2. A constraint property must be valid for the declared type, with the same validity rules as on the job parameter
    definition of that type (for example, `minValue` may not exceed `maxValue`).
+3. `collect: APPEND` requires a `LIST[...]` type.
 
 > **TODO (deferred): `PATH` and `LIST[PATH]` outputs.** A path produced on one worker host and read on another needs
 > defined path-mapping semantics, which this draft does not specify. Until then, a producer writes a `STRING` path
 > relative to a `PATH` job parameter and the consumer joins them (`Param.WorkDir / Steps.P.Output.RelPath`), which
 > keeps path mapping on the parameter. Adding the types later is backward compatible.
 
-> **TODO (deferred): producer-declared defaults.** A `default` for an output that a Task doesn't write, or that a
+> **TODO (deferred): producer-declared defaults.** A `default` for an output that a Task doesn't report, or that a
 > skipped Step would otherwise leave `null`, was proposed by Argo's `valueFrom.default` and Tekton's TEP-0048. The
 > `or` operator and conditional expressions cover the use cases at the consumer. Adding an optional `default` later is
 > backward compatible.
@@ -1141,13 +1319,12 @@ New property:
 
 ##### The `Steps.*` scope
 
-CONTROL_FLOW adds two symbol families and one Task symbol to the value references of §7.3.1:
+CONTROL_FLOW adds two symbol families to the value references of §7.3.1:
 
 | Value | Type | Description |
 |---|---|---|
 | `Steps.<StepName>.Output.<VarName>` | See below | The value of output variable `<VarName>` of Step `<StepName>`. |
 | `Steps.<StepName>.TaskParam.<ParamName>` | See below | The value of Task parameter `<ParamName>` for every Task of Step `<StepName>`, in iteration order. |
-| `Task.OutputFile` | `path` | The location of the current Task's output file. |
 
 **Types.** Let `T` be the expression type of one Task's value of output `<VarName>` (from the table in
 [`<OutputVariableDefinition>`](#outputvariabledefinition)), and `U` the expression type of Task parameter
@@ -1198,149 +1375,244 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
   `enableIf`, if any, has been decided. For a producer whose parameter space and `enableIf` read no `Steps.*`, that is
   at Job creation.
 
-**`Task.OutputFile`** is available in the *script* of a Step that declares *outputVariables*: in `<StepScript>`
-*actions*, *embeddedFiles*, and *let*, and in `<SimpleAction>` *script*, *args*, and *let*. Using it anywhere else,
-including a Step Environment of that Step, is a validation error.
-
 ##### Template processing stages
 
 > A modification to [`7.4. Template Processing Stages`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#74-template-processing-stages)
 
 | Stage | When | Known Values | Unknown Values | What Happens |
 |---|---|---|---|---|
-| **Template validation** | as today | as today | as today, and `Steps.*`, `Task.OutputFile` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every rule of [Validation](#validation) is checked. |
+| **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every rule of [Validation](#validation) is checked. |
 | **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`: an *enableIf* that reads no `Steps.*` is evaluated. A Step whose materialization expressions read no unresolved `Steps.*` is bound now; every other Step enters `PENDING_INPUTS`. |
 | **Step input binding** (new, `CONTROL_FLOW` only) | Per Step, once every `Steps.*` symbol its materialization expressions reference is concrete | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.*`, `Session.*` | The Step's materialization expressions are evaluated, in order and atomically. The Step becomes `READY`, `SKIPPED`, or `FAILED`. See [Step input binding](#step-input-binding). |
-| **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies, and `Task.OutputFile` | *(none)* | As today. With `CONTROL_FLOW`, the runtime creates the output file before `onRun` and reads it after `onRun` succeeds. |
+| **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies | *(none)* | As today. With `CONTROL_FLOW`, the runtime processes `onRun`'s output directives as they are printed and commits the values when the Task succeeds. |
 
 ### Output emission
 
-#### The output file
+#### The `openjd_output_var` directive
 
-Before each attempt to run the `onRun` action of a Task of a producer, the runtime creates an empty file and makes its
-absolute path available as:
+A Task of a Step that declares *outputVariables* reports an output value by printing a line to stdout or stderr from
+its `onRun` action, in one of two forms:
 
-* the template variable `Task.OutputFile`, and
-* the environment variable `OPENJD_TASK_OUTPUT_FILE`, set for that `onRun` action only.
+```
+openjd_output_var: <Name>=<JSON>
+openjd_output_var: <Name>=@<FilePath>
+```
 
-The file is specific to one attempt of one Task. The runtime chooses its location; it SHOULD be inside the Session's
-Working Directory, so that an Environment that makes the Working Directory available to a container (for example under
-`WRAP_ACTIONS`) makes the file available too. The action appends lines to it. The runtime does not read the file
-until the action has exited.
+The runtime recognizes the directive the way it recognizes the other messages of How Jobs Are Run: a line that begins
+with `openjd_output_var:`. It is recognized only in a Session running a Job whose Job Template lists `CONTROL_FLOW`. In
+any other Session the line is ordinary output, as it is today, and so it is for an Action of an Environment Template
+(see below). Like the other messages, the line is passed through
+to the Action's log unchanged.
 
-Under `WRAP_ACTIONS`, the Task's `onRun` is replaced by the wrapping Environment's `onWrapTaskRun`, which receives the
-same `OPENJD_TASK_OUTPUT_FILE` value, and the wrapped action's `Task.OutputFile` references were resolved to the same
-path. A wrap script that runs the wrapped action in another filesystem namespace must forward the variable and make
-the path writable there, as it does for the Session's Working Directory.
+The text after `openjd_output_var:` has the grammar:
 
-Only a Task's `onRun` action can write outputs. Environment actions have no output file.
+```bnf
+<Directive> ::= <WS>* <Identifier> "=" <WS>* <Value> <WS>*
+<Value>     ::= <JSON> | "@" <FilePath>
+<WS>        ::= " " | "\t"
+```
+
+Where:
+
+* The line terminator (`\n` or `\r\n`) is not part of the directive.
+* `<Identifier>` is the output's name, matched case-sensitively against the Step's declared output names. There is no
+  whitespace between it and the `=`.
+* `<JSON>` is one JSON value (RFC 8259). It is on one line, because a directive is a line, so a string that contains a
+  line break is written with the escape `\n`. `NaN`, `Infinity`, and `-Infinity` are not JSON and are invalid. Tools
+  that write JSON on one line, such as Python's `json.dumps` with default arguments, produce valid values directly for
+  finite numbers; `allow_nan=False` makes Python raise rather than print a non-finite number.
+* `<FilePath>` is the rest of the line after `@`, with trailing spaces and tabs removed. It must not be empty. A JSON
+  value never begins with `@`, so the two forms can't be confused.
+
+```bash
+echo "openjd_output_var: FrameCount=1440"
+echo "openjd_output_var: FrameRate=\"24000/1001\""
+echo "openjd_output_var: Keys=[\"clips/a.mov\", \"clips/b.mov\"]"
+echo "openjd_output_var: Children=@children.json"
+# Arbitrary text needs a JSON encoder:
+echo "openjd_output_var: Note=$(jq -Rn --arg v "$note" '$v')"
+```
+
+**Which Actions may print it.** Only the `onRun` action of a Task of a Step that declares *outputVariables*. Under
+`WRAP_ACTIONS`, the runtime scans a wrap hook's stdout in place of the wrapped Action's, so a line printed by a wrap
+hook, or forwarded by it from the wrapped process, is treated as output of the Action the hook runs in place of. A
+directive from `onWrapTaskRun` is therefore a directive of the Task, whichever template defines the wrapping
+Environment. In a Session running a Job that lists `CONTROL_FLOW`:
+
+* a directive attributed to any other Action defined in the Job Template, such as a Job or Step Environment's
+  `onEnter` or `onExit` (whether or not a wrap hook runs in its place), or the `onRun` of a Step that declares no
+  *outputVariables*, fails that Action;
+* a directive attributed to an Action defined in an Environment Template, which has not opted in to `CONTROL_FLOW`, is
+  ordinary output.
 
 > **TODO (deferred): outputs from Environment actions.** No use case requires them yet. A candidate is an
 > Environment whose `onEnter` discovers a license server address that a later Step needs. Adding them later is
 > backward compatible.
 
-#### Grammar
+#### File values
 
-The output file is UTF-8 text with the grammar:
+A value too large for one line, or more convenient to write as a file, is written to a file that the directive names
+with `@<FilePath>`:
 
-```bnf
-<OutputFile> ::= <BOM>? ( <Line> <EOL> )* <Line>?
-<Line>       ::= <OutputLine> | <WS>*
-<OutputLine> ::= <Identifier> "=" <WS>* <JSON> <WS>*
-<EOL>        ::= "\n" | "\r\n"
-<WS>         ::= " " | "\t"
-<BOM>        ::= U+FEFF        ; a leading byte order mark is ignored
-```
+1. A relative `<FilePath>` is resolved against the Session's Working Directory, which is also where an Action starts.
+   An absolute path is used as written.
+2. The file that is opened must be a regular file inside the Session's Working Directory, after following symbolic
+   links. Otherwise the directive is invalid. A runtime checks this on the file it actually opened, for example by
+   resolving the path beneath a handle to the Working Directory (Linux `openat2` with `RESOLVE_BENEATH`) or by
+   checking the opened handle's final path, so that the Action can't swap a link in between a check and the read.
+3. The runtime MUST read the file with no more access than the Action's user has. The runtime may run as a different
+   operating-system user from the Action, and without this rule a directive could copy a file that the Action's user
+   cannot read, for example through a hard link placed in the Working Directory, into outputs that are stored and
+   displayed. A runtime that runs Actions as its own user meets this rule directly; one that runs them as another user
+   reads the file as that user, for example through the helper process it already uses to run the Action.
+4. The file holds exactly one JSON value, UTF-8 encoded, optionally preceded by a byte order mark and surrounded by
+   whitespace, including line breaks. Unlike an inline value, it may span lines.
+5. The runtime reads the file when it processes the directive, before it processes any later line of the Action's
+   output. The value is the file's content at that moment, so the Action must finish writing and close the file before
+   it prints the directive. Later changes to the file have no effect. The runtime does not modify or delete the file.
 
-Where `<JSON>` is one JSON value (RFC 8259) containing no line break. There is no whitespace between the start of
-the line, the `<Identifier>`, and the `=`. Names are matched case-sensitively against the declared output names. A
-line that contains only spaces or tabs is ignored.
+Under `WRAP_ACTIONS`, a wrap script that runs the wrapped Action with the Session's Working Directory at another path,
+for example in a container, need do nothing for a relative `<FilePath>`. An absolute path printed by the wrapped
+Action must be valid for the runtime, so authors should prefer relative paths.
 
-```
-FrameCount=1440
-FrameRate="24000/1001"
-Keys=["clips/a.mov", "clips/b.mov"]
-Children=[[1, 2], [], []]
-```
+> **Note for PowerShell authors.** Windows PowerShell 5.1's `Out-File` and `>` default to UTF-16, which is not a
+> valid `@` file. Use `Set-Content -Encoding utf8` (or PowerShell 7, whose default is UTF-8).
 
-A value that contains a line break is written as a JSON string, where the break is the escape `\n`. Tools that write
-JSON on one line, such as Python's `json.dumps` with default arguments, produce valid lines directly.
+#### Collect modes
 
-> **Note for PowerShell authors.** Windows PowerShell 5.1's `Out-File` and `>>` default to UTF-16, and
-> `Add-Content` to the system code page. Use `Add-Content -Encoding utf8` (or PowerShell 7, whose default is UTF-8).
+The *collect* property of each `<OutputVariableDefinition>` says how the directives a Task prints for that output
+become the Task's value:
 
-#### Reading the output file
+| *collect* | Directives per Task | The Task's value | With no directive |
+|---|---|---|---|
+| `ONCE` (default) | Exactly one. A second one is invalid. | The value of the directive. | The Task fails. |
+| `LAST` | One or more. | The value of the last directive. | The Task fails. |
+| `APPEND` | Zero or more. The declared type is `LIST[T]`, and each directive supplies one `T`. | The list of the directives' values, in the order the runtime read them. | `[]` |
 
-After the `onRun` action exits successfully, the runtime reads the output file and validates it. The Task fails,
-with a message that names the problem, the line number where there is one, and the output variable, if:
+Under `APPEND`, a `<FilePath>` value supplies one element, as an inline value does. The order is the order in which
+the runtime reads the lines. A runtime that reads stdout and stderr separately does not define their relative order,
+so a Task should print all the directives for an `APPEND` or `LAST` output on one stream.
 
-1. the file is not valid UTF-8, or contains a NUL character;
-2. a line is neither an `<OutputLine>` nor a `<BlankLine>`;
-3. a line names a variable that the Step does not declare;
-4. a value is JSON `null` or a JSON object, or doesn't convert to the declared type (see below);
-5. a value violates a constraint property of its declaration;
-6. a declared variable has no line; or
-7. the file exceeds the runtime's size limit (see [Limits](#limits)).
+#### Processing a directive
 
-Rules 1–3 apply to every line. If a variable has more than one line, the last one is used, and rules 4 and 5 apply
-to it alone.
+The runtime processes each directive when it reads the line:
 
-If the `onRun` action fails, is canceled, or times out, the file is discarded unread and the attempt has no outputs.
+1. It checks that the Action may print directives, parses the directive, and checks that the name is a declared
+   output of the Step.
+2. It applies the collect mode: under `ONCE`, a second directive for the same name is invalid.
+3. For `@<FilePath>`, it opens the file under the rules of [File values](#file-values) and reads at most as many bytes
+   as remain of the Task's limit (see [Limits](#limits)), not counting the current value of a `LAST` output that this
+   directive replaces, plus one to detect a file that exceeds it.
+4. It converts the value to the declared type, or under `APPEND` to the element type (see below).
+5. It checks the constraint properties against the value: under `ONCE` and `LAST`, every declared constraint property
+   (so each value a `LAST` output reports must satisfy them, not only the last); under `APPEND`, the `item`
+   constraints on the new element and that the list does not exceed `maxLength`.
+6. It updates the Task's value and its size (see [Limits](#limits)).
+
+A directive that fails any of these checks is **invalid**. An invalid directive fails the Action it is attributed to
+(for a Task's `onRun`, the Task's attempt), with a
+message that names the output, the problem, and the offending text. The runtime MUST NOT ignore an invalid directive.
+It MAY cancel the Action as soon as it finds one, and otherwise fails the Action when it exits, whatever the exit
+code. Specifically, a directive is invalid if:
+
+1. the text after `openjd_output_var:` does not match the grammar, or `<JSON>` is not valid JSON;
+2. it names an output that the Step does not declare;
+3. the value is JSON `null` or a JSON object, contains either, or doesn't convert to the declared type;
+4. the value violates a constraint property as in step 5;
+5. it is a second directive for a `ONCE` output;
+6. for `@<FilePath>`: the path does not resolve to a regular file inside the Session's Working Directory, the file
+   can't be read, or its content is not valid UTF-8, contains a NUL character, or is not exactly one JSON value;
+7. it exceeds a limit of [Limits](#limits);
+8. it is attributed to an Action of the Job Template other than the `onRun` of a Task of a Step that declares
+   *outputVariables*; or
+9. the line is not valid UTF-8.
+
+When the Action exits successfully, the runtime also checks that every `ONCE` and `LAST` output has a value and that
+every `APPEND` output's list satisfies its `minLength`. A missing value or a list that is too short fails the Task.
+
+If the attempt fails for any reason, including an invalid directive, a missing value, or an `onRun` action that
+fails, is canceled, or times out, it has no outputs. Values from it that the runtime has already forwarded are
+discarded.
 
 **Type conversion.** A JSON value is first given its natural EXPR type: a number with neither a fraction nor an
 exponent that fits in a signed 64-bit integer is an `int`, any other number is a `float`, a string is a `string`,
 `true` and `false` are `bool`, and an array is a list. Array elements are typed by the same rule and the array is
-inferred as a list literal with the declared type as its target (§1.2.6 of the Expression Language). The value is
-then converted to the declared type with EXPR's implicit non-destructive coercion (§1.2.3), so that a `Steps.*` value
-behaves in an expression exactly like a `Param.*` value of the same type. `null` anywhere in a value, an object
-anywhere in a value, and nesting deeper than the declared type are errors. For example:
+inferred as a list literal with the target type (§1.2.6 of the Expression Language). The value is then converted to
+the target type with EXPR's implicit non-destructive coercion (§1.2.3), so that a `Steps.*` value behaves in an
+expression exactly like a `Param.*` value of the same type. The target type is the declared type, or for `APPEND` its
+element type. `null` anywhere in a value, an object anywhere in a value, and nesting deeper than the target type are
+errors, as is a number too large to represent as a `float`. For example:
 
-| Declared type | Line | Result |
+| Declared type | Directive (after `openjd_output_var: `) | Result |
 |---|---|---|
 | `INT` | `N=12` | `12` |
 | `INT` | `N=12.0` | `12` |
-| `INT` | `N=12.5` | Error: `12.5` cannot be represented exactly as an `int` |
+| `INT` | `N=12.5` | Invalid: `12.5` cannot be represented exactly as an `int` |
 | `FLOAT` | `X=3` | `3.0` |
 | `STRING` | `S="a=b"` | `"a=b"` |
 | `STRING` | `S=123` | `"123"` |
 | `BOOL` | `B=true` | `true` |
 | `RANGE_EXPR` | `R="1-10:2"` | `1-10:2` |
-| `RANGE_EXPR` | `R=[1, 3, 5]` | Error: a `list[int]` does not implicitly coerce to `range_expr` |
+| `RANGE_EXPR` | `R=[1, 3, 5]` | Invalid: a `list[int]` does not implicitly coerce to `range_expr` |
 | `LIST[INT]` | `L=[]` | `[]` |
 | `LIST[FLOAT]` | `L=[1, 2.5]` | `[1.0, 2.5]` |
 | `LIST[STRING]` | `L=[1, "a"]` | `["1", "a"]` |
-| `LIST[INT]` | `L=[1, null]` | Error: `null` cannot be a list element |
+| `LIST[INT]` | `L=[1, null]` | Invalid: `null` cannot be a list element |
 | `LIST[LIST[INT]]` | `G=[[1], []]` | `[[1], []]` |
-| any | `X=null` | Error: outputs are not optional |
+| `LIST[FLOAT]`, `collect: APPEND` | `E=1`, then `E=2.5` | `[1.0, 2.5]` |
+| `LIST[FLOAT]`, `collect: APPEND` | `E=[1]` | Invalid: each directive supplies one `float` |
+| `LIST[LIST[INT]]`, `collect: APPEND` | `G=[1]`, then `G=[]` | `[[1], []]` |
+| any | `X=null` | Invalid: outputs are not optional |
 
-**Commit.** A Task's output values are committed when the Task succeeds. The values of every Task of a producer are
-retained by the scheduler for the life of the Job. A scheduler SHOULD make each Task's committed outputs visible to
-users, for example next to the Task's parameters, since they are often useful with no consumer at all.
+#### Committing values
 
-Output values are stored and may be displayed, so they are not redacted and MUST NOT be used to pass secrets.
+A Task's output values are committed when the Task succeeds. The values of every Task of a Step are retained by the
+scheduler for the life of the Job. A scheduler SHOULD make each Task's committed outputs visible to users, for example
+beside the Task's parameters, using the declared *unit* and *description*, since they are often useful with no
+consumer at all.
+
+Because the runtime processes directives as they are printed, it MAY forward each value to the scheduler as soon as it
+is accepted, so that the scheduler has the values when the Task ends. A scheduler MAY show the values of a Task that
+is still running, such as a `LAST` counter, if it marks them as not yet committed. Only committed values are visible to
+consumers through `Steps.*`.
+
+Output values are stored, logged, and may be displayed, so they are not redacted and MUST NOT be used to pass secrets.
 
 #### Limits
 
-1. A runtime MUST accept an output file of at least 1 MiB (1,048,576 bytes) per Task and MAY accept larger files. A
-   file larger than the runtime's limit fails the Task.
-2. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
-   list outputs that feed a parameter space.
-3. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
+1. A runtime MUST accept a directive line of at least 64 KiB (65,536 bytes of UTF-8). A line that begins with
+   `openjd_output_var:` and is longer than the runtime's line limit is invalid: the runtime MUST NOT truncate a
+   directive and parse what remains, and MUST NOT recognize the discarded remainder of an over-long line as a
+   directive. Larger values use `@<FilePath>`.
+2. A runtime MUST accept at least 1 MiB (1,048,576 bytes) of output values per Task attempt, and MAY accept more. The
+   size counted is that of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>`
+   text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST` value (a value it replaces stops
+   counting), and every `APPEND` element. A directive that
+   takes the size over the runtime's limit is invalid.
+3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
+   list outputs that feed a parameter space, and on `APPEND` outputs.
+4. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
    fails at step input binding, before any of its Tasks runs, with a message that names the limit.
-4. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
+5. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
 
 #### Retries and re-runs
 
-* **Retry of a failed attempt.** A failed attempt committed nothing, so a retry gets a new, empty output file.
-* **Re-run of a succeeded Task.** A scheduler that allows re-running a Task that already succeeded MUST apply these
-  rules to the re-run Task's own output values once any output value of the producer has been **consumed**, meaning
-  that a consumer has been bound with it or a Task of a consumer has started:
-    1. If the re-run succeeds and writes the same values as before, nothing changes.
-    2. If the re-run succeeds and writes different values, the re-run is marked failed, with a message that names the
-       output and a consumer that has consumed it. The committed values are unchanged.
-    3. If the re-run fails, it commits nothing, as any failed attempt, and the committed values are unchanged.
+* **Retry of a failed attempt.** A failed attempt committed nothing, so a retry starts with no values.
+* **Re-run of a succeeded Task.** An output of a producer is **consumed** once a consumer that references it (as
+  found by symbol collection) has been bound or has started a Task. A scheduler that allows re-running a Task that
+  already succeeded MUST apply these rules to each of the re-run Task's own output values:
+    1. If the output has not been consumed, a successful re-run's value replaces the earlier one.
+    2. If the output has been consumed and the re-run succeeds with the same value, nothing changes.
+    3. If the output has been consumed and the re-run succeeds with a different value, the re-run attempt is
+       reported as failed, with a message that names the output and a consumer that has consumed it. The Task keeps
+       its earlier succeeded state and all of its committed values, so the Step and its consumers are unaffected.
+    4. If the re-run fails, it commits nothing, as any failed attempt, and the committed values are unchanged.
 
-  Before any value has been consumed, a successful re-run's values replace that Task's earlier values.
+  The check is all or nothing: if any output falls under rule 3, nothing from the re-run is committed. Values are the
+  same if their converted, typed values are equal.
+
+  So a metric that no Step reads never blocks a re-run, but a consumed value that varies from run to run, such as a
+  measured frame rate that a later Step reduces, makes every differing re-run of its Task fail once it is consumed.
 
 > **TODO (deferred): cascade recompute.** A scheduler could instead invalidate and re-bind every Step that consumed
 > the changed values, transitively. That has a large blast radius and is scheduler policy, so this draft only defines
@@ -1350,8 +1622,8 @@ Output values are stored and may be displayed, so they are not redacted and MUST
 
 CONTROL_FLOW adds no types, functions, or operators to EXPR. It adds:
 
-* The `Steps` root symbol and its `Output` and `TaskParam` members, and the `Task.OutputFile` symbol, with the types
-  and scopes of [The `Steps.*` scope](#the-steps-scope).
+* The `Steps` root symbol and its `Output` and `TaskParam` members, with the types and scopes of
+  [The `Steps.*` scope](#the-steps-scope).
 * The empty-list rule of [Empty parameter spaces](#empty-parameter-spaces) for Task parameter ranges.
 * A validation warning. EXPR discards a `null` silently in three places (§1.3.2 of the Expression Language): an
   interpolation with text around it becomes the empty string, so `"--size {{Steps.P.Output.X}}"` becomes
@@ -1507,28 +1779,22 @@ RFC adds to the model are:
 A Step that has been bound and is not `SKIPPED` is gated by its dependencies exactly as today. A Step whose binding
 fails is `FAILED`, which, like any failed Step, does not satisfy `dependsOn`.
 
-#### Session Environment Variables
-
-> A modification to [Session Environment Variables](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#session-environment-variables)
-
-| **Environment Variable** | **Value** | **Corresponding Template Variable** |
-|---|---|---|
-| `OPENJD_TASK_OUTPUT_FILE` | The absolute path to the current Task's output file. Set only for the `onRun` action of a Task of a Step that declares `outputVariables`. `CONTROL_FLOW` only. | `Task.OutputFile` |
-
-How Jobs Are Run asks that new environment variables be weighed against the "Tooling parseable" tenet. This one passes
-the test `OPENJD_SESSION_WORKING_DIR` passed: the data flow is declared in `outputVariables`, whichever way a script
-reaches the file, so tooling loses nothing. The variable exists for nested subprocesses, such as an adaptor, that
-cannot see template variables.
-
 #### Stdout messages
 
-No stdout message is added. A runtime does not recognize `openjd_output_var:` or any other stdout line as setting an
-output, with or without `CONTROL_FLOW`.
+> A modification to [Stdout/Stderr Messages](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#stdoutstderr-messages)
 
-> **TODO (deferred): a stdout directive.** #111 proposed `openjd_output_var: <Name>=<JSON>`. This draft leaves it
-> out for security (see [Design Choices](#2-outputs-go-to-a-session-supplied-file-not-a-stdout-directive)). If the
-> discussion shows a runtime where writing a file is impractical, a directive with the same line grammar could be
-> added later as a second channel, restricted to declared names.
+Add the following item to the list of special messages:
+
+* `openjd_output_var: <name>=<json>` or `openjd_output_var: <name>=@<path>` where `<name>` is the name of an output
+  variable that the Step declares, `<json>` is a JSON value on one line, and `<path>` names a file inside the
+  **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
+  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@`
+  file as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template,
+  fails the **Action**. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
+  of. Requires the CONTROL_FLOW extension; without it, and for **Actions** of an Environment Template, the line is
+  ordinary output. See [Output emission](#output-emission).
+
+No environment variable is added.
 
 ### Composition with `TASK_DEPENDENCIES`
 
@@ -1555,30 +1821,31 @@ Every rule this extension adds, and when it is checked.
 **At template validation** (by the model library, before submission):
 
 1. `CONTROL_FLOW` is listed only together with `EXPR`.
-2. *outputVariables*: 1 to 32 elements; names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint properties are
-   valid for the type; no `LIST[LIST[INT]]` on a Step with a `parameterSpace`; none on a Step with a `CHUNK[INT]` Task
-   parameter.
+2. *outputVariables*: 1 to 32 elements; names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint
+   properties are valid for the type; *collect* is an `<OutputCollectMode>`, and `APPEND` only with a `LIST[...]`
+   type; *unit* is 1 to 32 characters with no control characters; no `LIST[LIST[INT]]` on a Step with a
+   `parameterSpace`; none on a Step with a `CHUNK[INT]` Task parameter.
 3. Every `Steps.<StepName>.Output.<VarName>` names a Step with an `<Identifier>` name that declares output
    `<VarName>`. Every `Steps.<StepName>.TaskParam.<ParamName>` names a Step that has Task parameter `<ParamName>`.
 4. A Step that references `Steps.<StepName>.*` lists `<StepName>` directly in its `dependencies` as a whole-Step
    dependency, and `<StepName>` is not the Step itself.
 5. `Steps.*` appears only in the fields listed in [The `Steps.*` scope](#the-steps-scope), and a `PATH`
    `Steps.*.TaskParam.*` only in format strings resolved on the worker host.
-6. `Task.OutputFile` appears only in the script of a Step that declares *outputVariables*.
-7. *enableIf* references only the symbols its location allows, and does not appear in an Environment Template.
-8. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types; *enableIf* has type
+6. *enableIf* references only the symbols its location allows, and does not appear in an Environment Template.
+7. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types; *enableIf* has type
    `bool`.
-9. The warning of [Modifications to the Expression Language](#modifications-to-the-expression-language) for an
+8. The warning of [Modifications to the Expression Language](#modifications-to-the-expression-language) for an
    optional-typed expression that reads a conditional Step's `Steps.*` symbol where EXPR discards `null`.
-10. The Step dependency graph is acyclic, as today.
+9. The Step dependency graph is acyclic, as today.
 
 **At step input binding** (by the scheduler, before any Task of the Step runs): every materialization expression
 evaluates; ranges are valid (a range string may not be empty; a list may be); the Task count is within the
 scheduler's limit; and with `TASK_DEPENDENCIES`, the Task graph is acyclic.
 
-**When a Task's output file is read** (by the runtime, after `onRun` succeeds): the rules of
-[Reading the output file](#reading-the-output-file), including type conversion, constraint properties, missing
-outputs, and the size limit.
+**As Actions run** (by the runtime, as it reads each line of an Action's output in a Session of a `CONTROL_FLOW` Job): the rules of
+[Processing a directive](#processing-a-directive), including type conversion, constraint properties, collect modes,
+`@` file paths, and the limits; and when `onRun` exits successfully, that every `ONCE` and `LAST` output has a value
+and every `APPEND` list meets its `minLength`.
 
 **On re-run** (by the scheduler): the rules of [Retries and re-runs](#retries-and-re-runs).
 
@@ -1608,8 +1875,6 @@ What this RFC takes from them:
 * **Typed outputs** (Tekton, CWL). Declared types let a validator check every reference, every range built from it,
   and every condition before the run. Systems with string outputs (Argo, GitHub Actions) find those errors at run
   time.
-* **A file for emission** (GitHub Actions, Tekton, Argo, CWL). GitHub Actions moved from `::set-output` on stdout to
-  the `$GITHUB_OUTPUT` file because any tool that echoed attacker-influenced text could forge outputs.
 * **An explicit edge to read outputs** (GitHub Actions `needs`, Argo `dependencies`). Airflow, Tekton, and CWL derive
   edges from references instead; OpenJD already has explicit `dependencies`.
 * **`null` for a skipped unit's outputs** (CWL). CWL's `pickValue` is the explicit answer to "which of these
@@ -1626,11 +1891,32 @@ What this RFC takes from them:
 
 What this RFC does differently:
 
+* **A stdout directive rather than a file.** GitHub Actions, Tekton, Argo, and CWL emit outputs through a file, and
+  GitHub Actions moved from its `::set-output` stdout command to the `$GITHUB_OUTPUT` file because untrusted text in a
+  log could set outputs that steered more privileged workflow steps. OpenJD Actions already report everything else on
+  stdout, and code in `onRun` runs as the Job's user, so a printed value grants nothing new. This RFC keeps stdout,
+  requires each directive to name a declared output, and makes a repeated `ONCE` output an error, which turns an
+  accidental directive into a failed Task (see
+  [Design Choices](#2-outputs-are-reported-with-a-stdout-directive-with-file-for-large-values)). Argo's `result` (a
+  step's stdout as an output) and TeamCity's service messages are precedents for stdout.
+
 * **An empty fan-out succeeds** rather than being skipped (Airflow, Argo, Tekton) or failing (GitHub Actions), so a
   computed parameter space never makes a Step's outputs optional (see
-  [Design Choices](#7-an-empty-computed-parameter-space-is-a-zero-task-success)).
+  [Design Choices](#9-an-empty-computed-parameter-space-is-a-zero-task-success)).
 * **Re-runs are specified.** Render farms routinely requeue Tasks that succeeded, and the surveyed DAG systems mostly
   treat a run as one-shot (Airflow's "clear downstream" is the exception). This RFC defines a safe default.
+
+For Task metrics, the precedents are:
+
+* **TeamCity service messages.** A build step prints `##teamcity[buildStatisticValue key='<name>' value='<number>']`,
+  and TeamCity charts the value across builds. This is the closest match: a stdout line, a name, and a value.
+* **Amazon SageMaker training jobs.** A job declares `MetricDefinitions`, each a name and a regular expression, and
+  SageMaker extracts the values from the job's logs. This shows the demand, and the cost of making every user write a
+  regular expression for their own log format, which a fixed directive avoids.
+* **Kubeflow Pipelines.** Components write a metrics file that the UI shows and compares across runs.
+* **Experiment trackers** such as MLflow (`log_metric`) and Weights & Biases (`log`). These are library calls to a
+  tracking server and need network access and credentials in the Task. A directive needs neither, and a scheduler or
+  a bridge can still forward the values to such a tracker.
 
 The full survey, with per-system notes and references, is in
 [02-external-prior-art.md](../docs/control-flow-investigation/02-external-prior-art.md).
@@ -1641,8 +1927,8 @@ other than the current one without overloading `Step`.
 
 ## Implementation Impact
 
-- **Python (openjd-model)**: New schema fields (`outputVariables`, `enableIf` on Steps and Environments) gated on the
-  extension, and the `Steps` symbol family in the template-validation symbol table with types derived from the
+- **Python (openjd-model)**: New schema fields (`outputVariables` with `collect` and `unit`, `enableIf` on Steps and
+  Environments) gated on the extension, and the `Steps` symbol family in the template-validation symbol table with types derived from the
   producer. The validation rules are graph checks over existing data (direct dependency, identifier names, field
   scopes) plus the format-string warning. Job creation must stop treating every TEMPLATE-scope field as resolvable at
   creation: it reports which Steps need binding and exposes a function that binds one Step given the concrete
@@ -1652,16 +1938,25 @@ other than the current one without overloading `Step`.
   may be empty, and the 1024-element cap that `crates/openjd-model/src/job/create_job/ranges.rs` applies to computed list ranges
   (`max_task_param_range_len`) applies only to YAML list literals, with a scheduler-supplied Task count limit taking
   its place.
-- **Sessions (openjd-sessions, Python and Rust)**: Before `onRun` of a producer's Task, create the output file and set
-  `OPENJD_TASK_OUTPUT_FILE`; after a successful exit, read, parse, convert, and validate it, and return the values with
-  the Task result. This happens once per Task at the end of `run_task`, not in the stdout filter. A size limit joins
-  the existing session limits. No stdout parsing changes.
+- **Sessions (openjd-sessions, Python and Rust)**: Add `openjd_output_var:` to the action filter beside `openjd_env`,
+  recognized only in a Session of a `CONTROL_FLOW` Job. For each directive: parse it and check its name and collect
+  mode; for `@`, open the file with the Action user's access, check that the opened file is inside the Session's
+  Working Directory, and read it up to the remaining limit; convert and check the value against the Step's
+  declarations; and report the value through a new callback so that the application running
+  the Session can forward it at once. At exit, check for missing values and return the collected values with the Task
+  result. The Session must be given the Step's output declarations along with its script, whether the Job lists
+  `CONTROL_FLOW`, and for each Environment it enters, whether the Job Template or an Environment Template defines it. A runtime that runs
+  Actions as another user reads `@` files through its cross-user helper. One existing behavior must change: openjd-rs
+  truncates over-long lines silently in three places (`truncate_line` in `crates/openjd-sessions/src/subprocess.rs`,
+  and `decode_and_truncate` and `fit_out_payload` in `crates/openjd-sessions/src/helper/src/framer.rs`, the last of
+  which can cut a line under 64 KiB that grows when escaped), and each must instead mark the line as truncated so that
+  an over-long directive is invalid. No file is created before the Action runs.
 - **CLI (`openjd run`)**: Runs Steps in dependency order already, so it binds each Step just before running it, passes
-  the collected values in, and prints each Task's outputs. `openjd summary` reports a Step that would need binding as
+  the collected values in, and prints each Task's outputs, with their units. `openjd summary` reports a Step that would need binding as
   having a Task count determined at run time.
-- **Schedulers**: The largest work: storing committed output values for the life of the Job, the `PENDING_INPUTS` and
-  `SKIPPED` states, triggering binding when producers finish, displaying outputs and pending Steps, and the re-run
-  rule. A scheduler that creates every Task at submission today must either defer creating a pending Step's Tasks or
+- **Schedulers**: The largest work: storing committed output values for the life of the Job, the `PENDING_INPUTS`
+  and `SKIPPED` states, triggering binding when producers finish, displaying outputs (as metric columns beside each
+  Task's parameters) and pending Steps, and the re-run rule. A scheduler that creates every Task at submission today must either defer creating a pending Step's Tasks or
   support adding them later.
 
 No part of the design is harder in one language than another: the parsing is JSON, the evaluation is EXPR, and the
@@ -1670,18 +1965,53 @@ reduction is evaluated once per consumer, at binding or at Task start.
 
 ## Rejected Ideas
 
-### `openjd_output_var:` on stdout as the emission channel
+### A session-supplied output file
 
-Proposed in #111 and designed in detail during this investigation. Rejected as the channel for v1 because a Task's stdout carries text from
-third-party tools, so a stdout channel lets that text forge the values that shape the rest of the Job (see
-[Design Choices](#2-outputs-go-to-a-session-supplied-file-not-a-stdout-directive)). It could be added later as an
-alternative channel if the discussion shows a runtime where writing a file is impractical.
+An earlier draft gave each Task attempt a file, `Task.OutputFile` (also `OPENJD_TASK_OUTPUT_FILE`), to append
+`<Name>=<JSON>` lines to, read after `onRun` exits, as GitHub Actions does with `$GITHUB_OUTPUT`. Rejected because it
+adds a second channel beside the stdout messages Actions already use, with its own lifecycle, permission, and
+container questions; because its values arrive only after the Action exits; and because the security argument for it
+does not hold in OpenJD (see [Design Choices](#2-outputs-are-reported-with-a-stdout-directive-with-file-for-large-values)).
+`@<FilePath>` keeps the one thing a file does better, carrying large values.
+
+### Reading `@` files when the Action exits
+
+Reading every `@` file after `onRun` exits would let a script print the directive before it writes the file. Rejected
+because it delays every file value until the Task ends, so a runtime could neither validate nor forward it promptly,
+and because it would make the value depend on whatever the file held at exit rather than when it was reported.
+
+### A separate `TASK_METRICS` extension with an `openjd_metric:` directive
+
+Proposed before this RFC for per-Task measurements: numbers only, an optional declaration, last value wins, and
+malformed lines ignored with a warning. Rejected in favor of treating a metric as an output variable that no Step
+reads, so the system has one reporting mechanism with one set of rules (see
+[Design Choices](#4-task-metrics-are-output-variables)). Its declaration properties, `unit` and `description`, and
+its last-value-wins behavior, as `collect: LAST`, are part of this RFC.
+
+### Lenient handling of malformed or undeclared values
+
+The metrics proposal ignored a malformed or undeclared line with a warning, as `openjd_progress` does. Rejected for
+every output: a value dropped with a warning can't be read by a consumer, and a Task that reports a bad measurement
+has produced a bad result. Failing the Task points the author at the line that caused it.
+
+### Last value wins by default
+
+Rejected in favor of `collect: ONCE` as the default. A second directive for an output computed once is almost always
+a mistake, and with last-value-wins a stray directive would silently replace the real value. `collect: LAST` is
+available where repeated reports are intended.
+
+### Concatenating list values
+
+A `collect` mode that splices each directive's list into the Task's value, so that `[1, 2]` then `[3]` gives
+`[1, 2, 3]`. Rejected because it is ambiguous for a `LIST[LIST[INT]]` output, where a list could be either one
+element or a batch, and because `APPEND` with one directive per value covers the same cases (see
+[Design Choices](#3-repeated-reports-follow-a-declared-collect-mode)).
 
 ### `Step.<StepName>.<VarName>`
 
 Proposed in #111. Rejected because `Step` already means the current Step, a Step named `Name` would be unreachable,
 and every future `Step.<Property>` would be a breaking change (see
-[Design Choices](#3-a-new-steps-root-with-output-and-taskparam-levels)).
+[Design Choices](#5-a-new-steps-root-with-output-and-taskparam-levels)).
 
 ### Transitive access to outputs
 
@@ -1697,28 +2027,31 @@ names the fix.
 ### Skipping the consumers of a skipped Step (Tekton's rule)
 
 Rejected because enablement would flow along an edge that exists only in expression text, and because the explicit
-form is one line (see [Design Choices](#6-a-skipped-step-satisfies-ordering-and-yields-null-data)).
+form is one line (see [Design Choices](#8-a-skipped-step-satisfies-ordering-and-yields-null-data)).
 
 ### Treating an empty computed parameter space as skipped
 
 Rejected because every Step with a computed parameter space would then have optional outputs (see
-[Design Choices](#7-an-empty-computed-parameter-space-is-a-zero-task-success)).
+[Design Choices](#9-an-empty-computed-parameter-space-is-a-zero-task-success)).
 
 ### Declared reductions
 
-`reduce: MAX | MIN | SUM | LIST` on each output was implied by #111. Rejected because the full list plus EXPR
-functions does everything a declared reduction does, lets consumers reduce differently, and keeps the correlation
-between results and configurations that the sweep needs.
+`reduce: MAX | MIN | SUM | LIST` on each output was implied by #111, to reduce across a producer's Tasks. Rejected
+because the full list plus EXPR functions does everything a declared reduction does, lets consumers reduce
+differently, and keeps the correlation between results and configurations that the sweep needs. The same reasoning
+applies to reducing the values one Task reports: `collect` keeps them (`APPEND`) or picks the last (`LAST`), and never
+sums or averages them.
 
 ### An outputs-only extension first
 
-folouiseAWS's two-part plan. Rejected as a split of the specification, though not of implementation work (see
+folouiseAWS's two-part plan, which would also have been the natural home for Task metrics. Rejected as a split of the
+specification, though not of implementation work (see
 [Design Choices](#1-variable-data-flow-is-part-of-control_flow-not-a-standalone-extension)).
 
 ### Task-task dependencies inside CONTROL_FLOW
 
 Rejected in favor of a separate `TASK_DEPENDENCIES` extension that composes with this one (see
-[Design Choices](#10-task-task-dependencies-are-a-separate-extension)).
+[Design Choices](#12-task-task-dependencies-are-a-separate-extension)).
 
 ### A record or map type for structured outputs
 
@@ -1735,10 +2068,12 @@ precludes.
 ## Open Questions
 
 These are to be raised on discussion #111 before this RFC leaves draft. Each has the answer this draft adopts. The
-reasoning is in [04-design-space.md §6](../docs/control-flow-investigation/04-design-space.md#6-open-questions-for-the-discussion-thread).
+reasoning is in [04-design-space.md §6](../docs/control-flow-investigation/04-design-space.md#6-open-questions-for-the-discussion-thread),
+and for the emission channel, collect modes, and metrics in [§8](../docs/control-flow-investigation/04-design-space.md#8-addendum-emission-channel-collect-modes-and-metrics).
 
-1. **Emission channel.** A session-supplied file, not stdout. Does anyone have a runtime where writing a file is
-   harder than printing a line?
+1. **Emission channel.** The `openjd_output_var:` stdout directive, with `@<FilePath>` for large values, read as soon
+   as the directive is read. Is a 64 KiB floor for a directive line right, and is limiting `@` paths to the Session's
+   Working Directory too strict for any runtime?
 2. **Namespace.** `Steps.<Name>.Output.<Var>` and `Steps.<Name>.TaskParam.<Param>`, with referenced Steps required to
    have `<Identifier>` names. Alternative: drop `.Output` and reserve a short list of property names.
 3. **Direct dependents only.** Adopted.
@@ -1748,8 +2083,10 @@ reasoning is in [04-design-space.md §6](../docs/control-flow-investigation/04-d
    `argmin`/`argmax`, or a list `index`, or `zip`. Which is preferred?
 6. **Fields that may reference outputs.** The materialization expressions plus host-scope script fields; not
    `combination`, job-level fields, or Environment Templates.
-7. **Emission rules.** Only `onRun`; last line wins; missing, malformed, undeclared, mistyped, or out-of-constraint
-   values fail the Task; failed attempts commit nothing; outputs are not secrets. Does anyone need outputs from an
+7. **Emission rules.** Only a Task's `onRun`; a directive anywhere else fails its Action; `collect: ONCE` by default,
+   with `LAST` and `APPEND` declared; missing, malformed, undeclared, mistyped, repeated `ONCE`, or out-of-constraint
+   values fail the Task; failed attempts commit nothing; outputs are not secrets. Should a runtime be required to
+   cancel the Action as soon as it finds an invalid directive, rather than allowed to? Does anyone need outputs from an
    Environment's `onEnter`?
 8. **Chunked producers.** Deferred; coordinate the format with #169.
 9. **Limits.** At least 1 MiB per Task, constraints checked at the producer, an optional scheduler Task-count limit
@@ -1767,13 +2104,18 @@ reasoning is in [04-design-space.md §6](../docs/control-flow-investigation/04-d
 13. **Re-runs.** A differing re-run after consumption fails; cascade recompute is a possible scheduler capability.
     Is "fail the re-run" acceptable to render-farm operators?
 14. **`TASK_DEPENDENCIES` beside, not inside.** Adopted.
-15. **Output file encoding.** UTF-8 only, with a leading BOM ignored. Should UTF-16 with a BOM be accepted, given
+15. **`@` file encoding.** UTF-8 only, with a leading BOM ignored. Should UTF-16 with a BOM be accepted, given
     Windows PowerShell 5.1's defaults?
 16. **Coercion strictness.** This draft converts JSON values with EXPR's implicit coercion, so `S=123` is the string
     `"123"` for a `STRING` output. Should output conversion be stricter than EXPR's?
 17. **Number of outputs per Step.** This draft allows up to 32. Is a limit needed, and is that the right one?
 18. **Standalone StepTemplates (#22).** Not replaced by this RFC. May a Step appended to a running Job reference
     `Steps.*`?
+19. **Collect modes.** `ONCE`, `LAST`, and `APPEND`, named `collect`. Are they enough for metrics and for data flow,
+    and is `collect` the right name?
+20. **Uncommitted values.** A scheduler MAY show values of a running Task, marked as not committed. Should it also
+    keep the values of failed attempts for display, as the metrics proposal asked, given that they are never
+    visible to consumers?
 
 ## Future Work
 
@@ -1792,7 +2134,7 @@ Each has a **TODO** block at the place in the specification it would change.
 | Outputs from Environment actions | No use case yet. |
 | `Steps.*.TaskRawParam` | No use case yet. |
 | Task-task dependencies | A separate `TASK_DEPENDENCIES` RFC, from #82. |
-| An `openjd_output_var:` stdout directive | Left out for security; addable as a second channel if needed. |
+| A reducing `collect` mode (sum, min, max, count) | Consumers reduce with EXPR; only needed if collected lists become too large. |
 | Standalone StepTemplates appended to a running Job (#22) | A different mechanism, for a separate RFC. |
 
 ## Copyright

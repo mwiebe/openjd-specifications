@@ -86,7 +86,6 @@ The following environment variables are automatically set for all **Actions** ru
 | **Environment Variable** | **Value** | **Corresponding Template Variable** |
 |---|---|---|
 | `OPENJD_SESSION_WORKING_DIR` | The absolute path to the **Session**'s **Working Directory**. | `Session.WorkingDirectory` |
-| `OPENJD_TASK_OUTPUT_FILE` | The absolute path to the current Task's output file. Set only for the `onRun` action of a Task of a Step that declares `outputVariables` (CONTROL_FLOW extension). | `Task.OutputFile` |
 
 These environment variables are provided for nested subprocesses that cannot access Open Job Description template
 variables directly. Unlike template variables, environment variables are automatically inherited by child processes.
@@ -94,10 +93,6 @@ variables directly. Unlike template variables, environment variables are automat
 As a rule of thumb, OpenJD favors template variables over environment variables. When jobs use template substitution, tools can look at the template and accurately determine data flow to understand and modify the template. When jobs use environment variables, there is no reliable way to do this. We use the Tooling parseable design tenet to guide choices like this.
 
 The `OPENJD_SESSION_WORKING_DIR` environment variable is an example of this consideration in practice. Unlike other template variables, the session working directory is already accessible without using a variable; session actions start their CWD set to the session working directory. This is the same value as the {{Session.WorkingDirectory}} template variable, so exposing it as an environment variable does not reduce the tooling parseability of Job Templates. Any future environment variable additions should be intentionally considered with the design tenets in mind rather than assumed to follow this precedent.
-
-`OPENJD_TASK_OUTPUT_FILE` was added with this consideration. A Step's data flow is declared in its `outputVariables`,
-whichever way a script reaches the output file, so the variable does not reduce the tooling parseability of Job
-Templates. It exists for nested subprocesses, such as an adaptor, that cannot see template variables.
 
 ## Step States and Step Input Binding
 
@@ -130,11 +125,11 @@ dependency on a failed Step today.
 A scheduler may create a pending Step's Tasks only when it is bound, or create the Step at submission and fill in its
 Tasks when it is bound. The two are equivalent to a Job's author.
 
-Each Task of a Step that declares `outputVariables` writes its values to an output file, whose path is the template
-variable `Task.OutputFile` and the environment variable `OPENJD_TASK_OUTPUT_FILE`. The runtime reads and validates the
-file when the Task's `onRun` action succeeds, and the scheduler keeps the values for the life of the Job. Output
-values are never read from stdout. See the [Template Schemas](2023-09-Template-Schemas#371-the-output-file) for the
-file format.
+Each Task of a Step that declares `outputVariables` reports its values with `openjd_output_var:` messages (see
+[Stdout/Stderr Messages](#stdoutstderr-messages)). The runtime validates each one as it is printed, the values are
+committed when the Task succeeds, and the scheduler keeps them for the life of the Job and may display them, for
+example as metrics beside the Task's parameters. See the
+[Template Schemas](2023-09-Template-Schemas#371-reporting-output-values) for the rules.
 
 
 ## Host Requirements
@@ -186,6 +181,15 @@ messages to convey information about the **Action** to the render management sys
 * `openjd_unset_env: <var>` where `<var>` is the string name of an environment variable. This can only be emitted by the
   **Action** for entering an **Environment**. This unsets the given environment variable for all subsequent **Action**s
   in the **Session** until the **Environment** that emitted it is exited.
+* `openjd_output_var: <name>=<json>` or `openjd_output_var: <name>=@<path>` where `<name>` is the name of an output
+  variable that the Step declares, `<json>` is a JSON value on one line, and `<path>` names a file inside the
+  **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
+  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@`
+  file as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template,
+  fails the **Action**. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
+  of. Requires the CONTROL_FLOW extension; without it, and for **Actions** of an Environment Template, the line is
+  ordinary output. See
+  [Reporting output values](2023-09-Template-Schemas#371-reporting-output-values).
 
 When the WRAP_ACTIONS extension is in use, schedulers must scan the stdout of the wrap script (`onWrapEnvEnter`,
 `onWrapTaskRun`, or `onWrapEnvExit`) for these macros, not the stdout of the wrapped process. Wrap scripts must
