@@ -1367,7 +1367,8 @@ Where:
 3. *value* — The value, as a format string whose target type is the expression type of *type*, made optional: an
    expression that reads a conditional Step can evaluate to `null`, which means the output has no value. It may
    reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name`, and the `Steps.*`
-   symbols of any Step of the Job, with `PATH` values read through `RawOutput` and `TaskRawParam`. It may not reference `Step.Name`,
+   symbols of any Step of the Job, with values whose type is or contains `path` read through `RawOutput` and
+   `TaskRawParam`. It may not reference `Step.Name`,
    `Task.*`, `Session.*`, or names bound by `let`.
 4. *description* and *unit* — For display, as on `<OutputVariableDefinition>`.
 5. Constraint properties — Checked against the value when it is evaluated. A violation fails the Job. A `null`
@@ -1736,7 +1737,7 @@ which `PATH` job parameter values are given, by applying the Session's path mapp
 
 The requirements are on the outcome. They assume, as forward mapping of `PATH` job parameters already does, that a
 Session's path mapping rules map from the Job's submission path context; a runtime that knows the submission path
-format SHOULD use only rules from that format.
+format SHOULD use only rules whose `source_path_format` is that format or `URI`.
 
 * A relative path is invalid: it would be relative to a Session Working Directory that no consumer can see.
 * A URI value (EXPR's URI form, such as `s3://bucket/key`) is stored unchanged, as a URI job parameter value is
@@ -1744,7 +1745,7 @@ format SHOULD use only rules from that format.
 * If the Session has no path mapping rules, any other (absolute) value is stored unchanged.
 * Otherwise the stored value MUST be in the submission path context, and forward mapping it with the producing
   Session's own rules MUST give back the reported path, where two paths are equal if they are equal after lexical
-  normalization (`.` removed, `..` applied, trailing separators dropped) and compared under the rules of the worker
+  normalization (`.` removed, `..` applied, trailing separators dropped except at a root) and compared under the rules of the worker
   host's path format: Windows paths case-insensitively with `\` and `/` both separators, POSIX paths
   case-sensitively. If the runtime can find no such form, the value is invalid.
 
@@ -1761,9 +1762,9 @@ than the rules alone. A runtime that has only the rules SHOULD use this referenc
    Paths in the worker host's format are compared with that format's rules: a Windows path case-insensitively, with
    `\` and `/` both separators; a POSIX path case-sensitively, with `/`. A rule matches when its `destination_path` is
    the path, or a prefix of it that ends on a component boundary.
-4. Each matching rule gives a candidate: the rest of the path after `destination_path`, with its separators
-   converted to the rule's `source_path_format` (`/` for `URI`), joined to `source_path` with one separator of that
-   format unless `source_path` already ends with one. If the rest is empty, the candidate is `source_path`. Candidates are tried in
+4. Each matching rule gives a candidate: the remaining components of the path after `destination_path`, joined with
+   the separator of the rule's `source_path_format` (`/` for `URI`), then joined to `source_path` with one such
+   separator unless `source_path` already ends with one. If no components remain, the candidate is `source_path`. Candidates are tried in
    order of decreasing `destination_path` length, then in the order the rules are listed, and the first candidate
    that forward-maps back to the reported path is stored. Forward mapping can choose a different rule when rules
    nest: with `P:\` → `/mnt/p` and `P:\x` → `/data/x`, the worker path `/mnt/p/x/f` can't be stored as `P:\x\f`,
@@ -1805,7 +1806,8 @@ Output values are stored, logged, and may be displayed, so they are not redacted
    size counted is that of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>`
    text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST`
    value (a value it replaces stops counting), and every `APPEND` element. For each `PATH` value or `LIST[PATH]`
-   element, the larger of the reported bytes and the JSON serialization of the stored value counts. A directive that takes the size over the runtime's limit is invalid.
+   element, the larger of the reported bytes and the JSON serialization of the stored value counts, measured for the
+   whole `PATH` or `LIST[PATH]` value. A directive that takes the size over the runtime's limit is invalid.
 3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
    list outputs that feed a parameter space, and on `APPEND` outputs.
 4. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
@@ -2134,8 +2136,8 @@ Every rule this extension adds, and when it is checked.
 9. The Step dependency graph is acyclic, as today.
 10. *jobOutputDefinitions*: 1 to 50 elements; names are unique `<Identifier>`s; types and constraint properties as
     for *outputVariables*; each *value* type-checks against its type, made optional, and references only the symbols
-    [`<JobOutputDefinition>`](#joboutputdefinition) allows, with any Step's `Steps.*` symbols, `PATH` values only
-    through `RawOutput` and `TaskRawParam`.
+    [`<JobOutputDefinition>`](#joboutputdefinition) allows, with any Step's `Steps.*` symbols, values whose type
+    is or contains `path` only through `RawOutput` and `TaskRawParam`.
 
 **At step input binding** (by the scheduler, before any Task of the Step runs): every materialization expression
 evaluates; ranges are valid (a range string may not be empty; a list may be); the Task count is within the
