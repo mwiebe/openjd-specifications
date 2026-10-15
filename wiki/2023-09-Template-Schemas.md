@@ -1677,20 +1677,20 @@ a `string`; `true`/`false` a `bool`; an array a list) and is converted to the de
 to its element type, with the [implicit type coercion](2026-02-Expression-Language#123-implicit-type-coercion) rules of
 the Expression Language. `null` and objects are not accepted anywhere in a value.
 
-A directive is invalid, and cancels and fails the action it is attributed to as soon as it is read, if it: does not
-match the grammar or is not valid JSON; names an undeclared output; has a value that is `null`, an object, or does not
-convert; violates a constraint property; repeats a `collect: ONCE` output; names a file that is not a regular file
-inside the Session's Working Directory, is unreadable, or is not UTF-8, contains NUL, or is not exactly one JSON value;
-is on a line that is not valid UTF-8; is longer than the runtime's line limit, which must be at least 64 KiB (an
-over-long directive is never truncated and parsed); or takes the size of the values the Task holds over the runtime's
-limit, which must be at least 1 MiB. The Task also fails if, when the action exits, a `ONCE` or `LAST` output has no
-value or an `APPEND` output has fewer elements than its *minLength*. In a Job that lists `CONTROL_FLOW`, a directive
-printed by any action of the Job Template other than the `onRun` of a Task of a Step that declares *outputVariables*
-cancels and fails that action. Under `WRAP_ACTIONS`, a line from a wrap hook counts as output of the action it runs in
-place of, so `onWrapTaskRun` reports the Task's outputs whichever template defines it. For an action of an Environment
-Template, a directive is ordinary output. If the attempt fails for any reason, it has no outputs. Like the other
-messages, a directive line appears in the action's log by default, and a runtime option to hide recognized messages
-applies to it too.
+A directive is invalid, and cancels and fails the action it is attributed to as soon as it is read, using the action's
+normal cancelation, if it: does not match the grammar or is not valid JSON; names an undeclared output; has a value that
+is `null`, an object, or does not convert; violates a constraint property; repeats a `collect: ONCE` output; names a
+file that is not a regular file inside the Session's Working Directory, is unreadable, or is not UTF-8, contains NUL, or
+is not exactly one JSON value; is on a line that is not valid UTF-8; is longer than the runtime's line limit, which must
+be at least 64 KiB (an over-long directive is never truncated and parsed); or takes the size of the values the Task
+holds over the runtime's limit, which must be at least 1 MiB. The Task also fails if, when the action exits, a `ONCE` or
+`LAST` output has no value or an `APPEND` output has fewer elements than its *minLength*. In a Job that lists
+`CONTROL_FLOW`, a directive printed by any action of the Job Template other than the `onRun` of a Task of a Step that
+declares *outputVariables* cancels and fails that action. Under `WRAP_ACTIONS`, a line from a wrap hook counts as output
+of the action it runs in place of, so `onWrapTaskRun` reports the Task's outputs whichever template defines it. For an
+action of an Environment Template, a directive is ordinary output. If the attempt fails for any reason, it has no
+outputs. Like the other messages, a directive line appears in the action's log by default, and a runtime option to hide
+recognized messages applies to it too.
 
 The values are committed when the Task succeeds, and are retained by the render management system for the life of the
 Job. They may be forwarded as soon as they are reported, and displayed before then if marked as not yet committed. They are not redacted and must not be used to
