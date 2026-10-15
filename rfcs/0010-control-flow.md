@@ -769,6 +769,7 @@ because the input lives on the farm or in a bucket the workstation can't reach.
 | U8–U14 | **Static task-task dependencies**: export→render per frame, simulation chains, temporal offsets, static DAGs, fan-in by frame. | #82, #79 | Nothing | `TASK_DEPENDENCIES` (separate extension) |
 | U15 | **Fully dynamic work items** such as Houdini PDG. | #22 | Number and shape of the work | Out of scope |
 | U16 | **Task metrics.** Each Task reports measurements (error, coverage, frames per second, render time, peak memory) that a scheduler shows as sortable columns beside the Task's parameters. | folouiseAWS, #111; the Task metrics proposal | Nothing; the values are the result | Outputs with no consumer, `unit`, `collect` |
+| U17 | **Loop until done.** Run a Step's Tasks one after another, each one's parameters computed from the outputs of the Task before it, until a condition holds: refine until converged, list S3 one page at a time with a continuation token, or re-render with more samples until a quality check passes. | Discussion of this draft | How many Tasks run, and each one's parameters | Future Work: a separate loop extension (see [Loop Steps](#loop-steps)) |
 
 U1–U4 need a value from a running Task and are the core of this RFC. U5 and U6 need no run-time data, but their hard
 questions (what happens to a disabled Step's outputs and dependents) are data-flow questions, so they are answered
@@ -780,6 +781,11 @@ U4 also shows that outputs are useful with no consumer at all, which is U16. A s
 Task's metrics next to its parameters replaces the workarounds users reach for today. U16 was first proposed as a
 separate `TASK_METRICS` extension with its own `openjd_metric:` directive; this RFC covers it with output variables
 instead (see [Design Choices](#4-task-metrics-are-output-variables)).
+
+U17 needs everything this RFC adds, and one thing it doesn't: a Step whose Task count isn't known when it is bound,
+because each Task's parameters come from the Task before it. Today it can only be written by unrolling the loop into
+a fixed number of copies of the Step, chained with *enableIf*. It is deferred to a separate extension (see
+[Loop Steps](#loop-steps)).
 
 ### Workarounds in use today
 
@@ -1707,6 +1713,11 @@ Tasks are enumerable if and only if it has been bound and is not `SKIPPED`. A sc
 `PENDING_INPUTS` Step SHOULD report its Task count as not yet known and name the outputs it is waiting for, for
 example "determined at run time from `Steps.VideoToFrames.Output.FrameCount`".
 
+> **TODO (deferred): loop Steps.** A loop extension would add Steps whose Tasks are created one at a time after the
+> Step is bound, so it would amend this contract for those Steps: a loop Step's Tasks are enumerable only up to the
+> last one created, and its Task count is reported as not yet known until the loop ends. See
+> [Loop Steps](#loop-steps).
+
 ### Conditional execution: `enableIf`
 
 * **Static or dynamic.** An *enableIf* that references no `Steps.*` symbol is decided at Job creation. One that does
@@ -2074,7 +2085,8 @@ rejected map types for EXPR, and parallel lists aligned by index cover the use c
 Houdini PDG-style dynamic work (U15) needs the step graph itself to change. Every surveyed system that allows this
 loses static validation and the view of total work at the dynamic boundary. Discussion #22 pointed that use case at a
 separate mechanism, standalone StepTemplates submitted into a running Job, which this RFC neither replaces nor
-precludes.
+precludes. A loop Step (U17, [Loop Steps](#loop-steps)) is different: the step graph stays fixed and only one Step's
+width grows, within a declared bound.
 
 ## Open Questions
 
@@ -2146,6 +2158,65 @@ Each has a **TODO** block at the place in the specification it would change.
 | Task-task dependencies | A separate `TASK_DEPENDENCIES` RFC, from #82. |
 | A reducing `collect` mode (sum, min, max, count) | Consumers reduce with EXPR; only needed if collected lists become too large. |
 | Standalone StepTemplates appended to a running Job (#22) | A different mechanism, for a separate RFC. |
+| Loop Steps (U17) | Breaks "Task count known once bound" and needs sequential, incremental Task creation; a separate extension. See [Loop Steps](#loop-steps). |
+
+### Loop Steps
+
+A loop Step runs its Tasks one after another, and each Task's parameters are computed from the Task that ran before
+it, until an expression says to stop. It would be a separate extension, provisionally `STEP_LOOPS`, that depends on
+`CONTROL_FLOW`, for the same kind of reasons that task-task dependencies are separate (see
+[Design Choices](#12-task-task-dependencies-are-a-separate-extension)). Everything else in this RFC assumes that a
+bound Step's Tasks are all known; a loop Step's are not, and a scheduler needs a new capability to create them one at
+a time and run them strictly in sequence.
+
+A sketch, to test that this RFC doesn't block it:
+
+```yaml
+- name: Refine
+  dependencies:
+    - dependsOn: Setup
+  parameterSpace:
+    taskParameterDefinitions:
+      - name: Iter
+        type: INT
+        initial: "{{Steps.Setup.Output.StartIter}}"
+        next: "{{Task.Param.Iter + 1 if Task.Output.Residual > Param.Tolerance else null}}"
+    maxTaskCount: 50
+  outputVariables:
+    - name: Residual
+      type: FLOAT
+  script:
+    # ...
+```
+
+* **`initial` and `next` instead of `range`.** `initial` is the first Task's value, a materialization expression that
+  may read `Steps.*`. `next` is evaluated after each Task succeeds; its value is the next Task's value, and `null` ends
+  the loop. The loop parameter may be any Task parameter type, so a `STRING` continuation token works as well as an
+  index.
+* **The scope of `next`.** The Task that just ran: its `Task.Param.*` and its committed outputs, as a new
+  `Task.Output.<Var>` symbol that exists only in `next`. That is a new evaluation point, after a Task and before the
+  next one, which this RFC's stage table would gain.
+* **A required bound.** Termination can't be checked statically, so `maxTaskCount` is required, in keeping with
+  [Technical Requirements](#technical-requirements) item 7. Reaching it fails the Step; a loop that should stop
+  quietly says so in `next`.
+* **Parameters.** In the simplest form, a loop Step's parameter space has only loop parameters. A product of a loop
+  with static parameters, one independent loop per combination ("refine each configuration until it converges"),
+  overlaps with `TASK_DEPENDENCIES` and is a later step.
+* **Consumers** read `Steps.<Loop>.Output.*` as lists in the order the Tasks ran, and are bound once the loop ends,
+  under this RFC's completeness rule ([Reductions](#reductions) item 3). `collect: LAST` and `APPEND` already cover a
+  single Task's final value and history.
+* **Re-runs.** Each Task's outputs are consumed by the next Task's `next`, so under
+  [Retries and re-runs](#retries-and-re-runs) a re-run of a Task other than the last that reports different values
+  fails. The rule needs no change.
+* **Sessions.** Because a loop runs in sequence, a scheduler would do well to keep its Tasks in one Session, reusing
+  its Environments.
+* **Not covered.** A loop over one Step can't repeat a group of Steps, such as render, check, and re-render until
+  clean. Looping over part of the step graph is a much larger change, close to the dynamic work of U15.
+
+Prior art: CWL's loop feature, whose loop condition and output method (the last iteration's value, or all of them)
+correspond to `next` and to reading the last element or the whole list; Argo Workflows' recursive templates with a `when`
+condition; and AWS Step Functions' Choice state that transitions back to an earlier state. Apache Airflow, GitHub
+Actions, and Tekton have no loops, because their graphs are acyclic.
 
 ## Copyright
 
