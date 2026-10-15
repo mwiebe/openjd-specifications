@@ -893,11 +893,13 @@ unit: <OutputVariableUnit> # @optional
 
 Where:
 
-1. *name* — The name by which callers read the output. Job outputs are not available in any Format String.
+1. *name* — The name by which callers read the output. Job outputs are not available in any Format String. Job
+   output names and Job Parameter names are separate namespaces.
 2. *type* — See [&lt;OutputVariableDefinition&gt;](#37-outputvariabledefinition-extension-control_flow): the same types,
    expression types, and constraint properties. `LIST[LIST[INT]]` is allowed.
 3. *value* — The output's value, whose target type is the expression type of *type*, made optional: a `null` result
-   means the output has no value, which is not an error. It may reference `Param.*` (except `PATH` parameters),
+   means the output has no value, which is not an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]`
+   parameters),
    `RawParam.*`, `Job.Name`, and the `Steps.*` values of any Step of the Job, with `PATH` values read through
    `Steps.<StepName>.RawOutput.*` and `Steps.<StepName>.TaskRawParam.*`. It may not reference `Step.Name`, `Task.*`,
    `Session.*`, or names bound by `let`.
@@ -905,11 +907,13 @@ Where:
 5. Constraint properties — Checked against the value when it is evaluated.
 
 The render management system evaluates each Job output as soon as every `Steps.*` value its *value* references is
-concrete, or at Job creation if it references none, and keeps the result for the life of the Job. If evaluation
+concrete, or at Job creation if it references none, and keeps the result for the life of the Job. It does not need
+the referenced Steps to be dependencies of anything. If evaluation
 fails, including a conversion error, a constraint violation, or a value over the implementation's size limit (which
 must be at least 1 MiB for all of a Job's outputs), the Job fails: no further Tasks are dispatched. If a Step the
 output references fails, the output is never evaluated. When a re-run of a Task commits new values, the outputs that
-reference its Step are evaluated again. A `PATH` Job output is in the submission path context. Job outputs are not
+reference its Step are evaluated again; if that fails, the output keeps its earlier value, marked stale, and the Job
+fails, even if it had already succeeded. A `PATH` Job output is in the submission path context. Job outputs are not
 redacted and must not be used to pass secrets.
 
 ## 3. `<StepTemplate>`
@@ -1739,12 +1743,14 @@ outputs. Like the other messages, a directive line appears in the action's log b
 recognized messages may hide a valid directive, but an invalid one always stays in the log with the error.
 
 A `PATH` value, or each element of a `LIST[PATH]` value, is stored in the **submission path context**, the form in
-which `PATH` Job Parameter values are given. The runtime applies the Session's path mapping rules in reverse: a URI is
-stored unchanged; any other value must be an absolute path, which is lexically normalized and matched against each
-rule's `destination_path` on a path component boundary, and the rule with the longest match replaces that prefix
-with its `source_path`, with separators converted to its `source_path_format`. A path that no rule matches is invalid
-if the Session has path mapping rules, and is stored unchanged if it has none. How a runtime computes the inverse is
-implementation-defined, provided the stored value maps forward correctly in another Session.
+which `PATH` Job Parameter values are given, by applying the Session's path mapping rules in reverse. The stored value
+must map forward, with the producing Session's rules, back to the reported path; how the inverse is computed is
+implementation-defined. The reference inverse: a URI is stored unchanged; any other value must be an absolute path,
+which is lexically normalized and matched against each rule's `destination_path` on a component boundary (Windows
+paths case-insensitively with `\` or `/` separators, POSIX paths case-sensitively); matching rules are tried longest
+`destination_path` first, each replacing that prefix with its `source_path` in its `source_path_format`, and the
+first result that maps forward back to the reported path is stored. If none does and the Session has path mapping
+rules, the value is invalid; if the Session has no rules, it is stored unchanged.
 
 The values are committed when the Task succeeds, and are retained by the render management system for the life of the
 Job. They may be forwarded as soon as they are reported, and displayed before then if marked as not yet committed. They are not redacted and must not be used to
