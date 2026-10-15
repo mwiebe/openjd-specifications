@@ -557,10 +557,10 @@ steps:
   configuration `c` occupy indices `c*n` to `c*n + n - 1` of every `Steps.Sweep.*` list. This index arithmetic is the
   clearest readability cost of the design; see [Open Questions](#open-questions) item 5.
 * If no configuration is fast enough, `RunWinner` fails at binding with the `fail(...)` message and runs no Tasks.
-* `ResultDir` is a path on the worker, under `Param.OutputDir` with the worker's path mapping applied. The runtime
-  maps it back to the submission path context before storing it, so `ResultDirs` names the directories as the
-  submitter sees them, and a Windows workstation that submitted with `OutputDir` set to `P:\results` gets
-  `P:\results\...` paths even though the Tasks ran on Linux (see [Path values](#path-values)).
+* `ResultDir` is an absolute path on the worker, under `Param.OutputDir` with the worker's path mapping applied. The
+  runtime maps it back to the submission path context before storing it, so `ResultDirs` names the directories as the
+  submitter sees them: given the farm's path mapping rule for `P:\`, a Windows workstation that submitted with
+  `OutputDir` set to `P:\results` gets `P:\results\...` paths even though the Tasks ran on Linux (see [Path values](#path-values)).
 * The job outputs appear one at a time: `VideoCount` when `Discover` succeeds, `BestTaskErrorMm` when the sweep
   does, and `ResultDirs` when `RunWinner` does. If any of them failed to evaluate, the Job would fail at that point.
 * The `Sweep` Step alone is useful: a scheduler can show all 270 Tasks' `mpjpe_mm` and `fps` with no consumer (see
@@ -998,6 +998,9 @@ breaking change. RFC 0008 avoided the same problem with a separate `WrappedStep`
 
 * `Steps.<StepName>.Output.<VarName>` for an output value, and
 * `Steps.<StepName>.TaskParam.<ParamName>` for the producer's Task parameter values, aligned with its output lists.
+* `Steps.<StepName>.RawOutput.<VarName>` and `Steps.<StepName>.TaskRawParam.<ParamName>` for the same values with no
+  path mapping applied, as `RawParam.*` is to `Param.*` (see
+  [Design Choices](#14-path-values-are-stored-in-the-submission-path-context)).
 
 The `Output` level costs one word per reference. It leaves room for `TaskParam` and for later per-Step symbols such as
 a Task count or a parameter-space introspection (#82 proposed `Step.<Name>.ParameterSpace.<Param>.Range`) without any
@@ -1014,6 +1017,9 @@ what a Step consumes. The extra `dependsOn` never changes scheduling, since a tr
 Steps. A reference does not create an edge: a missing edge is a validation error that names the fix. GitHub Actions
 (`needs`) and Argo make the same choice, and it keeps the template's explicit `dependencies` the only source of
 edges.
+
+Job outputs are the exception: a job output's *value* may read any Step. A job output is not scheduled, so there is
+no edge to declare, and the Job is the consumer of all of its Steps.
 
 ### 7. Output shape is determined by the template
 
@@ -1203,8 +1209,9 @@ Extension list addition to item 3 (*extensions*): `CONTROL_FLOW` (this RFC). New
   for the submitter and other callers to read. See [`<JobOutputDefinition>`](#joboutputdefinition) and
   [Job outputs](#job-outputs). Constraints:
     1. Minimum number of elements: If provided, then this list must contain at least one element.
-    2. Maximum number of elements: 50, as for *parameterDefinitions*.
-    3. No two elements in this list may have the same value for the `name` property.
+    2. Maximum number of elements: 50, whatever extensions are enabled.
+    3. No two elements in this list may have the same value for the `name` property. Job output names and job
+       parameter names are separate namespaces, so a job output may have the same name as a job parameter.
 
 #### `<StepTemplate>`
 
@@ -1356,8 +1363,8 @@ Where:
    `LIST[LIST[INT]]` is allowed.
 3. *value* — The value, as a format string whose target type is the expression type of *type*, made optional: an
    expression that reads a conditional Step can evaluate to `null`, which means the output has no value. It may
-   reference `Param.*` (except `PATH` parameters), `RawParam.*`, `Job.Name`, and the `Steps.*` symbols of any Step of
-   the Job, with `PATH` values read through `RawOutput` and `TaskRawParam`. It may not reference `Step.Name`,
+   reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name`, and the `Steps.*`
+   symbols of any Step of the Job, with `PATH` values read through `RawOutput` and `TaskRawParam`. It may not reference `Step.Name`,
    `Task.*`, `Session.*`, or names bound by `let`.
 4. *description* and *unit* — For display, as on `<OutputVariableDefinition>`.
 5. Constraint properties — Checked against the value when it is evaluated. A violation fails the Job.
@@ -1523,7 +1530,7 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
 | **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every rule of [Validation](#validation) is checked. |
 | **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`: an *enableIf* that reads no `Steps.*` is evaluated. A Step whose materialization expressions read no unresolved `Steps.*` is bound now; every other Step enters `PENDING_INPUTS`. A job output that reads no unresolved `Steps.*` is evaluated. |
 | **Step input binding** (new, `CONTROL_FLOW` only) | Per Step, once every `Steps.*` symbol its materialization expressions reference is concrete | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.*`, `Session.*` | The Step's materialization expressions are evaluated, in order and atomically. The Step becomes `READY`, `SKIPPED`, or `FAILED`. See [Step input binding](#step-input-binding). |
-| **Job output evaluation** (new, `CONTROL_FLOW` only) | Per job output, once every `Steps.*` symbol its *value* references is concrete | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.*`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted, and checked; a failure fails the Job. See [Job outputs](#job-outputs). |
+| **Job output evaluation** (new, `CONTROL_FLOW` only) | Per job output, once every `Steps.*` symbol its *value* references is concrete | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted, and checked; a failure fails the Job. See [Job outputs](#job-outputs). |
 | **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies | *(none)* | As today. With `CONTROL_FLOW`, the runtime processes `onRun`'s output directives as they are printed, reverse-maps `PATH` values, and commits the values when the Task succeeds. |
 
 ### Output emission
@@ -1718,27 +1725,38 @@ errors, as is a number too large to represent as a `float`. For example:
 A `PATH` value that a Task reports is a path in that Task's Session: on its worker host, with its Session's path
 mapping rules applied to the paths it was given. A consumer may run on another host with other rules, and a job
 output is read by the submitter. So the runtime stores a `PATH` value in the **submission path context**, the form in
-which `PATH` job parameter values are given, by applying the Session's path mapping rules in reverse:
+which `PATH` job parameter values are given, by applying the Session's path mapping rules in reverse.
+
+The requirement is on the outcome. The stored value MUST be in the submission path context, and forward mapping it
+with the producing Session's own rules MUST give back the reported path, after the normalization of step 3 below. How
+a runtime computes the inverse is up to it; a runtime with more knowledge of the farm's storage may do better than
+the rules alone. A runtime that has only the rules SHOULD use this reference inverse:
 
 1. A value that is a URI (EXPR's URI form, such as `s3://bucket/key`) is stored unchanged, as a URI job parameter
    value passes through forward mapping unchanged when no rule matches it.
 2. Any other value must be an absolute path. A relative path is invalid: it would be relative to a Session Working
    Directory that no consumer can see.
-3. The path is lexically normalized (`.` components removed, `..` components applied, without resolving symbolic
-   links), and compared with each rule's `destination_path`, using the comparison rules that forward mapping uses
-   for paths of the worker host's format. A rule matches when its `destination_path` is the path or a prefix of it
-   that ends on a path component boundary.
-4. If one or more rules match, the one with the longest `destination_path` is used. The stored value is its
-   `source_path` followed by the rest of the path, with separators converted to the rule's `source_path_format` (`/`
-   for `URI`, so a local path under a rule from a URI prefix is stored as a URI).
-5. If none matches and the Session has path mapping rules, the value is invalid: the path is on the worker only, for
-   example under the Session Working Directory, which is deleted when the Session ends.
-6. If the Session has no path mapping rules, the worker's path context is the submission path context, and the value
-   is stored unchanged.
+3. The path is lexically normalized: `.` components are removed and `..` components applied, without resolving
+   symbolic links, and trailing separators are dropped. Each rule's `destination_path` is normalized the same way.
+   Paths in the worker host's format are compared with that format's rules: a Windows path case-insensitively, with
+   `\` and `/` both separators; a POSIX path case-sensitively, with `/`. A rule matches when its `destination_path` is
+   the path, or a prefix of it that ends on a component boundary.
+4. Each matching rule gives a candidate: its `source_path`, then one separator of the rule's `source_path_format`
+   (`/` for `URI`), then the rest of the path with its separators converted to that format. Candidates are tried in
+   order of decreasing `destination_path` length, then in the order the rules are listed, and the first candidate
+   that forward-maps back to the reported path is stored. Forward mapping can choose a different rule when rules
+   nest: with `P:\` → `/mnt/p` and `P:\x` → `/data/x`, the worker path `/mnt/p/x/f` can't be stored as `P:\x\f`,
+   which maps forward to `/data/x/f`. A candidate from a rule whose `source_path_format` is `URI` is a URI, and a
+   consumer whose Session has no rule for it receives it as a URI.
+5. If no candidate maps back and the Session has path mapping rules, the value is invalid. Most often the path is on
+   the worker only, for example under the Session Working Directory, which is deleted when the Session ends.
+6. If the Session has no path mapping rules, the value is stored unchanged, as a `PATH` job parameter is used
+   unchanged then. This is right when the worker and the submitter share their path context, as with `openjd run` on
+   one host. A scheduler that runs Tasks on hosts with another path context must supply rules for `PATH` values to
+   work, as it must for `PATH` job parameters.
 
-How a runtime obtains and applies the inverse is up to it, provided the stored value is in the submission path
-context and forward mapping in another Session maps it back to a valid path there. Constraint properties
-(`allowedValues`, `minLength`, `maxLength`) are checked against the stored value. A consumer reads a `PATH` value as
+Constraint properties (`allowedValues`, `minLength`, `maxLength`) are checked against the stored value, and the
+stored value is the one compared for [Retries and re-runs](#retries-and-re-runs). A consumer reads a `PATH` value as
 `Steps.P.Output.X` in format strings resolved on the worker host, with its own Session's rules applied forward, or as
 `Steps.P.RawOutput.X`, the stored value, anywhere else.
 
@@ -1764,9 +1782,9 @@ Output values are stored, logged, and may be displayed, so they are not redacted
    directive. Larger values use `@<FilePath>`.
 2. A runtime MUST accept at least 1 MiB (1,048,576 bytes) of output values per Task attempt, and MAY accept more. The
    size counted is that of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>`
-   text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST` value (a value it replaces stops
-   counting), and every `APPEND` element. A directive that
-   takes the size over the runtime's limit is invalid.
+   text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST`
+   value (a value it replaces stops counting), and every `APPEND` element. For a `PATH` value, the larger of the
+   reported and the stored form counts. A directive that takes the size over the runtime's limit is invalid.
 3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
    list outputs that feed a parameter space, and on `APPEND` outputs.
 4. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
@@ -1954,7 +1972,8 @@ an expression over the Job's parameters and its Steps' outputs. A Task never wri
 
 1. **When an output is evaluated.** Each job output is evaluated on its own, as soon as every `Steps.*` symbol its
    *value* references is concrete (see [The `Steps.*` scope](#the-steps-scope)), by the same rule that decides when a
-   Step is bound. An output that references no `Steps.*` symbol is evaluated at Job creation. An output that reads a
+   Step is bound. An output that references no `Steps.*` symbol, or only `TaskParam` and `TaskRawParam` symbols of
+   Steps bound at Job creation, is evaluated at Job creation. An output that reads `Output` or `RawOutput` of a
    multi-Task Step is evaluated when that Step completes, because its lists are concrete only then
    ([Reductions](#reductions) item 3). A user interface can therefore show each output as soon as it exists, before
    the Job finishes.
@@ -1969,11 +1988,15 @@ an expression over the Job's parameters and its Steps' outputs. A Task never wri
 4. **Missing producers.** If a Step that an output references fails, or can never run because one of its
    dependencies failed, the output is never evaluated, and a scheduler SHOULD show it as unavailable, naming the
    Step, rather than as pending. If the Step is `SKIPPED`, its symbols are `null` and the output is evaluated with
-   them; a `null` result means the output has no value, which is not an error.
+   them; a `null` result means the output has no value, which is not an error. A Step with zero Tasks gives empty
+   lists, so `min(Steps.P.Output.X)` fails the Job when the space is empty; write
+   `min(x) if len(x) > 0 else null` where emptiness is expected (see
+   [Design Choices](#9-an-empty-computed-parameter-space-is-a-zero-task-success)).
 5. **Re-runs.** Job outputs do not count as consumers for [Retries and re-runs](#retries-and-re-runs): a caller
    outside the Job can't be tracked. When a re-run commits new values for a Task, the scheduler re-evaluates every job
-   output that references the Task's Step and replaces its value. A re-evaluation that fails fails the Job, as in
-   item 3.
+   output that references the Task's Step and replaces its value. If a re-evaluation fails, the re-run's values stay
+   committed, the job output keeps its earlier value and is marked stale, and the Job fails as in item 3, including a
+   Job that had already succeeded.
 6. **Paths.** A `PATH` or `LIST[PATH]` job output is in the submission path context, because every `PATH` value it
    can read there (`RawParam.*`, `Steps.*.RawOutput.*`, `Steps.*.TaskRawParam.*`) is. A caller can use it directly
    on the submitting host, for example to download or open the results.
@@ -2009,11 +2032,11 @@ RFC adds to the model are:
 A Step that has been bound and is not `SKIPPED` is gated by its dependencies exactly as today. A Step whose binding
 fails is `FAILED`, which, like any failed Step, does not satisfy `dependsOn`.
 
-#### Job outputs
+#### Job output evaluation
 
 > An addition to [How Jobs Are Run](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run)
 
-A scheduler evaluates each job output as soon as the Steps it reads have completed, or at Job creation if it reads
+A scheduler evaluates each job output as soon as every Step value it reads is known, or at Job creation if it reads
 none, keeps its value for the life of the Job, and returns it to callers. A job output that fails to evaluate fails
 the Job. See [Job outputs](#job-outputs).
 
@@ -2141,6 +2164,9 @@ What this RFC takes from them:
 * **Workflow-level outputs as expressions over step outputs** (GitHub Actions reusable workflows'
   `on.workflow_call.outputs.<name>.value`, Tekton Pipeline `results`, CWL workflow `outputs` with `outputSource`, Argo
   workflow `outputs`), for job outputs.
+* **Path remapping in render managers.** Thinkbox Deadline's path mapping and Pixar Tractor's dirmaps translate paths
+  between submitter and worker forms. This survey found no system that specifies the reverse direction for values a
+  task produces; this RFC defines it in terms of the existing rules.
 * **Limits with a guaranteed minimum.** GitHub Actions allows 1 MB of outputs per job, Step Functions 256 KiB per
   state, Tekton 4 KB per TaskRun by default. This RFC guarantees at least 1 MiB per Task.
 
@@ -2189,7 +2215,9 @@ other than the current one without overloading `Step`.
   creation: it reports which Steps need binding and exposes a function that binds one Step given the concrete
   `Steps.*` values, which schedulers and the CLI call. The parameter-space iterator already defines the order
   reductions need. Job outputs add the `jobOutputDefinitions` schema and a function that evaluates one job output
-  given the concrete `Steps.*` values it reads, used in the same way.
+  given the concrete `Steps.*` values it reads, used in the same way. The `Raw` symbols are typed like the others,
+  and `PATH` values of `Steps.*.Output` and `TaskParam` are passed to the session marked as paths, so that it maps
+  them forward in host-scope format strings as it does `PATH` job parameters.
 - **Rust (openjd-rs)**: The same model changes. Two existing behaviors change under the extension: a computed range
   may be empty, and the 1024-element cap that `crates/openjd-model/src/job/create_job/ranges.rs` applies to computed list ranges
   (`max_task_param_range_len`) applies only to YAML list literals, with a scheduler-supplied Task count limit taking
@@ -2211,6 +2239,7 @@ other than the current one without overloading `Step`.
   applies its path mapping rules in reverse, which needs the rules' source and destination paths it already holds.
 - **CLI (`openjd run`)**: Runs Steps in dependency order already, so it binds each Step just before running it, passes
   the collected values in, and prints each Task's outputs, with their units, and each job output as soon as it is
+  evaluated. When it runs only some Steps (`--step`), a job output that reads a Step it doesn't run is reported as not
   evaluated. `openjd summary` reports a Step that would need binding as
   having a Task count determined at run time.
 - **Schedulers**: The largest work: storing committed output values for the life of the Job, evaluating job outputs as
@@ -2357,15 +2386,16 @@ and for the emission channel, collect modes, and metrics in [§8](../docs/contro
 1. **Emission channel.** The `openjd_output_var:` stdout directive, with `@<FilePath>` for large values, read as soon
    as the directive is read. Is a 64 KiB floor for a directive line right, and is limiting `@` paths to the Session's
    Working Directory too strict for any runtime?
-2. **Namespace.** `Steps.<Name>.Output.<Var>` and `Steps.<Name>.TaskParam.<Param>`, with referenced Steps required to
+2. **Namespace.** `Steps.<Name>.Output.<Var>` and `Steps.<Name>.TaskParam.<Param>`, and their unmapped forms
+   `RawOutput` and `TaskRawParam`, with referenced Steps required to
    have `<Identifier>` names. Alternative: drop `.Output` and reserve a short list of property names.
 3. **Direct dependents only.** Adopted.
 4. **Output shape.** Scalar for a producer without `parameterSpace`, a list in iteration order otherwise; reductions
    are ordinary EXPR.
 5. **Correlating a reduced value with its Task.** `Steps.*.TaskParam` lists now, and a separate RFC 0006 addendum for
    `argmin`/`argmax`, or a list `index`, or `zip`. Which is preferred?
-6. **Fields that may reference outputs.** The materialization expressions plus host-scope script fields; not
-   `combination`, job-level fields, or Environment Templates.
+6. **Fields that may reference outputs.** The materialization expressions plus host-scope script fields, and job
+   output *value*s, which may read any Step; not `combination`, other job-level fields, or Environment Templates.
 7. **Emission rules.** Only a Task's `onRun`; a directive anywhere else cancels and fails its Action; `collect: ONCE` by
    default, with `LAST` and `APPEND` declared; missing, malformed, undeclared, mistyped, repeated `ONCE`, or
    out-of-constraint values fail the Task, and an invalid directive cancels the Action at once; failed attempts commit
