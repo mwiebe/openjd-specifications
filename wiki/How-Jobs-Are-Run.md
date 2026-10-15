@@ -262,6 +262,6 @@ With the CONTROL_FLOW extension, a **PATH** value that a Task reports as an outp
 direction before it is stored, giving the value in the submission path context, the form in which **PATH** Job
 Parameters are given; the stored value must map forward with the same rules back to the reported path. It is then
 mapped forward, as a **PATH** parameter is, in each **Session** that reads it. A value for which no such form can be
-found is invalid when the **Session** has rules, and is kept as it is when the **Session** has none. A relative path
-is invalid. See the
+found is invalid when the **Session** has rules, and is kept as it is when the **Session** has none. A URI is stored
+unchanged, and a relative path is invalid. See the
 [Template Schemas](2023-09-Template-Schemas#371-reporting-output-values).
