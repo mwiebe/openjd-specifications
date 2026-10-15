@@ -930,8 +930,8 @@ Where:
 8. *parameterSpace* — Defines the parameterization of the Step's action; the available parameters, the values that they
    take on, and how those parameters' values are combined to produce the Tasks of the Step. Absent this property the Step
    is run a single time.
-9. *outputVariables* — `@extension CONTROL_FLOW`. The output variables that every Task of the Step writes to its output
-   file, `Task.OutputFile`. See: [&lt;OutputVariableDefinition&gt;](#37-outputvariabledefinition-extension-control_flow).
+9. *outputVariables* — `@extension CONTROL_FLOW`. The output variables that every Task of the Step reports with
+   `openjd_output_var:` directives. See: [&lt;OutputVariableDefinition&gt;](#37-outputvariabledefinition-extension-control_flow).
     * Minimum number of elements: If provided, then this list must contain at least one element.
     * Maximum number of elements: 32.
     * No two elements in this list may have the same value for the `name` property.
@@ -1470,8 +1470,8 @@ The format string scopes available to format strings within a `<StepScript>` are
 2. `Session.*` — Values such as the Session's working directory.
 3. `Task.*` — Values of embedded file locations defined within the `<StepScript>`, and Task Parameters.
 4. Names bound by `let` in the enclosing `<StepTemplate>` and `<StepScript>`. Available with the `EXPR` extension.
-5. `Steps.*` — Output variables and Task parameter values of the Step's direct dependencies, and `Task.OutputFile` in
-   a Step that declares *outputVariables*. Available with the `CONTROL_FLOW` extension.
+5. `Steps.*` — Output variables and Task parameter values of the Step's direct dependencies. Available with the
+   `CONTROL_FLOW` extension.
    See [Value References](#731-value-references).
 
 #### 3.5.1. `<StepActions>`
@@ -1555,9 +1555,8 @@ Note: `Task.Param.*` and `Task.RawParam.*` are only available in `<StepScript>` 
 values are not known until task execution time.
 
 Note: With the `CONTROL_FLOW` extension, `<StepTemplate>.let`, `<StepScript>.let`, and `<SimpleAction>.let` may also
-reference the `Steps.*` values of the Step's direct dependencies, and `<StepScript>.let` and `<SimpleAction>.let` may
-reference `Task.OutputFile` in a Step that declares `outputVariables`. A `<StepTemplate>.let` that references `Steps.*`
-is evaluated at step input binding.
+reference the `Steps.*` values of the Step's direct dependencies. A `<StepTemplate>.let` that references `Steps.*` is
+evaluated at step input binding.
 
 Note: `Task.File.*` symbols in `<StepScript>.let` and `Env.File.*` symbols in `<EnvironmentScript>.let` refer to
 embedded files defined in the same script. The file path is determined before evaluation, so `let` bindings can
@@ -1571,15 +1570,18 @@ no enclosing Step exists.
 
 ### 3.7. `<OutputVariableDefinition>` `@extension CONTROL_FLOW`
 
-Defines a value that every Task of a Step writes to its output file, for the Steps that depend on it to read. Introduced
-in [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md) (draft).
+Defines a value that every Task of a Step reports, for the Steps that depend on it to read and for the render
+management system to store and display. A metric, such as an error score or a frame rate, is an output variable that
+no Step reads. Introduced in [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md) (draft).
 
 An `<OutputVariableDefinition>` is the object:
 
 ```yaml
 name: <Identifier>
 type: <OutputVariableType>
+collect: <OutputCollectMode> # @optional
 description: <Description> # @optional
+unit: <OutputVariableUnit> # @optional
 # @optional constraint properties: see the table below.
 ```
 
@@ -1587,13 +1589,14 @@ description: <Description> # @optional
 <OutputVariableType> ::= "INT" | "FLOAT" | "STRING" | "BOOL" | "RANGE_EXPR" |
                          "LIST[INT]" | "LIST[FLOAT]" | "LIST[STRING]" | "LIST[BOOL]" |
                          "LIST[LIST[INT]]"
+<OutputCollectMode>  ::= "ONCE" | "LAST" | "APPEND"
 ```
 
 Where:
 
-1. *name* — The name by which the value is written to the output file and referenced as
+1. *name* — The name by which the value is reported in an `openjd_output_var:` directive and referenced as
    `Steps.<StepName>.Output.<name>`. See: [&lt;Identifier&gt;](#71-identifier).
-2. *type* — The type of the value each Task writes. Type names are case-insensitive. Each type maps to the expression
+2. *type* — The type of the value each Task reports. Type names are case-insensitive. Each type maps to the expression
    type of the job parameter type of the same name, and accepts that job parameter definition's constraint properties
    with the same meaning:
 
@@ -1610,54 +1613,86 @@ Where:
    | `LIST[BOOL]` | `list[bool]` | [§2.15](#215-joblistboolparameterdefinition-extension-expr): `minLength`, `maxLength` |
    | `LIST[LIST[INT]]` | `list[list[int]]` | [§2.16](#216-joblistlistintparameterdefinition-extension-expr): `minLength`, `maxLength`, `item` |
 
-3. *description* — A description of the value. It has no functional purpose, but may appear in UI elements.
+3. *collect* — How the directives a Task prints for this output become the Task's value. Default `ONCE`.
+    1. `ONCE` — Exactly one directive. A second directive, or none, fails the Task.
+    2. `LAST` — One or more directives. The last one is the value. None fails the Task.
+    3. `APPEND` — Zero or more directives. The *type* must be a `LIST[...]` type, each directive supplies one element,
+       and the value is the list of elements in the order the directives were read. With none, the value is `[]`.
+4. *description* — A description of the value. It has no functional purpose, but may appear in UI elements.
    See: [&lt;Description&gt;](#72-description).
-4. Constraint properties — Checked against each Task's value when the Task's output file is read. A value that
-   violates one fails the Task. The `default` and `userInterface` properties of job parameter definitions are not
-   available.
+5. *unit* — The unit of the values, such as `mm`, `%`, or `frames/s`, for display. It has no functional purpose, and
+   values are not converted. Allowed characters: any Unicode character except those in the Cc category. Length: 1 to
+   32 characters.
+6. Constraint properties — Checked against each value as the Task reports it, so under `collect: LAST` every reported
+   value must satisfy them. A value that violates one fails the Task. For `collect: APPEND`, `item` constraints and
+   `maxLength` are checked as each element is reported, and `minLength` when the Task's action exits. Only the
+   properties the definition declares are checked: a default implied by a job parameter definition, such as the
+   1024-character `maxLength` of a `RANGE_EXPR` parameter, does not apply. The `default` and `userInterface`
+   properties of job parameter definitions are not available.
 
 Constraints:
 
 1. `LIST[LIST[INT]]` may only be declared by a Step without a *parameterSpace*.
 2. A constraint property must be valid for the declared type, with the same rules as on the job parameter definition
    of that type.
+3. `collect: APPEND` requires a `LIST[...]` *type*.
 
 `PATH` and `LIST[PATH]` outputs are not available.
 
-#### 3.7.1. The output file
+#### 3.7.1. Reporting output values
 
-Before each attempt to run the `onRun` action of a Task of a Step that declares *outputVariables*, the runtime creates
-an empty file and makes its absolute path available as the template value `Task.OutputFile` and as the environment
-variable `OPENJD_TASK_OUTPUT_FILE`. The action appends a `<Name>=<JSON>` line for each output variable:
+A Task reports a value by printing one of these lines to stdout or stderr from its `onRun` action (see
+[How Jobs Are Run](How-Jobs-Are-Run#stdoutstderr-messages)):
+
+```
+openjd_output_var: <Name>=<JSON>
+openjd_output_var: <Name>=@<FilePath>
+```
 
 ```bnf
-<OutputFile> ::= <BOM>? ( <Line> <EOL> )* <Line>?
-<Line>       ::= <OutputLine> | <WS>*
-<OutputLine> ::= <Identifier> "=" <WS>* <JSON> <WS>*
-<EOL>        ::= "\n" | "\r\n"
-<WS>         ::= " " | "\t"
-<BOM>        ::= U+FEFF        ; a leading byte order mark is ignored
+<Directive> ::= <WS>* <Identifier> "=" <WS>* ( <JSON> | "@" <FilePath> ) <WS>*
+<WS>        ::= " " | "\t"
 ```
 
-Where `<JSON>` is one JSON value containing no line break. Names are case-sensitive. The file is UTF-8. For
-example:
+Where `<JSON>` is one JSON value on the rest of the line (`NaN` and `Infinity` are not JSON, and the line must be valid
+UTF-8), and `<FilePath>` is the
+rest of the line after `@`, with trailing spaces and tabs removed. The line terminator is not part of the directive. Names
+are case-sensitive. For example:
 
 ```bash
-echo "FrameCount=$count" >> {{repr_sh(Task.OutputFile)}}
+echo "openjd_output_var: FrameCount=$count"
+echo "openjd_output_var: Keys=@keys.json"
 ```
 
-After the action exits successfully, the runtime reads the file. Each JSON value is given its natural expression type
-(a number without a fraction or exponent that fits in a signed 64-bit integer is an `int`; any other number a `float`; a string a `string`;
-`true`/`false` a `bool`; an array a list) and is converted to the declared type with the
-[implicit type coercion](2026-02-Expression-Language#123-implicit-type-coercion) rules of the Expression Language. If
-a variable has more than one line, the last one is used. `null` and objects are not accepted anywhere in a value. The Task fails if the file is not valid UTF-8 or contains
-NUL; a line is malformed; a line names an undeclared variable; a value is `null`, an object, or does not convert to
-the declared type; a value violates a constraint property; a declared variable has no line; or the file exceeds the
-runtime's size limit, which must be at least 1 MiB. If the action fails, the file is discarded and the attempt has no
-outputs.
+A relative `<FilePath>` is resolved against the Session's Working Directory; an absolute one is used as written. Either
+way, the file the runtime opens must be a regular file inside the Session's Working Directory, after following symbolic links, and the runtime must read it
+with no more access than the user that runs the action. The file holds exactly
+one UTF-8 JSON value, which may span lines and be preceded by a byte order mark. The runtime does not modify or delete
+the file. The runtime reads the file when it reads the directive, so the action must finish writing the file before it
+prints the directive.
 
-Output values are retained by the scheduler for the life of the Job and may be displayed. They are not redacted and
-must not be used to pass secrets.
+The runtime processes each directive as it reads it. Each JSON value is given its natural expression type (a number
+without a fraction or exponent that fits in a signed 64-bit integer is an `int`; any other number a `float`; a string
+a `string`; `true`/`false` a `bool`; an array a list) and is converted to the declared type, or for `collect: APPEND`
+to its element type, with the [implicit type coercion](2026-02-Expression-Language#123-implicit-type-coercion) rules of
+the Expression Language. `null` and objects are not accepted anywhere in a value.
+
+A directive is invalid, and fails the action it is attributed to, if it: does not match the grammar or is not valid
+JSON; names an undeclared output; has a value that is `null`, an object, or does not convert; violates a constraint
+property; repeats a `collect: ONCE` output; names a file that is not a regular file inside the Session's Working
+Directory, is unreadable, or is not UTF-8, contains NUL, or is not exactly one JSON value; is on a line that is not
+valid UTF-8; is longer than the runtime's line limit, which must be at least 64 KiB (an over-long directive is never
+truncated and parsed); or takes the size of the values the Task holds over the runtime's limit, which must be at least 1
+MiB. The Task also fails if, when the action exits, a `ONCE` or `LAST` output has no value or an `APPEND` output has
+fewer elements than its *minLength*. In a Job that lists `CONTROL_FLOW`, a directive printed by any action of the Job
+Template other than the `onRun` of a Task of a Step that declares *outputVariables* fails that action. Under
+`WRAP_ACTIONS`, a line from a wrap hook counts as output of the action it runs in place of, so `onWrapTaskRun` reports
+the Task's outputs whichever template defines it. For an action of an Environment Template, a directive is ordinary
+output. If the attempt fails for any reason, it has no outputs.
+
+The values are committed when the Task succeeds, and are retained by the render management system for the life of the
+Job. They may be forwarded as soon as they are reported, and displayed before then if marked as not yet committed. They are not redacted and must not be used to
+pass secrets.
 
 ## 4. `<Environment>`
 
@@ -2202,7 +2237,6 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Session.PathMappingRulesFile`|This is a string whose value is the location of a JSON file on the worker node's local disk that contains the path mapping rule substitutions for the Session.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Steps.<StepName>.Output.<VarName>`|The value of output variable `<VarName>` of Step `<StepName>`. If the Step has no *parameterSpace* its type is the declared type `T`; otherwise it is `list[T]`, one element per Task in parameter-space iteration order. If the Step has an *enableIf*, the type is optional (`T?` or `list[T]?`) and the value is `null` when the Step was skipped. `<StepName>` must be an `<Identifier>`. Requires the `CONTROL_FLOW` extension.|Available in the Step Template scope (*enableIf*, *let*, *hostRequirements*, *parameterSpace* ranges, *stepEnvironments*, *script*) of a Step that lists `<StepName>` directly in its *dependencies*. Not available in *combination*, job-level fields, or Environment Templates.|
 |`Steps.<StepName>.TaskParam.<ParamName>`|A `list` of the values of Task parameter `<ParamName>` for every Task of Step `<StepName>`, in parameter-space iteration order, aligned element-for-element with the Step's `Output` lists. The element type is the Task parameter's type (`int` for `CHUNK[INT]`). Optional, and `null` when skipped, if the Step has an *enableIf*. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.Output.*`. For a `PATH` Task parameter, only in format strings annotated `@fmtstring[host]`, with path mapping rules applied.|
-|`Task.OutputFile`|The location of the current Task's output file, as a `path`. See [The output file](#371-the-output-file). Requires the `CONTROL_FLOW` extension.|Available within the Step Script Actions, Embedded Files, and `let` bindings of a Step that declares *outputVariables*.|
 |`<name>` (let binding)|Names bound by `let` in `<StepTemplate>`, `<StepScript>`, `<SimpleAction>`, or `<EnvironmentScript>`. Names must start with a lowercase letter or underscore (see `<UserIdentifier>`). The type is determined by the expression. Available with the `EXPR` extension.|See [Let Binding Scope Summary](#362-let-binding-scope-summary) for detailed scoping rules.|
 
 ### 7.4. Template Processing Stages
@@ -2212,10 +2246,10 @@ different sets of values are known, which determines which format strings can be
 
 | Stage | When | Known Values | Unknown Values | What Happens |
 |-------|------|-------------|----------------|--------------|
-| **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Steps.*` and `Task.OutputFile` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `CONTROL_FLOW` extension: `Steps.*` values are available as `unresolved` values of the types derived from the producing Steps' *outputVariables* and Task parameters, and references to them are checked against the referencing Step's *dependencies*. |
-| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Task.OutputFile` and the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension: an *enableIf* that references no `Steps.*` is evaluated, and a Step whose materialization expressions reference a `Steps.*` value that is not yet concrete is not evaluated here but waits for step input binding. |
+| **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Steps.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `CONTROL_FLOW` extension: `Steps.*` values are available as `unresolved` values of the types derived from the producing Steps' *outputVariables* and Task parameters, and references to them are checked against the referencing Step's *dependencies*. |
+| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension: an *enableIf* that references no `Steps.*` is evaluated, and a Step whose materialization expressions reference a `Steps.*` value that is not yet concrete is not evaluated here but waits for step input binding. |
 | **Step input binding** (`CONTROL_FLOW` only) | Once per Step whose materialization expressions reference `Steps.*`, when every referenced `Steps.*` value is concrete | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The Step's materialization expressions (its format strings not annotated `@fmtstring[host]`: *enableIf*, *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, and *script*) are evaluated in that order. If *enableIf* is `false` the Step is skipped and nothing after it is evaluated. If any evaluation fails, or the Task count exceeds the implementation's limit, the Step fails before any of its Tasks runs. Until it is bound the Step is pending inputs. |
-| **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. With the `CONTROL_FLOW` extension: the `Steps.*` values of the Step's direct dependencies are concrete, and the output file is created before `onRun` and read after it succeeds. |
+| **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. With the `CONTROL_FLOW` extension: the `Steps.*` values of the Step's direct dependencies are concrete, and the `openjd_output_var:` directives that `onRun` prints are processed as they are printed (see [3.7.1](#371-reporting-output-values)). |
 
 The `@fmtstring` and `@fmtstring[host]` annotations in this specification indicate which stage
 a format string is resolved in. A format string annotated `@fmtstring` (without `[host]`) is
