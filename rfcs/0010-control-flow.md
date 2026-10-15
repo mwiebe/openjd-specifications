@@ -1401,8 +1401,9 @@ openjd_output_var: <Name>=@<FilePath>
 The runtime recognizes the directive the way it recognizes the other messages of How Jobs Are Run: a line that begins
 with `openjd_output_var:`. It is recognized only in a Session running a Job whose Job Template lists `CONTROL_FLOW`. In
 any other Session the line is ordinary output, as it is today, and so it is for an Action of an Environment Template
-(see below). Like the other messages, the line appears in the Action's log by default; a runtime that offers an
-option to hide recognized messages from the log applies it to this one too.
+(see below). Like the other messages, the line appears in the Action's log by default. A runtime that offers an
+option to hide recognized messages from the log may hide a valid directive too, but an invalid directive always stays
+in the log, with the error, so that the cause of the failure can be seen.
 
 The text after `openjd_output_var:` has the grammar:
 
@@ -1786,23 +1787,16 @@ fails is `FAILED`, which, like any failed Step, does not satisfy `dependsOn`.
 
 > A modification to [Stdout/Stderr Messages](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#stdoutstderr-messages)
 
-Add a sentence after the introduction of the list of special messages, stating what implementations already do for
-all of them:
-
-> These lines appear in the **Action**'s output log like any other line. An application may offer an option to hide
-> well-formed recognized messages from the log, which then applies to all of them; a message that is rejected as
-> malformed or invalid stays in the log, so the cause of the failure can be seen.
-
 Add the following item to the list of special messages:
 
 * `openjd_output_var: <name>=<json>` or `openjd_output_var: <name>=@<path>` where `<name>` is the name of an output
   variable that the Step declares, `<json>` is a JSON value on one line, and `<path>` names a file inside the
   **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
-  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@`
-  file as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template,
-  cancels the **Action** at once and fails it. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
-  of. Requires the CONTROL_FLOW extension; without it, and for **Actions** of an Environment Template, the line is
-  ordinary output. See [Output emission](#output-emission).
+  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@` file
+  as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template, cancels
+  the **Action** at once and fails it, and stays in the log with the error. Under WRAP_ACTIONS, a line from a wrap hook
+  counts as output of the **Action** it runs in place of. Requires the CONTROL_FLOW extension; without it, and for
+  **Actions** of an Environment Template, the line is ordinary output. See [Output emission](#output-emission).
 
 No environment variable is added.
 
@@ -2100,10 +2094,10 @@ and for the emission channel, collect modes, and metrics in [§8](../docs/contro
    `argmin`/`argmax`, or a list `index`, or `zip`. Which is preferred?
 6. **Fields that may reference outputs.** The materialization expressions plus host-scope script fields; not
    `combination`, job-level fields, or Environment Templates.
-7. **Emission rules.** Only a Task's `onRun`; a directive anywhere else cancels and fails its Action; `collect: ONCE` by default,
-   with `LAST` and `APPEND` declared; missing, malformed, undeclared, mistyped, repeated `ONCE`, or out-of-constraint
-   values fail the Task, and an invalid directive cancels the Action at once; failed attempts commit nothing; outputs
-   are not secrets. Does anyone need outputs from an Environment's `onEnter`?
+7. **Emission rules.** Only a Task's `onRun`; a directive anywhere else cancels and fails its Action; `collect: ONCE` by
+   default, with `LAST` and `APPEND` declared; missing, malformed, undeclared, mistyped, repeated `ONCE`, or
+   out-of-constraint values fail the Task, and an invalid directive cancels the Action at once; failed attempts commit
+   nothing; outputs are not secrets. Does anyone need outputs from an Environment's `onEnter`?
 8. **Chunked producers.** Deferred; coordinate the format with #169.
 9. **Limits.** At least 1 MiB per Task, constraints checked at the producer, an optional scheduler Task-count limit
    checked at binding. Is 1 MiB the right floor?

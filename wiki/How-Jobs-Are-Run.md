@@ -163,10 +163,7 @@ filesystems `"movie-A"`, `"shared-assets"`, and `"software"` all mounted.
 
 Open Job Description defines some special messages that can be emitted on stdout or stderr as a single line by an
 **Action** when it is running within a **Session**. The application that is running the **Action** may intercept these
-messages to convey information about the **Action** to the render management system. These lines appear in the
-**Action**'s output log like any other line. An application may offer an option to hide well-formed recognized messages
-from the log, which then applies to all of them; a message that is rejected as malformed or invalid stays in the log, so
-the cause of the failure can be seen. These special lines contain one of:
+messages to convey information about the **Action** to the render management system. These special lines contain one of:
 
 * `openjd_progress: <number>` where `<number>` is a percentile between 0 and 100 that indicates what the progress of
   the **Action** is.
@@ -187,12 +184,12 @@ the cause of the failure can be seen. These special lines contain one of:
 * `openjd_output_var: <name>=<json>` or `openjd_output_var: <name>=@<path>` where `<name>` is the name of an output
   variable that the Step declares, `<json>` is a JSON value on one line, and `<path>` names a file inside the
   **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
-  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@`
-  file as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template,
-  cancels the **Action** at once and fails it. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
-  of. Requires the CONTROL_FLOW extension; without it, and for **Actions** of an Environment Template, the line is
-  ordinary output. See
-  [Reporting output values](2023-09-Template-Schemas#371-reporting-output-values).
+  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@` file
+  as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template, cancels
+  the **Action** at once and fails it, and stays in the log with the error. Under WRAP_ACTIONS, a line from a wrap hook
+  counts as output of the **Action** it runs in place of. Requires the CONTROL_FLOW extension; without it, and for
+  **Actions** of an Environment Template, the line is ordinary output. See [Reporting output
+  values](2023-09-Template-Schemas#371-reporting-output-values).
 
 When the WRAP_ACTIONS extension is in use, schedulers must scan the stdout of the wrap script (`onWrapEnvEnter`,
 `onWrapTaskRun`, or `onWrapEnvExit`) for these macros, not the stdout of the wrapped process. Wrap scripts must
