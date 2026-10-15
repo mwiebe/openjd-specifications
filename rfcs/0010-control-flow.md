@@ -1790,7 +1790,8 @@ Add a sentence after the introduction of the list of special messages, stating w
 all of them:
 
 > These lines appear in the **Action**'s output log like any other line. An application may offer an option to hide
-> recognized messages from the log, which then applies to all of them.
+> well-formed recognized messages from the log, which then applies to all of them; a message that is rejected as
+> malformed or invalid stays in the log, so the cause of the failure can be seen.
 
 Add the following item to the list of special messages:
 
