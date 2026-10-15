@@ -86,6 +86,7 @@ The following environment variables are automatically set for all **Actions** ru
 | **Environment Variable** | **Value** | **Corresponding Template Variable** |
 |---|---|---|
 | `OPENJD_SESSION_WORKING_DIR` | The absolute path to the **Session**'s **Working Directory**. | `Session.WorkingDirectory` |
+| `OPENJD_TASK_OUTPUT_FILE` | The absolute path to the current Task's output file. Set only for the `onRun` action of a Task of a Step that declares `outputVariables` (CONTROL_FLOW extension). | `Task.OutputFile` |
 
 These environment variables are provided for nested subprocesses that cannot access Open Job Description template
 variables directly. Unlike template variables, environment variables are automatically inherited by child processes.
@@ -93,6 +94,47 @@ variables directly. Unlike template variables, environment variables are automat
 As a rule of thumb, OpenJD favors template variables over environment variables. When jobs use template substitution, tools can look at the template and accurately determine data flow to understand and modify the template. When jobs use environment variables, there is no reliable way to do this. We use the Tooling parseable design tenet to guide choices like this.
 
 The `OPENJD_SESSION_WORKING_DIR` environment variable is an example of this consideration in practice. Unlike other template variables, the session working directory is already accessible without using a variable; session actions start their CWD set to the session working directory. This is the same value as the {{Session.WorkingDirectory}} template variable, so exposing it as an environment variable does not reduce the tooling parseability of Job Templates. Any future environment variable additions should be intentionally considered with the design tenets in mind rather than assumed to follow this precedent.
+
+`OPENJD_TASK_OUTPUT_FILE` was added with this consideration. A Step's data flow is declared in its `outputVariables`,
+whichever way a script reaches the output file, so the variable does not reduce the tooling parseability of Job
+Templates. It exists for nested subprocesses, such as an adaptor, that cannot see template variables.
+
+## Step States and Step Input Binding
+
+Without the CONTROL_FLOW extension (introduced in [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md), draft), every Step's Tasks are known when the Job is
+created, and a Step's Tasks are scheduled once the Steps it depends on have completed successfully.
+
+With CONTROL_FLOW, a Step may compute its parameter space, its host requirements, its `let` bindings, its Step
+Environments, or whether it runs at all (`enableIf`) from the output variables of the Steps it depends on. Those values
+don't exist until the producing Steps have run, so such a Step is **pending inputs** (`PENDING_INPUTS`) from Job
+creation until they do. While it is pending inputs its Tasks are not known and none of them can be scheduled. A
+scheduler or tool that shows a pending Step should report its Task count as not yet known and name the output
+variables it is waiting for.
+
+When every value the Step's expressions reference is available, the scheduler performs **step input binding**: it
+evaluates the Step's `enableIf`, `let`, `hostRequirements`, parameter space, Step Environments, and any other of its
+fields that are resolved before its Tasks run, in that order, as a unit. The Step then becomes one of:
+
+* **Ready** — Its Tasks are now known and are scheduled as they are today, once its dependencies are satisfied. A
+  Step whose computed parameter space is empty has zero Tasks and completes successfully once its dependencies are
+  satisfied.
+* **Skipped** — Its `enableIf` was `false`. It runs nothing, and its output variables are `null` to the Steps that
+  read them. A Step whose `enableIf` reads only Job Parameters is decided at Job creation instead.
+* **Failed** — An expression failed, or its Task count exceeded the scheduler's limit. None of its Tasks runs.
+
+A skipped Step, and a Step that completed with zero Tasks, satisfies the dependencies of the Steps that depend on it
+once its own dependencies are satisfied, so skipping a Step never lets later work start before the work ordered ahead
+of it. A failed Step does not satisfy dependencies, and a pending Step whose producer fails never runs, as with any
+dependency on a failed Step today.
+
+A scheduler may create a pending Step's Tasks only when it is bound, or create the Step at submission and fill in its
+Tasks when it is bound. The two are equivalent to a Job's author.
+
+Each Task of a Step that declares `outputVariables` writes its values to an output file, whose path is the template
+variable `Task.OutputFile` and the environment variable `OPENJD_TASK_OUTPUT_FILE`. The runtime reads and validates the
+file when the Task's `onRun` action succeeds, and the scheduler keeps the values for the life of the Job. Output
+values are never read from stdout. See the [Template Schemas](2023-09-Template-Schemas#371-the-output-file) for the
+file format.
 
 
 ## Host Requirements
