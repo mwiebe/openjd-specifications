@@ -186,7 +186,7 @@ messages to convey information about the **Action** to the render management sys
   **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
   **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@`
   file as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template,
-  fails the **Action**. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
+  cancels the **Action** at once and fails it. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
   of. Requires the CONTROL_FLOW extension; without it, and for **Actions** of an Environment Template, the line is
   ordinary output. See
   [Reporting output values](2023-09-Template-Schemas#371-reporting-output-values).
