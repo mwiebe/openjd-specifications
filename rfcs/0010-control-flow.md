@@ -1401,8 +1401,8 @@ openjd_output_var: <Name>=@<FilePath>
 The runtime recognizes the directive the way it recognizes the other messages of How Jobs Are Run: a line that begins
 with `openjd_output_var:`. It is recognized only in a Session running a Job whose Job Template lists `CONTROL_FLOW`. In
 any other Session the line is ordinary output, as it is today, and so it is for an Action of an Environment Template
-(see below). Like the other messages, the line is passed through
-to the Action's log unchanged.
+(see below). Like the other messages, the line appears in the Action's log by default; a runtime that offers an
+option to hide recognized messages from the log applies it to this one too.
 
 The text after `openjd_output_var:` has the grammar:
 
@@ -1511,11 +1511,12 @@ The runtime processes each directive when it reads the line:
    constraints on the new element and that the list does not exceed `maxLength`.
 6. It updates the Task's value and its size (see [Limits](#limits)).
 
-A directive that fails any of these checks is **invalid**. An invalid directive fails the Action it is attributed to
-(for a Task's `onRun`, the Task's attempt), with a
-message that names the output, the problem, and the offending text. The runtime MUST NOT ignore an invalid directive.
-It MAY cancel the Action as soon as it finds one, and otherwise fails the Action when it exits, whatever the exit
-code. Specifically, a directive is invalid if:
+A directive that fails any of these checks is **invalid**. The runtime MUST NOT ignore an invalid directive. As soon
+as it finds one, it MUST cancel the Action it is attributed to and fail it (for a Task's `onRun`, the Task's
+attempt), whatever the exit code, with a message that names the output, the problem, and the offending text.
+Cancelling at once avoids spending the rest of the run on an attempt that can't succeed, and makes the outcome the
+same in every runtime. The cancel is the Action's normal cancelation, including its notify period. Specifically, a
+directive is invalid if:
 
 1. the text after `openjd_output_var:` does not match the grammar, or `<JSON>` is not valid JSON;
 2. it names an output that the Step does not declare;
@@ -1792,7 +1793,7 @@ Add the following item to the list of special messages:
   **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
   **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@`
   file as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template,
-  fails the **Action**. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
+  cancels the **Action** at once and fails it. Under WRAP_ACTIONS, a line from a wrap hook counts as output of the **Action** it runs in place
   of. Requires the CONTROL_FLOW extension; without it, and for **Actions** of an Environment Template, the line is
   ordinary output. See [Output emission](#output-emission).
 
@@ -1983,6 +1984,12 @@ Reading every `@` file after `onRun` exits would let a script print the directiv
 because it delays every file value until the Task ends, so a runtime could neither validate nor forward it promptly,
 and because it would make the value depend on whatever the file held at exit rather than when it was reported.
 
+### Failing an invalid directive when the Action exits
+
+Letting the Action run to the end and failing it then would let a long render finish after its outputs were already
+known to be unusable. Rejected: the runtime cancels at once, which saves the rest of the run and makes the outcome the
+same in every runtime.
+
 ### A separate `TASK_METRICS` extension with an `openjd_metric:` directive
 
 Proposed before this RFC for per-Task measurements: numbers only, an optional declaration, last value wins, and
@@ -2088,9 +2095,8 @@ and for the emission channel, collect modes, and metrics in [§8](../docs/contro
    `combination`, job-level fields, or Environment Templates.
 7. **Emission rules.** Only a Task's `onRun`; a directive anywhere else fails its Action; `collect: ONCE` by default,
    with `LAST` and `APPEND` declared; missing, malformed, undeclared, mistyped, repeated `ONCE`, or out-of-constraint
-   values fail the Task; failed attempts commit nothing; outputs are not secrets. Should a runtime be required to
-   cancel the Action as soon as it finds an invalid directive, rather than allowed to? Does anyone need outputs from an
-   Environment's `onEnter`?
+   values fail the Task, and an invalid directive cancels the Action at once; failed attempts commit nothing; outputs
+   are not secrets. Does anyone need outputs from an Environment's `onEnter`?
 8. **Chunked producers.** Deferred; coordinate the format with #169.
 9. **Limits.** At least 1 MiB per Task, constraints checked at the producer, an optional scheduler Task-count limit
    checked at binding. Is 1 MiB the right floor?
