@@ -1,0 +1,1800 @@
+* Feature Name: control_flow
+* Author(s): Mark Wiebe <[mwiebe](https://github.com/mwiebe)>
+* RFC Tracking Issue: (pending). The number `0010` is a placeholder assigned before a tracking issue exists, and may
+  change when one is created.
+* Start Date: 2026-10-15
+* Specification Version: 2023-09 extension CONTROL_FLOW
+* Accepted On: (pending)
+* Depends On:
+  * RFC 0002, Model Extensions (https://github.com/OpenJobDescription/openjd-specifications/issues/57)
+  * RFC 0005, Expression Language (EXPR) (https://github.com/OpenJobDescription/openjd-specifications/issues/112)
+  * RFC 0006, Expression Function Library
+  * RFC 0007, Extended Parameter Types
+* Related:
+  * Discussion #111, variable data flow along step dependencies, the seed idea for this RFC
+    (https://github.com/OpenJobDescription/openjd-specifications/discussions/111)
+  * Discussion #81, `enableIf` to include or exclude parts of a template
+    (https://github.com/OpenJobDescription/openjd-specifications/discussions/81)
+  * Discussion #82, task-task dependencies (https://github.com/OpenJobDescription/openjd-specifications/discussions/82),
+    proposed here as a separate `TASK_DEPENDENCIES` extension
+  * Discussion #22, immutability vs. dynamic adjustments
+    (https://github.com/OpenJobDescription/openjd-specifications/discussions/22)
+  * Investigation notes behind this draft: [`docs/control-flow-investigation/`](../docs/control-flow-investigation/)
+
+> **Draft status.** This is the first draft. Blocks marked **TODO** are parts of the design space that this draft
+> deliberately defers (see [Future Work](#future-work)); each states what is missing and why it can wait. The
+> [Open Questions](#open-questions) section lists the decisions to confirm on discussion #111 before this RFC
+> leaves draft.
+
+## Summary
+
+Open Job Description Jobs have a structure that is fixed when the Job is created: every Step's Tasks are enumerated
+from Job Parameters at submission. Many real pipelines need part of that structure to come from data produced while
+the Job runs: how many frames a video has, which objects are under an S3 prefix, which configuration won a parameter
+sweep, or whether a quality check found a problem. Today that data reaches a Job only through a pre-submission script,
+which job bundle submitters cannot run, or through files and conventions that no scheduler or tool can see.
+
+This RFC proposes a `CONTROL_FLOW` extension that lets a Step declare typed **output variables**, lets a Task report
+them through a session-supplied **output file**, and lets the Steps that depend on it use those values in EXPR
+expressions through a new `Steps.<Name>.Output.<Var>` symbol class. With those values a dependent Step can compute
+its parameter space (**dynamic fan-out**), decide whether it runs at all (**conditional execution** with `enableIf`),
+and reduce the values of every Task of a multi-Task Step (**fan-in**) with the existing EXPR function library. The
+Job's Steps and their dependencies stay fixed and are validated before submission; only Task counts, Task parameter
+values, and enablement are late-bound, in one new evaluation stage called **step input binding**.
+
+## Overview
+
+### What CONTROL_FLOW adds
+
+The `CONTROL_FLOW` extension adds the following, each specified in the section linked:
+
+* **Declaring outputs.** An `outputVariables` list on `<StepTemplate>`, typed with the job parameter type vocabulary
+  and constrained with the same properties: [`<OutputVariableDefinition>`](#outputvariabledefinition).
+* **Writing outputs.** A per-Task output file, `Task.OutputFile` / `OPENJD_TASK_OUTPUT_FILE`, with a strict
+  `<Name>=<JSON>` line grammar, read and validated when the Task's `onRun` succeeds:
+  [Output emission](#output-emission).
+* **Reading outputs.** The `Steps.<StepName>.Output.<VarName>` and `Steps.<StepName>.TaskParam.<ParamName>` symbols,
+  available in Steps that depend directly on the producer: [The `Steps.*` scope](#the-steps-scope).
+* **Late-bound structure.** Parameter-space ranges, step `let` bindings, host requirements, and Step Environment
+  fields that reference `Steps.*` are evaluated at a new stage, step input binding, while the Step waits in a new
+  `PENDING_INPUTS` state: [Step input binding](#step-input-binding).
+* **Conditional execution.** An `enableIf` predicate on Steps and Environments, decided at Job creation or at step
+  input binding. A disabled Step is `SKIPPED`: [`enableIf`](#conditional-execution-enableif).
+* **Fan-in.** A multi-Task producer's outputs are ordered lists in parameter-space iteration order, reduced with
+  RFC 0006 functions: [Reductions](#reductions).
+* **Composition with task-task dependencies.** A rule that makes computed task DAGs work when a template also enables
+  the separate `TASK_DEPENDENCIES` extension: [Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies).
+* **Validation.** An index of every rule the extension adds, static and runtime: [Validation](#validation).
+
+### Key concepts
+
+**Fixed step graph, late-bound width.** The set of Steps, their names, their dependencies, and the types of their
+outputs are in the template, so a validator can check every reference before submission. What may depend on a value
+produced at run time is how many Tasks a Step has, the values those Tasks receive, and whether a Step or Environment
+runs. Steps never create new Steps.
+
+**Output variables are control data.** An output is a small typed value that shapes the rest of the Job: a count, a
+list of keys, a score, an adjacency list. Bulk data keeps flowing through files and `PATH` job parameters.
+
+**One new stage, two new states.** EXPR evaluates format strings at template validation, Job creation, and Task
+execution. CONTROL_FLOW inserts a fourth stage per Step, between Job creation and Task execution, at which the Step's
+TEMPLATE-scope expressions that read upstream outputs are evaluated. A Step waiting for that stage is in the
+`PENDING_INPUTS` state, and a Step whose `enableIf` is false ends in the `SKIPPED` state. A Step that has no
+`enableIf` and reads no upstream outputs in those fields never enters either state and behaves exactly as today.
+
+**Types first.** Every `Steps.*` symbol has a type known at template validation, derived from the producer's
+declarations. EXPR's existing `unresolved[T]` placeholders type-check expressions that use them, so no second type
+checker is needed.
+
+### Evaluation stages
+
+RFC 0005 defines three stages. CONTROL_FLOW adds step input binding, which runs once per Step that needs it:
+
+```
+  Template            Job Creation         Step Input Binding          Task Execution
+  Validation          (submit time)        (per Step, when its         (worker host)
+                                           producers are terminal)
+  ──────────────      ──────────────       ──────────────────────      ──────────────
+  Param.*:            Param.*:             Param.*:                    Param.*:
+    unresolved[T]       CONCRETE             CONCRETE                    CONCRETE
+  Steps.P.Output.*:   Steps.P.Output.*:    Steps.P.Output.*:           Steps.P.Output.*:
+    unresolved[T]       unresolved[T]        CONCRETE                    CONCRETE
+  Task.Param.*:       Task.Param.*:        Task.Param.*:               Task.Param.*:
+    unresolved[T]       unresolved[T]        unresolved[T]               CONCRETE
+
+  ► Type-check        ► Evaluate static    ► Evaluate the Step's       ► Evaluate all
+    all exprs,          enableIf and         materialization             remaining
+    check Steps.*       TEMPLATE scope;      expressions; Step           expressions;
+    references          Steps that read      becomes READY,              read the output
+                        outputs enter        SKIPPED, or FAILED          file after onRun
+                        PENDING_INPUTS
+```
+
+### Step states
+
+```
+             job creation
+                  │
+      ┌───────────┴─────────────┐
+      ▼                         ▼
+ PENDING_INPUTS ──binding──► READY ──► RUNNING ──► SUCCEEDED
+      │                         │                ╰► FAILED
+      ├──binding: enableIf false ──► SKIPPED
+      ├──binding: error / cycle / cap ──► FAILED
+      └──referenced producer FAILED ──► (blocked; never runs, as today)
+```
+
+`SKIPPED` and a zero-Task `SUCCEEDED` both satisfy `dependsOn`. `FAILED` does not. A Step whose `enableIf` is decided
+at Job creation goes directly to `SKIPPED` or to the left-hand path.
+
+A Step with no Tasks to run, because it is `SKIPPED` or its parameter space is empty, still respects its own
+dependencies: the Steps that depend on it are released only once its own dependencies are satisfied. So skipping a
+Step never lets work that was ordered after it run sooner than the Steps it was ordered after.
+
+## Basic Examples
+
+These examples use EXPR as specified in the [Expression Language](../wiki/2026-02-Expression-Language.md) and the
+schema in [Specification](#specification). Application command lines (`ffmpeg`, `stylize`, `bake-node`, ...) are
+illustrative.
+
+The examples were tested as far as is possible without an implementation of CONTROL_FLOW. For each one, a proxy
+template replaced every `Steps.P.Output.X` and `Steps.P.TaskParam.Y` with a job parameter of the type this RFC
+assigns, and `Task.OutputFile` with a path under `Session.WorkingDirectory`. It dropped `outputVariables`, `enableIf`,
+and `dependsOnSubspace`, moving their expressions into `let` bindings. The proxies, generated mechanically from the
+YAML below, pass `openjd check` in the openjd-rs CLI, and hand-written copies pass `openjd run` with mock values,
+including empty upstream lists, the `fail(...)` paths, and a `null` output from a skipped Step. The proxies cannot
+test the CONTROL_FLOW semantics themselves (binding, skipping, the output file).
+
+| Example | Use case | Data flow | Fan-out | `enableIf` | Task DAG | Fan-in |
+|---|---|---|---|---|---|---|
+| [Video frame count](#video-frame-count) | U1 | ✔ | ✔ | | | |
+| [S3 prefix fan-out with a manifest](#s3-prefix-fan-out-with-a-manifest) | U3 | ✔ | ✔ | | | ✔ |
+| [Parameter sweep, then run the winner](#parameter-sweep-then-run-the-winner) | U4 + U3 | ✔ | ✔ | | | ✔ |
+| [Scene-graph DAG](#scene-graph-dag) | U2 | ✔ | ✔ | | ✔ (`TASK_DEPENDENCIES`) | |
+| [Render, quality check, and optional steps](#render-quality-check-and-optional-steps) | U5 + dynamic | ✔ | ✔ (may be empty) | ✔ static and dynamic | | |
+
+### Video frame count
+
+Discussion #111, Example 1. The submitter doesn't know the frame count; the first Step finds it, and the second Step
+runs one Task per frame.
+
+```yaml
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+name: "Stylize {{path(RawParam.InputVideo).name}}"
+parameterDefinitions:
+  - name: InputVideo
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+  - name: WorkDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+  - name: OutputVideo
+    type: PATH
+    objectType: FILE
+    dataFlow: OUT
+steps:
+  - name: VideoToFrames
+    outputVariables:
+      - name: FrameCount
+        type: INT
+        minValue: 1
+        maxValue: 200000
+      - name: FrameRate
+        type: STRING
+    bash:
+      script: |
+        set -euo pipefail
+        frames={{repr_sh(Param.WorkDir / 'frames')}}
+        mkdir -p "$frames"
+        ffmpeg -nostdin -i {{repr_sh(Param.InputVideo)}} "$frames/in_%06d.png"
+        count=$(find "$frames" -name 'in_*.png' | wc -l)
+        rate=$(ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate \
+                 -of default=noprint_wrappers=1:nokey=1 {{repr_sh(Param.InputVideo)}})
+        echo "FrameCount=$count" >> {{repr_sh(Task.OutputFile)}}
+        echo "FrameRate=\"$rate\"" >> {{repr_sh(Task.OutputFile)}}
+
+  - name: StylizeFrame
+    dependencies:
+      - dependsOn: VideoToFrames
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: INT
+          range: "1-{{Steps.VideoToFrames.Output.FrameCount}}"
+    bash:
+      script: |
+        stylize --in {{repr_sh((Param.WorkDir / 'frames' / 'in_%06d.png').with_number(Task.Param.Frame))}} \
+                --out {{repr_sh((Param.WorkDir / 'frames' / 'out_%06d.png').with_number(Task.Param.Frame))}}
+
+  - name: FramesToVideo
+    dependencies:
+      - dependsOn: VideoToFrames
+      - dependsOn: StylizeFrame
+    bash:
+      script: |
+        ffmpeg -nostdin -framerate {{repr_sh(Steps.VideoToFrames.Output.FrameRate)}} \
+               -i {{repr_sh(Param.WorkDir / 'frames' / 'out_%06d.png')}} {{repr_sh(Param.OutputVideo)}}
+```
+
+* `StylizeFrame` is in `PENDING_INPUTS` until `VideoToFrames` succeeds. `minValue: 1` makes an empty video fail
+  `VideoToFrames` itself. Without it, an empty video would produce the range string `"1-0"` downstream, which is
+  not empty: under §3.4.1.1.1 it is `[1]`.
+* `FramesToVideo` uses `FrameRate` only in its script, which is evaluated on the worker host, so it never enters
+  `PENDING_INPUTS`. It still lists `VideoToFrames` directly, because only direct dependents may read a Step's
+  outputs, even though `StylizeFrame` already orders it after.
+
+The scheduler's view of the Job over time:
+
+```
+VideoToFrames   READY ─► RUNNING ─► SUCCEEDED (FrameCount=1440, FrameRate="24000/1001")
+StylizeFrame    PENDING_INPUTS ─────────────► binding: range "1-1440" ─► READY (1440 Tasks) ─► ... ─► SUCCEEDED
+FramesToVideo   READY (gated on both dependencies) ──────────────────────────────────────────────► RUNNING ─► ...
+```
+
+### S3 prefix fan-out with a manifest
+
+One discovery Task lists the objects under an S3 prefix, one Task per object transcodes it, and a final Task writes
+a manifest. Today this needs a pre-submission script, which job bundle submitters can't run.
+
+```yaml
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+name: "Transcode s3://{{Param.Bucket}}/{{Param.Prefix}}"
+parameterDefinitions:
+  - name: Bucket
+    type: STRING
+  - name: Prefix
+    type: STRING
+  - name: OutputPrefix
+    type: STRING
+steps:
+  - name: Discover
+    outputVariables:
+      - name: Keys
+        type: LIST[STRING]
+        maxLength: 5000        # Discover fails if the prefix holds more .mov objects
+    python:
+      script: |
+        import boto3, json
+        keys = []
+        pages = boto3.client("s3").get_paginator("list_objects_v2").paginate(
+            Bucket={{repr_py(Param.Bucket)}}, Prefix={{repr_py(Param.Prefix)}})
+        for page in pages:
+            keys += [o["Key"] for o in page.get("Contents", []) if o["Key"].endswith(".mov")]
+        with open({{repr_py(Task.OutputFile)}}, "a") as f:
+            f.write("Keys=" + json.dumps(keys) + "\n")
+
+  - name: Transcode
+    dependencies:
+      - dependsOn: Discover
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Key
+          type: STRING
+          range: "{{Steps.Discover.Output.Keys}}"    # zero tasks if nothing matched
+    outputVariables:
+      - name: OutputBytes
+        type: INT
+        minValue: 0
+    python:
+      let:
+        - out_key = Param.OutputPrefix + '/' + path(Task.Param.Key).stem + '.mp4'
+      script: |
+        import boto3, subprocess
+        s3 = boto3.client("s3")
+        s3.download_file({{repr_py(Param.Bucket)}}, {{repr_py(Task.Param.Key)}}, "in.mov")
+        subprocess.run(["ffmpeg", "-nostdin", "-i", "in.mov", "out.mp4"], check=True)
+        s3.upload_file("out.mp4", {{repr_py(Param.Bucket)}}, {{repr_py(out_key)}})
+        size = s3.head_object(Bucket={{repr_py(Param.Bucket)}}, Key={{repr_py(out_key)}})["ContentLength"]
+        with open({{repr_py(Task.OutputFile)}}, "a") as f:
+            f.write(f"OutputBytes={size}\n")
+
+  - name: Manifest
+    dependencies:
+      - dependsOn: Transcode
+    let:
+      - keys = Steps.Transcode.TaskParam.Key
+      - sizes = Steps.Transcode.Output.OutputBytes
+    python:
+      script: |
+        import boto3, json
+        manifest = {"inputs": {{repr_py(keys)}}, "outputBytes": {{repr_py(sizes)}},
+                    "totalBytes": {{sum(sizes)}}}
+        boto3.client("s3").put_object(Bucket={{repr_py(Param.Bucket)}},
+                                      Key={{repr_py(Param.OutputPrefix + '/manifest.json')}},
+                                      Body=json.dumps(manifest))
+```
+
+* `Manifest` gets the keys from `Steps.Transcode.TaskParam.Key`, which is aligned element-for-element with
+  `Steps.Transcode.Output.OutputBytes`, so it needs no dependency on `Discover`.
+* If the prefix holds no `.mov` objects, `Transcode` is a zero-Task success and `Manifest` writes an empty manifest
+  with `totalBytes` 0.
+* Python's `json.dumps` writes a list on one line, which the output file grammar requires.
+
+### Parameter sweep, then run the winner
+
+27 configurations × 10 benchmark episodes report two metrics each. The Job picks the most accurate configuration that
+runs fast enough and then runs it on every video under an S3 prefix.
+
+```yaml
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+name: Hand-tracking sweep and full run
+parameterDefinitions:
+  - name: BenchmarkDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: IN
+  - name: EpisodeCount
+    type: INT
+    default: 10
+    minValue: 1
+  - name: MinFps
+    type: FLOAT
+    default: 20
+  - name: DatasetBucket
+    type: STRING
+  - name: DatasetPrefix
+    type: STRING
+  - name: OutputDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+steps:
+  - name: Sweep
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Window
+          type: INT
+          range: [8, 16, 32]
+        - name: Overlap
+          type: FLOAT
+          range: [0.25, 0.5, 0.75]
+        - name: DetConf
+          type: FLOAT
+          range: [0.3, 0.5, 0.7]
+        - name: Episode
+          type: INT
+          range: "0-{{Param.EpisodeCount - 1}}"
+      combination: "Window * Overlap * DetConf * Episode"   # Episode varies fastest
+    outputVariables:
+      - name: mpjpe_mm
+        type: FLOAT
+        minValue: 0
+      - name: fps
+        type: FLOAT
+        minValue: 0
+    python:
+      script: |
+        from handtrack import benchmark
+        score = benchmark({{repr_py(Param.BenchmarkDir)}}, episode={{Task.Param.Episode}},
+                          window={{Task.Param.Window}}, overlap={{Task.Param.Overlap}},
+                          det_conf={{Task.Param.DetConf}})
+        with open({{repr_py(Task.OutputFile)}}, "a") as f:
+            f.write(f"mpjpe_mm={score.mpjpe_mm}\n")
+            f.write(f"fps={score.fps}\n")
+
+  - name: Discover
+    outputVariables:
+      - name: Videos
+        type: LIST[STRING]
+        minLength: 1
+        maxLength: 2000
+    python:
+      script: |
+        import boto3, json
+        pages = boto3.client("s3").get_paginator("list_objects_v2").paginate(
+            Bucket={{repr_py(Param.DatasetBucket)}}, Prefix={{repr_py(Param.DatasetPrefix)}})
+        keys = [o["Key"] for p in pages for o in p.get("Contents", []) if o["Key"].endswith(".mp4")]
+        with open({{repr_py(Task.OutputFile)}}, "a") as f:
+            f.write("Videos=" + json.dumps(keys) + "\n")
+
+  - name: RunWinner
+    dependencies:
+      - dependsOn: Sweep
+      - dependsOn: Discover
+    let:
+      - n = Param.EpisodeCount
+      - err = Steps.Sweep.Output.mpjpe_mm
+      - rate = Steps.Sweep.Output.fps
+      - configs = range(len(err) // n)
+      - mean_err = [sum(err[c * n:(c + 1) * n]) / n for c in configs]
+      - mean_fps = [sum(rate[c * n:(c + 1) * n]) / n for c in configs]
+      - fast = [c for c in configs if mean_fps[c] >= Param.MinFps]
+      - ok = fast if len(fast) > 0 else fail("No configuration reached MinFps")
+      - best_err = min([mean_err[c] for c in ok])
+      - first_task = [c for c in ok if mean_err[c] == best_err][0] * n
+      - window = Steps.Sweep.TaskParam.Window[first_task]
+      - overlap = Steps.Sweep.TaskParam.Overlap[first_task]
+      - det_conf = Steps.Sweep.TaskParam.DetConf[first_task]
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Video
+          type: STRING
+          range: "{{Steps.Discover.Output.Videos}}"
+    python:
+      script: |
+        from handtrack import track_s3_video
+        track_s3_video({{repr_py(Param.DatasetBucket)}}, {{repr_py(Task.Param.Video)}},
+                       window={{window}}, overlap={{overlap}}, det_conf={{det_conf}},
+                       out_dir={{repr_py(Param.OutputDir)}})
+```
+
+* `Sweep` and `Discover` don't depend on each other and run in parallel.
+* The per-configuration means rely on the defined iteration order: with `Episode` last in `combination`, the Tasks of
+  configuration `c` occupy indices `c*n` to `c*n + n - 1` of every `Steps.Sweep.*` list. This index arithmetic is the
+  clearest readability cost of the design; see [Open Questions](#open-questions) item 5.
+* If no configuration is fast enough, `RunWinner` fails at binding with the `fail(...)` message and runs no Tasks.
+* The `Sweep` Step alone is useful: a scheduler can show all 270 Tasks' `mpjpe_mm` and `fps` with no consumer.
+
+### Scene-graph DAG
+
+Discussion #111, Example 2: an analysis Step computes both the number of Tasks and the edges between them. This
+example also needs the separate `TASK_DEPENDENCIES` extension, whose `dependsOnSubspace` syntax is sketched from #82
+and is not specified by this RFC.
+
+```yaml
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR, CONTROL_FLOW, TASK_DEPENDENCIES, FEATURE_BUNDLE_1]
+name: "Bake lighting for {{path(RawParam.Scene).stem}}"
+parameterDefinitions:
+  - name: Scene
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+  - name: BakeDir
+    type: PATH
+    objectType: DIRECTORY
+    dataFlow: OUT
+steps:
+  - name: AnalyzeSceneGraph
+    outputVariables:
+      - name: Children
+        type: LIST[LIST[INT]]
+        maxLength: 10000
+        description: Children[i] lists the nodes whose bakes node i consumes.
+      - name: NodeNames
+        type: LIST[STRING]
+        maxLength: 10000
+    python:
+      script: |
+        import json
+        from scenetools import load_graph
+        g = load_graph({{repr_py(Param.Scene)}})
+        with open({{repr_py(Task.OutputFile)}}, "a") as f:
+            f.write("Children=" + json.dumps([n.child_indices for n in g.nodes]) + "\n")
+            f.write("NodeNames=" + json.dumps([n.name for n in g.nodes]) + "\n")
+
+  - name: BakeNode
+    dependencies:
+      - dependsOn: AnalyzeSceneGraph
+      - dependsOn: BakeNode
+        dependsOnSubspace:
+          - name: Node
+            range: "{{Steps.AnalyzeSceneGraph.Output.Children[Task.Param.Node]}}"
+    let:
+      - children = Steps.AnalyzeSceneGraph.Output.Children
+      - names = Steps.AnalyzeSceneGraph.Output.NodeNames
+      - node_count = len(children) if len(children) == len(names) else fail("Children and NodeNames differ in length")
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Node
+          type: INT
+          range: "{{range(node_count)}}"
+    bash:
+      script: |
+        bake-node --scene {{repr_sh(Param.Scene)}} --node {{repr_sh(names[Task.Param.Node])}} \
+          {{repr_sh(flatten([['--input', string(Param.BakeDir / (names[c] + '.bake'))] for c in children[Task.Param.Node]]))}} \
+          --out {{repr_sh(Param.BakeDir / (names[Task.Param.Node] + '.bake'))}}
+
+  - name: AssembleLightmaps
+    dependencies:
+      - dependsOn: BakeNode
+    bash:
+      script: |
+        assemble-lightmaps {{repr_sh(Param.BakeDir)}}
+```
+
+* The subspace range is evaluated once per `BakeNode` Task with `Task.Param.Node` bound to that Task. Leaf nodes have
+  `[]` children and wait only on `AnalyzeSceneGraph`.
+* At binding the scheduler evaluates `node_count`, materializes that many Tasks, evaluates every Task's subspace, and
+  checks the resulting graph for cycles and out-of-range indices. A cyclic scene graph fails `BakeNode` before any
+  bake runs, with the cycle in the message.
+* `AnalyzeSceneGraph` is listed as a plain dependency. A `dependsOnSubspace` edge doesn't count as the direct
+  dependency that reading `Steps.AnalyzeSceneGraph.*` requires, because it lets Tasks start before every upstream
+  Task has finished.
+
+### Render, quality check, and optional steps
+
+A static `enableIf` from a `BOOL` parameter, a dynamic `enableIf` from an upstream metric, an output of a conditional
+producer, and a fan-out that is usually empty.
+
+```yaml
+specificationVersion: jobtemplate-2023-09
+extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+name: "Render {{path(RawParam.SceneFile).stem}}"
+parameterDefinitions:
+  - name: SceneFile
+    type: PATH
+    objectType: FILE
+    dataFlow: IN
+  - name: Frames
+    type: RANGE_EXPR
+    default: "1-240"
+  - name: OutputPattern
+    type: PATH
+    objectType: FILE
+    dataFlow: OUT
+    default: "out/beauty_####.exr"
+  - name: NoiseThreshold
+    type: FLOAT
+    default: 0.02
+  - name: EncodeVideo
+    type: BOOL
+    default: true
+  - name: OutputVideo
+    type: PATH
+    objectType: FILE
+    dataFlow: OUT
+    default: "out/beauty.mp4"
+steps:
+  - name: Render
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: INT
+          range: "{{Param.Frames}}"
+    bash:
+      script: |
+        render --scene {{repr_sh(Param.SceneFile)}} --frame {{Task.Param.Frame}} \
+               --out {{repr_sh(Param.OutputPattern.with_number(Task.Param.Frame))}}
+
+  - name: QualityCheck
+    dependencies:
+      - dependsOn: Render
+    outputVariables:
+      - name: BadFrames
+        type: LIST[INT]
+      - name: MeanNoise
+        type: FLOAT
+        minValue: 0
+    python:
+      script: |
+        import json
+        from qc import check_frames
+        report = check_frames({{repr_py(Param.OutputPattern)}}, {{repr_py(list(Param.Frames))}})
+        with open({{repr_py(Task.OutputFile)}}, "a") as f:
+            f.write("BadFrames=" + json.dumps(report.bad_frames) + "\n")
+            f.write(f"MeanNoise={report.mean_noise}\n")
+
+  - name: Rerender
+    dependencies:
+      - dependsOn: QualityCheck
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: INT
+          range: "{{Steps.QualityCheck.Output.BadFrames}}"   # usually empty: zero tasks
+    bash:
+      script: |
+        render --scene {{repr_sh(Param.SceneFile)}} --frame {{Task.Param.Frame}} --safe-mode \
+               --out {{repr_sh(Param.OutputPattern.with_number(Task.Param.Frame))}}
+
+  - name: Denoise
+    dependencies:
+      - dependsOn: QualityCheck
+      - dependsOn: Rerender
+    enableIf: "{{Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold}}"   # decided at binding
+    parameterSpace:
+      taskParameterDefinitions:
+        - name: Frame
+          type: INT
+          range: "{{Param.Frames}}"
+    bash:
+      script: |
+        denoise --in-place {{repr_sh(Param.OutputPattern.with_number(Task.Param.Frame))}}
+
+  - name: EncodeVideo
+    dependencies:
+      - dependsOn: Rerender
+      - dependsOn: Denoise          # satisfied whether Denoise ran or was skipped
+    enableIf: "{{Param.EncodeVideo}}"   # decided at job creation
+    outputVariables:
+      - name: VideoBytes
+        type: INT
+    bash:
+      script: |
+        set -euo pipefail
+        ffmpeg -nostdin -start_number {{min(Param.Frames)}} -i {{repr_sh(Param.OutputPattern)}} \
+               {{repr_sh(Param.OutputVideo)}}
+        echo "VideoBytes=$(stat -c %s {{repr_sh(Param.OutputVideo)}})" >> {{repr_sh(Task.OutputFile)}}
+
+  - name: Publish
+    dependencies:
+      - dependsOn: EncodeVideo
+    let:
+      - video_bytes = Steps.EncodeVideo.Output.VideoBytes    # int?, because EncodeVideo has enableIf
+      - summary = 'video of ' + string(video_bytes) + ' bytes' if video_bytes != null else 'frames only'
+    bash:
+      script: |
+        publish --pattern {{repr_sh(Param.OutputPattern)}} --note {{repr_sh(summary)}}
+```
+
+* With `EncodeVideo: false`, the `EncodeVideo` Step is `SKIPPED` at Job creation and `Publish` still runs with
+  `video_bytes = null`, so its note reads `frames only`. Without the null check, `string(video_bytes)` gives the text
+  `null`, and arithmetic such as `video_bytes + 1` passes validation but fails `Publish` when it binds. (The
+  `summary` text avoids `': '`, which would turn the `let` item into a YAML mapping.)
+* `Denoise` binds when `QualityCheck` succeeds and is skipped if the noise is under the threshold. Its `Rerender`
+  dependency still gates its Tasks.
+* `Rerender` with `BadFrames = []` is a zero-Task success, so the common clean render costs nothing.
+
+## Motivation
+
+An Open Job Description Job is created from a template and Job Parameter values, and every Step's Tasks are known at
+that moment. Discussion #22 defended this immutability: it lets a scheduler show the whole Job, estimate when it will
+finish, and tell a healthy Job from a stuck one. It also asked that "specific dynamic job structures" be added through
+RFCs rather than by opening the Job to arbitrary mutation. This RFC is that addition for the cases the community has
+asked for.
+
+The cases share a shape. A Job's first Step discovers something, and the rest of the Job depends on what it found:
+
+* How many frames does this video have? (#111, Example 1)
+* Which objects are under this S3 prefix? (crowecawcaw, #111)
+* What does this scene graph look like? (#111, Example 2)
+* Which of these 27 configurations scored best? (folouiseAWS, #111)
+* Is the render noisy enough to need denoising? (#111 introduction, #81)
+
+None of these is known to the person submitting the Job, and some can't be computed on the submitter's machine at all
+because the input lives on the farm or in a bucket the workstation can't reach.
+
+### Use cases
+
+| ID | Use case | Source | Unknown at submission | Covered by |
+|---|---|---|---|---|
+| U1 | **Video frame count.** Extract frames, process one Task per frame, re-encode. | #111 Ex. 1 | Task count of the middle Step | Outputs, dynamic ranges |
+| U2 | **Scene-graph DAG.** Analyze a 3D scene into a DAG for lightmap baking, GI, or spatial partitioning; leaves run in parallel and parents wait for their children. | #111 Ex. 2 | Task count and the edges between Tasks | Outputs, dynamic ranges, and `TASK_DEPENDENCIES` |
+| U3 | **S3-prefix fan-out.** List the objects under a prefix and process each in its own Task. Today this is a pre-submission script, which blocks use of the job bundle submitter. | crowecawcaw, #111 | Task count and `STRING` Task parameter values | Outputs, dynamic ranges, fan-in |
+| U4 | **Parameter sweep, then run the winner.** 27 configurations × 10 episodes = 270 Tasks, each reporting accuracy and speed metrics; pick the best and run it on the full dataset in the same Job. | folouiseAWS, #111 | Which configuration the final Step uses | Outputs, `Steps.*.TaskParam`, fan-in |
+| U5 | **Optional Step from a `BOOL` parameter**, such as skipping a video encode. | #81, issue #80 | Nothing | Static `enableIf` |
+| U6 | **Optional Environment** gated by a parameter. | #81 | Nothing | Static `enableIf` |
+| U7 | **CPU-only vs. GPU host requirements** chosen by a parameter. | #81 | Nothing | Already expressible with EXPR (see [Future Work](#future-work)) |
+| U8–U14 | **Static task-task dependencies**: export→render per frame, simulation chains, temporal offsets, static DAGs, fan-in by frame. | #82, #79 | Nothing | `TASK_DEPENDENCIES` (separate extension) |
+| U15 | **Fully dynamic work items** such as Houdini PDG. | #22 | Number and shape of the work | Out of scope |
+
+U1–U4 need a value from a running Task and are the core of this RFC. U5 and U6 need no run-time data, but their hard
+questions (what happens to a disabled Step's outputs and dependents) are data-flow questions, so they are answered
+here too. U8–U14 need per-Task scheduling and nothing else from this RFC; they belong to a separate extension (see
+[Task-task dependencies are a separate extension](#10-task-task-dependencies-are-a-separate-extension)). U15 is the
+territory of the standalone StepTemplate mechanism discussed in #22, and CONTROL_FLOW does not replace it.
+
+U4 also shows that outputs are useful with no consumer at all. A scheduler or UI that shows each Task's metrics next
+to its parameters replaces the workarounds users reach for today.
+
+### Workarounds in use today
+
+* **A pre-submission script** discovers the inputs and generates the template. It requires the submitter to be able
+  to reach the data and to run code at submission, which job bundle submitters and web UIs can't do, and the template
+  that reaches the scheduler no longer describes how it was made.
+* **A Task that calls the farm's submit command** to add work. It isn't portable across schedulers, and the scheduler
+  can't show the Job's shape until it happens.
+* **Files and conventions**: each Task writes a file, and an aggregation Step reads them; or numbers are packed into
+  `openjd_status` messages; or results go to an external tracker. None of these is visible to the scheduler or to
+  tooling, and none can change how many Tasks a later Step has.
+
+### Why now
+
+EXPR (RFCs 0005–0007) supplies nearly everything this RFC needs: a type system with lists, nested lists, and optional
+types; progressive evaluation with `unresolved[T]` placeholders, which type-checks an expression whose inputs are not
+known yet; symbol collection for data-flow analysis; list-valued parameter ranges; and a function library with the
+reductions (`min`, `max`, `sum`, `len`, `sorted`, comprehensions) that fan-in needs. What is missing is a way for a
+Task to produce a value, a symbol to read it by, and a stage at which to evaluate expressions that depend on it.
+
+### Backward compatibility
+
+This RFC is additive and gated by the `CONTROL_FLOW` extension name declared under RFC 0002:
+
+* `CONTROL_FLOW` requires `EXPR`. A template that lists `CONTROL_FLOW` must also list `EXPR`, and a scheduler must
+  reject one that does not.
+* No existing field changes meaning in a template that doesn't list `CONTROL_FLOW`. A scheduler that does not
+  implement `CONTROL_FLOW` rejects a template that lists it, so a Job is never run with its outputs or conditions
+  silently ignored.
+* Within a template that lists `CONTROL_FLOW`, one existing rule is relaxed: a Task parameter range given as an
+  expression may evaluate to an empty list (see [Empty parameter spaces](#empty-parameter-spaces)).
+* A Step that declares no outputs, has no `enableIf`, and reads no `Steps.*` symbols behaves exactly as it does
+  without the extension.
+
+## Technical Requirements
+
+1. **Backward compatibility.** Existing templates, and templates that list `CONTROL_FLOW` but don't use a given
+   feature, behave exactly as they do today.
+2. **Opt-in activation.** Every new field and symbol is available only when `CONTROL_FLOW` is listed in
+   `extensions`, and `CONTROL_FLOW` requires `EXPR`.
+3. **Fixed step graph.** The Steps of a Job, their names, their dependencies, and their output types are determined by
+   the template and are the same for every Job created from it, whatever the parameter values or run-time data.
+4. **Fail fast where possible.** Every reference to an output, every expression that uses one, and every type error
+   in those expressions is caught at template validation, before submission. Only the values themselves, and the
+   checks that depend on them, are deferred.
+5. **Fail at the cause.** A value that violates its declared type or constraints fails the Task that produced it, not
+   a consumer that reads it later. A consumer whose expressions fail on valid values fails before any of its Tasks
+   runs.
+6. **Deterministic results.** The value a consumer sees does not depend on the order in which the producer's Tasks
+   ran or finished. A Job run twice on the same data has the same structure.
+7. **Bounded.** Output values have a size limit with a guaranteed minimum, a computed parameter space can be bounded
+   by a scheduler limit, and reductions are evaluated under EXPR's existing memory and operation limits.
+8. **Safe emission channel.** Text that a Task's tools print, which may include file names, object keys, or log lines
+   from third-party software, cannot set an output value.
+9. **Implementation strategy is the scheduler's choice.** A scheduler may create a waiting Step's Tasks only once its
+   inputs are known, or create the Step first and fill it in. The specification states the observable contract.
+10. **Composable.** The design composes with `TASK_CHUNKING`, `WRAP_ACTIONS`, and a future `TASK_DEPENDENCIES`
+    extension without special cases in either direction.
+
+## Design Choices
+
+### 1. Variable data flow is part of CONTROL_FLOW, not a standalone extension
+
+Discussion #111 framed the idea as variable data flow along step dependencies, and folouiseAWS suggested shipping it
+in two parts: Task outputs reported to the scheduler first, data flow into downstream Steps second. An early outline
+of this work also had a standalone `VAR_DATA_FLOW` extension. This RFC folds all of it into one `CONTROL_FLOW`
+extension, for three reasons.
+
+* **Outputs exist to steer the Job.** Every use case for passing data between Steps (U1–U4) passes it in order to
+  change the Job's structure: its fan-out, its enablement, or the configuration a later Step runs. A data-flow
+  extension without dynamic ranges or `enableIf` would solve none of them, and dynamic ranges or dynamic `enableIf`
+  without data flow have nothing to read. The pieces are one feature.
+* **The hard questions are shared.** What a skipped Step's outputs evaluate to, whether its dependents run, how an
+  empty fan-out behaves, when expressions are evaluated: each of these involves both data flow and control flow.
+  Every surveyed system that designed skip semantics separately from data flow has a pitfall at the join between
+  them (see [Prior Art](#prior-art)).
+* **Two extensions would freeze the smaller one.** RFC 0002 extensions are versioned by name. An outputs-only
+  extension would have to stay as it is, and the data-flow half most users want would need a second name. Templates
+  that use only outputs are a subset of templates that use the whole extension, so splitting buys nothing for
+  authors. Implementations can still phase their work: a scheduler can build output collection and display first
+  and advertise `CONTROL_FLOW` once binding works.
+
+Static `enableIf` alone (U5, U6) is cheap and would close issue #80 sooner. It stays here because its semantics are
+data-flow semantics, and because nothing in its syntax would change if it later had to be split out.
+
+### 2. Outputs go to a session-supplied file, not a stdout directive
+
+Discussion #111 proposed an `openjd_output_var: <Name>=<JSON>` line on stdout, modeled on `openjd_env`. This RFC
+instead gives each Task a file, `Task.OutputFile` (also exported as `OPENJD_TASK_OUTPUT_FILE`), to which the Task
+appends `<Name>=<JSON>` lines.
+
+The reason is what a forged value can do. `openjd_progress`, `openjd_status`, and `openjd_fail` affect only the
+reporting of the action that printed them. `openjd_env` has high impact, but only an Environment's `onEnter` may emit
+it, and that action is usually short setup code under the Environment author's control. An output variable comes
+from `onRun`, where a Job's heaviest third-party code runs (DCC applications, renderers, plugins, `aws s3 ls`
+listings of user-named objects), and its value decides how many Tasks run downstream, what they receive, and whether
+Steps run at all. An S3 object key may contain a newline, so a discovery script that logs the keys it found could
+inject an output line without any intent to do so. GitHub Actions deprecated its `::set-output` stdout command for
+exactly this reason and replaced it with the `$GITHUB_OUTPUT` file.
+
+The file also removes three problems a stdout directive has:
+
+* Stdout lines are capped (64 KiB in `openjd-sessions`), which would cap every output. A file has no per-line cap, so
+  the limit can be set where it belongs (see [Limits](#limits)).
+* Under `WRAP_ACTIONS`, the wrap script's stdout is scanned and must forward the wrapped process's output verbatim.
+  With a file, the wrapped process needs only the path, which a wrap script forwards like any other environment
+  variable.
+* A future per-Task report from a `TASK_CHUNKING` chunk is easier to express as a file format than as one stdout line
+  per value.
+
+The cost to authors is small: `echo "openjd_output_var: N=3"` becomes `echo "N=3" >> {{repr_sh(Task.OutputFile)}}`.
+The line grammar, last-write-wins, and type coercion that a stdout design would have used carry over unchanged.
+
+### 3. A new `Steps` root, with `Output` and `TaskParam` levels
+
+#111 wrote references as `Step.<StepName>.<VarName>`. `Step` already means "the current Step" in EXPR
+(`Step.Name`), so reusing it would make a Step named `Name` unreachable and turn every future `Step.<Property>` into a
+breaking change. RFC 0008 avoided the same problem with a separate `WrappedStep` root. This RFC uses:
+
+* `Steps.<StepName>.Output.<VarName>` for an output value, and
+* `Steps.<StepName>.TaskParam.<ParamName>` for the producer's Task parameter values, aligned with its output lists.
+
+The `Output` level costs one word per reference. It leaves room for `TaskParam` and for later per-Step symbols such as
+a Task count or a parameter-space introspection (#82 proposed `Step.<Name>.ParameterSpace.<Param>.Range`) without any
+risk of collision with user-chosen output names.
+
+Dotted access can't name a Step called `Render Frames`, so a Step referenced through `Steps.` must have an
+`<Identifier>` name. That is a validation error on the referencing expression, not a new rule for every Step name.
+
+### 4. Only direct dependents may read a Step's outputs
+
+A Step may read `Steps.P.*` only if it lists `P` in its own `dependencies`. Transitive access would save a line in a
+long chain, but it would hide data flow from a reader and from tools, which would have to compute reachability to know
+what a Step consumes. The extra `dependsOn` never changes scheduling, since a transitive dependency already orders the
+Steps. A reference does not create an edge: a missing edge is a validation error that names the fix. GitHub Actions
+(`needs`) and Argo make the same choice, and it keeps the template's explicit `dependencies` the only source of
+edges.
+
+### 5. Output shape is determined by the template
+
+`Steps.P.Output.X` has the declared type `T` if `P` has no `parameterSpace`, and `list[T]` in iteration order if it
+has one, even if that space happens to contain one Task or none. The type is therefore known at template validation,
+which EXPR's static type checking requires, and a reader can tell the shape of a value from the producer's definition
+alone. #111 Example 1 (a scalar `FrameCount` from a single-Task Step) and the sweep's per-Task lists both fall out of
+this rule.
+
+### 6. A skipped Step satisfies ordering and yields `null` data
+
+A Step whose `enableIf` is false is `SKIPPED`. It satisfies `dependsOn`, so its dependents run, and every
+`Steps.<It>.*` symbol is `null`. If a Step has an `enableIf`, its `Steps.*` symbols are typed `T?` everywhere, so a
+consumer handles `null` where a reader can see it: `Steps.P.Output.X or 0`, a conditional expression, a `fail(...)`,
+or an `enableIf` of its own.
+
+The alternative most often proposed is Tekton's: a dependent that reads a skipped Step's outputs is itself skipped.
+That makes enablement flow along an edge that is implicit in expression text, and its pitfall ("why did my publish
+step vanish?") is the join problem every surveyed system has. A consumer that wants Tekton's behavior gets it in one
+line: `enableIf: "{{Steps.P.Output.X != null}}"`. The rule is applied to the skipped Step only: a Step that runs
+after a skipped Step behaves normally, and its own outputs keep type `T`.
+
+"Satisfies ordering" means the skipped Step stands in for a Step that finished instantly at the moment it would have
+started. Its dependents wait for its own dependencies, so skipping a Step in the middle of a chain never lets the end
+of the chain start early.
+
+EXPR's type checker accepts a `T?` placeholder where `T` is required and defers the check to the concrete value
+(RFC 0005, *Coercion of Unresolved Values*). So misuse of a skipped Step's `null` is caught when the consumer binds,
+or when its Task starts, not at validation. Both are loud failures that name the expression. The silent cases are the
+places where EXPR discards a `null` by design: text interpolation, where it becomes `""`
+(`"--size {{Steps.P.Output.X}}"` becomes `--size `); a list item such as an `args` entry, which is dropped; and an
+optional field, which is omitted. This RFC requires a validation warning for each, and makes *enableIf* treat `null`
+as an error rather than as an omitted field, so that a skipped producer can never silently enable a Step.
+
+### 7. An empty computed parameter space is a zero-Task success
+
+If a Step's computed parameter space is empty, the Step succeeds with zero Tasks and its `Output` lists are `[]`.
+Treating it as skipped instead (as Airflow and Argo do) would make every Step with a computed parameter space
+potentially skipped, so all of its `Steps.*` symbols would have to be typed `T?`, which would push `null` handling
+into every reduction. As a success, `sum([])` is `0` and the empty manifest is just empty. An author who considers
+emptiness an error says so with `minLength: 1` on the producer's output or a `fail(...)` in the range expression.
+
+### 8. Reductions are ordinary EXPR over ordered lists
+
+There are no declared reductions (`reduce: MAX` on an output, for example). A multi-Task producer's output is the full
+list in parameter-space iteration order, and the consumer reduces it with RFC 0006 functions. Keeping the full list
+loses nothing, lets one consumer take the `max` while another takes the `sum`, and lets the sweep correlate three
+metrics with the configuration that produced them, which no scalar reduction can do. `Steps.P.TaskParam.*` provides
+the configuration side of that correlation without any new EXPR type.
+
+The order is the iteration order the producer's `combination` defines, not the order in which Tasks finished, so the
+result is deterministic.
+
+### 9. Limits are enforced at the producer
+
+Output values are bounded per Task, and a producer's declared constraints (`maxLength: 5000`, `minValue: 1`) are
+checked when its output file is read. A discovery Step that finds a million keys fails itself, next to the cause, with
+a message naming the constraint, rather than producing a consumer that fails later with a less obvious error.
+Airflow's `max_map_length`, which fails the producing task, is the precedent.
+
+### 10. Task-task dependencies are a separate extension
+
+Per-Task dependencies (#82 `dependsOnSubspace`, self-dependencies, `anyOf`) go in their own extension, provisionally
+`TASK_DEPENDENCIES`, which neither depends on CONTROL_FLOW nor is required by it. Seven of the eight task-task use cases
+(U8–U14) are fully static and need nothing from this RFC; bundling them would make render pipelines wait for data flow,
+or data-flow users wait for per-Task scheduling. For a scheduler the costs are independent and both large: this RFC
+needs value storage and a binding stage, and task-task dependencies need per-Task readiness instead of per-Step
+readiness. Their open questions don't overlap either.
+
+Composition needs no new syntax. A subspace range is a TEMPLATE-scope field of the dependent Step, so under this RFC's
+rules it is evaluated at binding and may read `Steps.*`, which is all the computed DAG of U2 requires (see
+[Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies)).
+
+### 11. Design tenets
+
+* **Portable.** A scheduler that doesn't implement the extension rejects the template rather than mis-running it. The
+  output file works the same on Linux, macOS, and Windows, and through `WRAP_ACTIONS`. The observable contract of
+  binding allows both deferred-creation and create-then-update schedulers. The tension is that this is the most
+  demanding extension for schedulers so far (persisted values, a new stage, two new states); keeping task-task
+  dependencies and chunked outputs out of it keeps the minimum smaller.
+* **Expressive.** One mechanism, typed outputs read by EXPR expressions at a defined stage, covers fan-out,
+  conditions, reductions, and (with `TASK_DEPENDENCIES`) computed DAGs. The fixed step graph rules out PDG-style work
+  by design, as #22 accepted.
+* **Human readable and writable.** `outputVariables` declares what flows, and `Steps.P.Output.X` reads plainly. The
+  tensions: correlating results with configurations needs index arithmetic until `argmin`/`argmax` or similar land;
+  `Steps.P.Output.X` is longer than #111's `Step.P.X`; appending to a file is slightly less obvious than printing a
+  directive; `"1-{{N}}"` and `"{{range(1, N + 1)}}"` behave differently for `N = 0`; and EXPR silently discards a
+  skipped Step's `null` in text interpolation, list items, and optional fields, which the validation warning
+  mitigates.
+* **Tooling parseable.** Outputs and their types are declared, references and edges are explicit and checked before
+  submission, and the output file has a strict grammar. This replaces opaque workarounds. The tension is that a Job's
+  Task count is no longer always known at submission, which #22 warned about. The fixed step graph, declared
+  constraints that bound fan-out, and the requirement to report pending Steps explicitly limit the loss.
+
+## Specification
+
+### Extension name and dependencies
+
+The extension name is `CONTROL_FLOW`. Every field, symbol, and behavior in this section is available only in a Job
+Template whose `extensions` list includes `CONTROL_FLOW`.
+
+* A template that lists `CONTROL_FLOW` MUST also list `EXPR`. A scheduler or validator MUST reject a template that
+  lists `CONTROL_FLOW` without `EXPR`. RFC 0002 does not define dependencies between extensions; this is a rule of the
+  `CONTROL_FLOW` extension, as the same rule is for `WRAP_ACTIONS`.
+* `CONTROL_FLOW` applies to Job Templates. An Environment Template cannot declare it, and nothing in an Environment
+  Template can reference the symbols it adds.
+
+### Terminology
+
+| Term | Definition |
+|------|------------|
+| **Producer** | A Step whose `Steps.*` symbols another Step reads. A Step that declares `outputVariables` is a producer of `Steps.*.Output`; any Step with a `parameterSpace` can be a producer of `Steps.*.TaskParam`. |
+| **Consumer** | A Step that reads a producer's `Steps.*` symbols. It must list the producer directly in its `dependencies`. |
+| **Output variable** | A typed value declared in a producer's `outputVariables` and written by each of its Tasks to the Task's output file. |
+| **Output file** | A file the runtime creates for each attempt of a Task of a producer, at the path `Task.OutputFile`, which the Task appends `<Name>=<JSON>` lines to. |
+| **Materialization expressions** | The format strings of a Step that the scheduler must evaluate to know whether the Step runs and what its Tasks are. See [Step input binding](#step-input-binding). |
+| **Step input binding** | The evaluation stage, once per Step, at which the Step's materialization expressions are evaluated with every `Steps.*` symbol they reference concrete. |
+| **Conditional Step** | A Step that has an `enableIf`. |
+| **`PENDING_INPUTS`** | The state of a Step whose materialization expressions reference a `Steps.*` symbol that is not concrete yet. |
+| **`SKIPPED`** | The terminal state of a Step whose `enableIf` evaluated to `false`. |
+
+### Schema modifications
+
+> Changes to [the template schema](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas).
+
+#### Job Template
+
+> A modification to [`1.1. Job Template`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#11-job-template)
+
+The Job Template object is unchanged. Extension list addition to item 3 (*extensions*): `CONTROL_FLOW` (this RFC).
+
+#### `<StepTemplate>`
+
+> A modification to [`3. <StepTemplate>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#3-steptemplate)
+
+```diff
+  name: <StepName>
+  description: <Description> # @optional
++ enableIf: <bool> | <FormatString> # @optional @fmtstring @extension CONTROL_FLOW
+  let: <LetBindings> # @optional @extension EXPR
+  dependencies: [ <StepDependency>, ... ] # @optional
+  stepEnvironments: [ <Environment>, ... ] # @optional
+  hostRequirements: <HostRequirements> # @optional
+  parameterSpace: <StepParameterSpaceDefinition> # @optional
++ outputVariables: [ <OutputVariableDefinition>, ... ] # @optional @extension CONTROL_FLOW
+  script: <StepScript>
+```
+
+New properties:
+
+* *enableIf* — Whether the Step runs. Although the field is optional, the expression's target type is `bool`, not
+  `bool?`: an expression that evaluates to `null` is an error, not an omitted field, so a skipped producer's `null`
+  can never silently enable a Step. If it evaluates to `false`, the Step is `SKIPPED`: none of its Tasks runs, its
+  Step Environments are not entered, its `Steps.*` symbols are `null`, and it satisfies the `dependsOn` of the Steps
+  that depend on it once its own dependencies are satisfied. If omitted, the Step is always enabled. See
+  [Conditional execution](#conditional-execution-enableif). Constraints:
+    1. It may reference `Param.*` (except `PATH` parameters, which are available only on the worker host),
+       `RawParam.*`, `Job.Name`, `Step.Name`, and the `Steps.*` symbols of the Step's direct dependencies (see
+       [The `Steps.*` scope](#the-steps-scope)).
+    2. It may not reference names bound by the Step's own `let`, `Task.*`, or `Session.*`.
+* *outputVariables* — The output variables that every Task of the Step writes to its output file. See
+  [`<OutputVariableDefinition>`](#outputvariabledefinition) and [Output emission](#output-emission). Constraints:
+    1. Minimum number of elements: If provided, then this list must contain at least one element.
+    2. Maximum number of elements: 32.
+    3. No two elements in this list may have the same value for the `name` property.
+    4. A Step whose parameter space contains a `CHUNK[INT]` Task parameter may not declare *outputVariables*.
+
+> **TODO (deferred): outputs from chunked Steps.** One `onRun` of a `TASK_CHUNKING` Step runs a whole chunk, so the
+> output file needs a per-Task record format before a chunked Step can produce per-Task outputs. That format should
+> be designed together with the per-Task progress report proposed in discussion #169 (checkpointing). Lifting
+> constraint 4 later is backward compatible.
+
+Changed semantics of existing properties:
+
+* *dependencies* — A dependency on a `SKIPPED` Step, or on a Step that succeeded with zero Tasks, is satisfied once
+  that Step's own dependencies are satisfied (see [`<StepDependency>`](#stepdependency)). Listing a producer here
+  is also what makes its `Steps.*` symbols visible to this Step.
+* *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, *script* — These fields may reference the `Steps.*`
+  symbols of the Step's direct dependencies. A format string among them that is resolved at Job creation (not
+  annotated `@fmtstring[host]`) and references `Steps.*` is evaluated at step input binding instead. See
+  [Step input binding](#step-input-binding).
+* *script* — May also reference `Task.OutputFile` if the Step declares *outputVariables*.
+
+##### `<OutputVariableDefinition>`
+
+An `<OutputVariableDefinition>` is the object:
+
+```yaml
+name: <Identifier>
+type: <OutputVariableType>
+description: <Description> # @optional
+# Constraint properties, @optional. The same names and meanings as the
+# <JobParameterDefinition> of the same type: see the table below.
+```
+
+```bnf
+<OutputVariableType> ::= "INT" | "FLOAT" | "STRING" | "BOOL" | "RANGE_EXPR" |
+                         "LIST[INT]" | "LIST[FLOAT]" | "LIST[STRING]" | "LIST[BOOL]" |
+                         "LIST[LIST[INT]]"
+```
+
+Where:
+
+1. *name* — The name by which the output is written to the output file and referenced as
+   `Steps.<StepName>.Output.<name>`. See [`<Identifier>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#71-identifier).
+2. *type* — The type of the value each Task writes. Type names are case-insensitive, as job parameter type names are
+   with `EXPR` enabled, and each maps to the expression type of the job parameter type of the same name (RFC 0007):
+
+   | `<OutputVariableType>` | Expression type of one Task's value | Constraint properties, as on |
+   |---|---|---|
+   | `INT` | `int` | `<JobIntParameterDefinition>`: `allowedValues`, `minValue`, `maxValue` |
+   | `FLOAT` | `float` | `<JobFloatParameterDefinition>`: `allowedValues`, `minValue`, `maxValue` |
+   | `STRING` | `string` | `<JobStringParameterDefinition>`: `allowedValues`, `minLength`, `maxLength` |
+   | `BOOL` | `bool` | `<JobBoolParameterDefinition>`: none |
+   | `RANGE_EXPR` | `range_expr` | `<JobRangeExprParameterDefinition>`: `minLength`, `maxLength` |
+   | `LIST[INT]` | `list[int]` | `<JobListIntParameterDefinition>`: `minLength`, `maxLength`, `item` |
+   | `LIST[FLOAT]` | `list[float]` | `<JobListFloatParameterDefinition>`: `minLength`, `maxLength`, `item` |
+   | `LIST[STRING]` | `list[string]` | `<JobListStringParameterDefinition>`: `minLength`, `maxLength`, `item` |
+   | `LIST[BOOL]` | `list[bool]` | `<JobListBoolParameterDefinition>`: `minLength`, `maxLength` |
+   | `LIST[LIST[INT]]` | `list[list[int]]` | `<JobListListIntParameterDefinition>`: `minLength`, `maxLength`, `item` |
+
+3. *description* — A description of the output. It has no functional purpose, but may appear in UI elements.
+4. Constraint properties — Checked against each Task's value when its output file is read. A value that violates
+   one fails the Task (see [Reading the output file](#reading-the-output-file)). Only the properties the definition
+   declares are checked: a default that a job parameter definition implies when a property is omitted (such as the
+   1024-character default `maxLength` of a `RANGE_EXPR` parameter) does not apply. The `default` and `userInterface`
+   properties of job parameter definitions are not available.
+
+Constraints:
+
+1. `LIST[LIST[INT]]` may only be declared by a Step without a `parameterSpace`. EXPR allows two levels of list
+   nesting, and a multi-Task producer's outputs are collected into a list (see [Reductions](#reductions)).
+2. A constraint property must be valid for the declared type, with the same validity rules as on the job parameter
+   definition of that type (for example, `minValue` may not exceed `maxValue`).
+
+> **TODO (deferred): `PATH` and `LIST[PATH]` outputs.** A path produced on one worker host and read on another needs
+> defined path-mapping semantics, which this draft does not specify. Until then, a producer writes a `STRING` path
+> relative to a `PATH` job parameter and the consumer joins them (`Param.WorkDir / Steps.P.Output.RelPath`), which
+> keeps path mapping on the parameter. Adding the types later is backward compatible.
+
+> **TODO (deferred): producer-declared defaults.** A `default` for an output that a Task doesn't write, or that a
+> skipped Step would otherwise leave `null`, was proposed by Argo's `valueFrom.default` and Tekton's TEP-0048. The
+> `or` operator and conditional expressions cover the use cases at the consumer. Adding an optional `default` later is
+> backward compatible.
+
+##### `<StepDependency>`
+
+> A modification to [`3.2. <StepDependency>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#32-stepdependency)
+
+The object is unchanged. With `CONTROL_FLOW`, the dependency is satisfied when the depended-upon Step has completed
+successfully, which includes completing with zero Tasks, or has been `SKIPPED` and its own dependencies are
+satisfied. The second condition keeps ordering transitive: if `C` depends on `B` and `B` on `A`, then `C` never starts
+before `A` has finished, whether or not `B` runs. A dependency on a Step that failed, or that can never run because one
+of its own dependencies failed, is never satisfied, as today.
+
+##### Task parameter ranges
+
+> A modification to [`3.4.1. <TaskParameterDefinition>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#341-taskparameterdefinition)
+> and to EXPR's [Task Parameter Range Field Extensions](https://github.com/OpenJobDescription/openjd-specifications/wiki/2026-02-Expression-Language#1312-task-parameter-range-field-extensions)
+
+The schema of each `<TaskParameterDefinition>` is unchanged. With `CONTROL_FLOW`, a `range` that is a format string may
+reference the `Steps.*` symbols of the Step's direct dependencies, which makes it a materialization expression
+evaluated at step input binding. The `combination` expression may not reference `Steps.*`: the shape of a parameter
+space (which parameters it has and how they combine) is fixed by the template, even when its size is not.
+
+```yaml
+range: "1-{{Steps.VideoToFrames.Output.FrameCount}}"     # INT, a range string
+range: "{{Steps.Discover.Output.Keys}}"                  # STRING, a ListExpressionString
+range: "{{range(len(Steps.Analyze.Output.Children))}}"   # INT, list[int]; zero Tasks if the list is empty
+```
+
+###### Empty parameter spaces
+
+With `CONTROL_FLOW`, a `range` given as a format string may evaluate to an empty list, for any Task parameter type.
+
+* If the Step's `combination` combines that parameter by product (`*`, the default), the parameter space is empty.
+* If it combines it by association (`(A, B)`), the usual rule that associated ranges have equal lengths applies: an
+  empty range associated with a non-empty one is an error at binding, and associated empty ranges give an empty
+  space.
+
+A Step with an empty parameter space has zero Tasks and completes successfully as soon as its own dependencies are
+satisfied. Its `Steps.*.Output` and `Steps.*.TaskParam` lists are `[]`.
+
+This applies to list results only. A range string has no empty value: `"1-{{N}}"` with `N = 0` is the range `1-0`,
+which §3.4.1.1.1 defines as `[1]` (some implementations reject it instead). An author who wants zero Tasks for
+`N = 0` writes `"{{range(1, N + 1)}}"`, which is a valid empty list. A `range` written as a YAML list literal must
+have at least one item as written; after its items are evaluated (where EXPR flattens a list-valued item), the
+result follows the same rules as a `range` given as a format string, and so may be empty.
+
+###### Range length
+
+With `CONTROL_FLOW`, the 1024-element maximum of §3.4.1 applies to the items of a `range` written as a YAML list
+literal, counted as written, and not to the values a format string evaluates to, which follows the rule §3.4.1.1.1 already states for `<IntRangeExpr>`: the
+number of values is not constrained by this specification, and a scheduler that needs to bound it does so with its
+own limit on the Task count of a Step (see [Limits](#limits)). Computed fan-out is the purpose of this extension, and
+a discovered list of 5,000 object keys is ordinary.
+
+#### `<Environment>`
+
+> A modification to [`4. <Environment>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#4-environment)
+
+```diff
+  name: <EnvironmentName>
+  description: <Description> # @optional
++ enableIf: <bool> | <FormatString> # @optional @fmtstring @extension CONTROL_FLOW
+  script: <EnvironmentScript> # @optional
+  variables: <EnvironmentVariables> # @optional
+```
+
+New property:
+
+* *enableIf* — Whether the Environment is entered. The expression's target type is `bool`, and a `null` result is an
+  error, as for a Step's *enableIf*. If it evaluates to `false`, the Environment is disabled: it is not entered or exited in any Session, its `variables` are not set, and
+  it is not part of the Session's Environment stack. If omitted, the Environment is always enabled. Constraints:
+    1. In a Job Environment (`jobEnvironments`), it may reference `Param.*` (except `PATH` parameters), `RawParam.*`,
+       and `Job.Name`, and is evaluated at Job creation.
+    2. In a Step Environment (`stepEnvironments`), it may also reference `Step.Name` and the `Steps.*` symbols of the
+       enclosing Step's direct dependencies, and is evaluated with the Step's other materialization expressions.
+    3. It may not reference `Session.*`, `Env.*`, or names bound by `let`.
+    4. Permitted only in a Job Template. An `<Environment>` in an Environment Template may not have *enableIf*.
+
+> **TODO (deferred): `enableIf` on individual host requirements.** #81 proposed it for CPU-only vs. GPU templates
+> (U7). EXPR already covers that case: an amount requirement's `min` can be computed (a `min` of `0` imposes nothing)
+> and an attribute requirement's `anyOf` list can be computed. Adding *enableIf* to `<AmountRequirement>` and
+> `<AttributeRequirement>` later is backward compatible.
+
+#### Format strings
+
+> A modification to [`7.3. Format Strings`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#73-format-strings)
+
+##### The `Steps.*` scope
+
+CONTROL_FLOW adds two symbol families and one Task symbol to the value references of §7.3.1:
+
+| Value | Type | Description |
+|---|---|---|
+| `Steps.<StepName>.Output.<VarName>` | See below | The value of output variable `<VarName>` of Step `<StepName>`. |
+| `Steps.<StepName>.TaskParam.<ParamName>` | See below | The value of Task parameter `<ParamName>` for every Task of Step `<StepName>`, in iteration order. |
+| `Task.OutputFile` | `path` | The location of the current Task's output file. |
+
+**Types.** Let `T` be the expression type of one Task's value of output `<VarName>` (from the table in
+[`<OutputVariableDefinition>`](#outputvariabledefinition)), and `U` the expression type of Task parameter
+`<ParamName>` for one Task:
+
+| Producer `<StepName>` | `Steps.<StepName>.Output.<VarName>` | `Steps.<StepName>.TaskParam.<ParamName>` |
+|---|---|---|
+| no `parameterSpace`, no `enableIf` | `T` | (validation error: no Task parameters) |
+| no `parameterSpace`, has `enableIf` | `T?` | (validation error) |
+| has `parameterSpace`, no `enableIf` | `list[T]` | `list[U]` |
+| has `parameterSpace`, has `enableIf` | `list[T]?` | `list[U]?` |
+
+`U` is `int`, `float`, `string`, or `path` for a Task parameter of type `INT`, `FLOAT`, `STRING`, or `PATH`. For a
+`CHUNK[INT]` Task parameter, `U` is `int`: the list has one element per Task, not per chunk, because the Tasks of a
+Step are defined before they are grouped into chunks.
+
+Element `i` of an `Output` list and element `i` of every `TaskParam` list of the same Step belong to the same Task:
+the `i`-th Task in the Step's parameter-space iteration order (see [Reductions](#reductions)).
+
+**Where available.** A `Steps.<StepName>.*` symbol is available in a format string of Step `S` if and only if all of
+the following hold:
+
+1. `S` lists `<StepName>` in its own `dependencies` as a whole-Step dependency. A transitive dependency is not
+   enough, and with `TASK_DEPENDENCIES` a dependency that selects a subspace of the producer's Tasks is not enough.
+2. `<StepName>` is not `S` itself.
+3. The format string is in one of `S`'s *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter
+   `range`s, *stepEnvironments* (any format string, including their *enableIf*), or *script*.
+
+`Steps.*` is not available in the Job Template's `name`, in `jobEnvironments`, in `parameterDefinitions`, in a
+`combination` expression, or anywhere in an Environment Template. A `Steps.<StepName>.TaskParam.<ParamName>` of a
+`PATH` Task parameter is available only in format strings resolved on the worker host (`@fmtstring[host]`), as `PATH`
+`Param.*` values are, and has the consuming Session's path mapping rules applied.
+
+> **TODO (deferred): unmapped Task parameter paths.** There is no `Steps.<StepName>.TaskRawParam.*` in this draft. If
+> a consumer needs the unmapped value of a producer's `PATH` Task parameter in a TEMPLATE-scope field, a raw form can
+> be added later without breaking templates.
+
+`<StepName>` must be an `<Identifier>`: a Step whose name is not of that form cannot be referenced through `Steps.`
+(the Step itself is still valid). `<VarName>` must name an output declared by the Step, and `<ParamName>` a Task
+parameter of the Step.
+
+**Concreteness.** At template validation every `Steps.*` symbol is an `unresolved` value of the type above, so every
+expression that uses one is type-checked by EXPR's existing progressive evaluator. The value becomes concrete:
+
+* `Steps.<StepName>.Output.<VarName>` — when Step `<StepName>` is terminal and has not failed: `SUCCEEDED` (with the
+  values of all of its Tasks) or `SKIPPED` (with the value `null`).
+* `Steps.<StepName>.TaskParam.<ParamName>` — when Step `<StepName>`'s parameter space has been materialized and its
+  `enableIf`, if any, has been decided. For a producer whose parameter space and `enableIf` read no `Steps.*`, that is
+  at Job creation.
+
+**`Task.OutputFile`** is available in the *script* of a Step that declares *outputVariables*: in `<StepScript>`
+*actions*, *embeddedFiles*, and *let*, and in `<SimpleAction>` *script*, *args*, and *let*. Using it anywhere else,
+including a Step Environment of that Step, is a validation error.
+
+##### Template processing stages
+
+> A modification to [`7.4. Template Processing Stages`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#74-template-processing-stages)
+
+| Stage | When | Known Values | Unknown Values | What Happens |
+|---|---|---|---|---|
+| **Template validation** | as today | as today | as today, and `Steps.*`, `Task.OutputFile` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every rule of [Validation](#validation) is checked. |
+| **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`: an *enableIf* that reads no `Steps.*` is evaluated. A Step whose materialization expressions read no unresolved `Steps.*` is bound now; every other Step enters `PENDING_INPUTS`. |
+| **Step input binding** (new, `CONTROL_FLOW` only) | Per Step, once every `Steps.*` symbol its materialization expressions reference is concrete | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.*`, `Session.*` | The Step's materialization expressions are evaluated, in order and atomically. The Step becomes `READY`, `SKIPPED`, or `FAILED`. See [Step input binding](#step-input-binding). |
+| **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies, and `Task.OutputFile` | *(none)* | As today. With `CONTROL_FLOW`, the runtime creates the output file before `onRun` and reads it after `onRun` succeeds. |
+
+### Output emission
+
+#### The output file
+
+Before each attempt to run the `onRun` action of a Task of a producer, the runtime creates an empty file and makes its
+absolute path available as:
+
+* the template variable `Task.OutputFile`, and
+* the environment variable `OPENJD_TASK_OUTPUT_FILE`, set for that `onRun` action only.
+
+The file is specific to one attempt of one Task. The runtime chooses its location; it SHOULD be inside the Session's
+Working Directory, so that an Environment that makes the Working Directory available to a container (for example under
+`WRAP_ACTIONS`) makes the file available too. The action appends lines to it. The runtime does not read the file
+until the action has exited.
+
+Under `WRAP_ACTIONS`, the Task's `onRun` is replaced by the wrapping Environment's `onWrapTaskRun`, which receives the
+same `OPENJD_TASK_OUTPUT_FILE` value, and the wrapped action's `Task.OutputFile` references were resolved to the same
+path. A wrap script that runs the wrapped action in another filesystem namespace must forward the variable and make
+the path writable there, as it does for the Session's Working Directory.
+
+Only a Task's `onRun` action can write outputs. Environment actions have no output file.
+
+> **TODO (deferred): outputs from Environment actions.** No use case requires them yet. A candidate is an
+> Environment whose `onEnter` discovers a license server address that a later Step needs. Adding them later is
+> backward compatible.
+
+#### Grammar
+
+The output file is UTF-8 text with the grammar:
+
+```bnf
+<OutputFile> ::= <BOM>? ( <Line> <EOL> )* <Line>?
+<Line>       ::= <OutputLine> | <WS>*
+<OutputLine> ::= <Identifier> "=" <WS>* <JSON> <WS>*
+<EOL>        ::= "\n" | "\r\n"
+<WS>         ::= " " | "\t"
+<BOM>        ::= U+FEFF        ; a leading byte order mark is ignored
+```
+
+Where `<JSON>` is one JSON value (RFC 8259) containing no line break. There is no whitespace between the start of
+the line, the `<Identifier>`, and the `=`. Names are matched case-sensitively against the declared output names. A
+line that contains only spaces or tabs is ignored.
+
+```
+FrameCount=1440
+FrameRate="24000/1001"
+Keys=["clips/a.mov", "clips/b.mov"]
+Children=[[1, 2], [], []]
+```
+
+A value that contains a line break is written as a JSON string, where the break is the escape `\n`. Tools that write
+JSON on one line, such as Python's `json.dumps` with default arguments, produce valid lines directly.
+
+> **Note for PowerShell authors.** Windows PowerShell 5.1's `Out-File` and `>>` default to UTF-16, and
+> `Add-Content` to the system code page. Use `Add-Content -Encoding utf8` (or PowerShell 7, whose default is UTF-8).
+
+#### Reading the output file
+
+After the `onRun` action exits successfully, the runtime reads the output file and validates it. The Task fails,
+with a message that names the problem, the line number where there is one, and the output variable, if:
+
+1. the file is not valid UTF-8, or contains a NUL character;
+2. a line is neither an `<OutputLine>` nor a `<BlankLine>`;
+3. a line names a variable that the Step does not declare;
+4. a value is JSON `null` or a JSON object, or doesn't convert to the declared type (see below);
+5. a value violates a constraint property of its declaration;
+6. a declared variable has no line; or
+7. the file exceeds the runtime's size limit (see [Limits](#limits)).
+
+Rules 1–3 apply to every line. If a variable has more than one line, the last one is used, and rules 4 and 5 apply
+to it alone.
+
+If the `onRun` action fails, is canceled, or times out, the file is discarded unread and the attempt has no outputs.
+
+**Type conversion.** A JSON value is first given its natural EXPR type: a number with neither a fraction nor an
+exponent that fits in a signed 64-bit integer is an `int`, any other number is a `float`, a string is a `string`,
+`true` and `false` are `bool`, and an array is a list. Array elements are typed by the same rule and the array is
+inferred as a list literal with the declared type as its target (§1.2.6 of the Expression Language). The value is
+then converted to the declared type with EXPR's implicit non-destructive coercion (§1.2.3), so that a `Steps.*` value
+behaves in an expression exactly like a `Param.*` value of the same type. `null` anywhere in a value, an object
+anywhere in a value, and nesting deeper than the declared type are errors. For example:
+
+| Declared type | Line | Result |
+|---|---|---|
+| `INT` | `N=12` | `12` |
+| `INT` | `N=12.0` | `12` |
+| `INT` | `N=12.5` | Error: `12.5` cannot be represented exactly as an `int` |
+| `FLOAT` | `X=3` | `3.0` |
+| `STRING` | `S="a=b"` | `"a=b"` |
+| `STRING` | `S=123` | `"123"` |
+| `BOOL` | `B=true` | `true` |
+| `RANGE_EXPR` | `R="1-10:2"` | `1-10:2` |
+| `RANGE_EXPR` | `R=[1, 3, 5]` | Error: a `list[int]` does not implicitly coerce to `range_expr` |
+| `LIST[INT]` | `L=[]` | `[]` |
+| `LIST[FLOAT]` | `L=[1, 2.5]` | `[1.0, 2.5]` |
+| `LIST[STRING]` | `L=[1, "a"]` | `["1", "a"]` |
+| `LIST[INT]` | `L=[1, null]` | Error: `null` cannot be a list element |
+| `LIST[LIST[INT]]` | `G=[[1], []]` | `[[1], []]` |
+| any | `X=null` | Error: outputs are not optional |
+
+**Commit.** A Task's output values are committed when the Task succeeds. The values of every Task of a producer are
+retained by the scheduler for the life of the Job. A scheduler SHOULD make each Task's committed outputs visible to
+users, for example next to the Task's parameters, since they are often useful with no consumer at all.
+
+Output values are stored and may be displayed, so they are not redacted and MUST NOT be used to pass secrets.
+
+#### Limits
+
+1. A runtime MUST accept an output file of at least 1 MiB (1,048,576 bytes) per Task and MAY accept larger files. A
+   file larger than the runtime's limit fails the Task.
+2. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
+   list outputs that feed a parameter space.
+3. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
+   fails at step input binding, before any of its Tasks runs, with a message that names the limit.
+4. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
+
+#### Retries and re-runs
+
+* **Retry of a failed attempt.** A failed attempt committed nothing, so a retry gets a new, empty output file.
+* **Re-run of a succeeded Task.** A scheduler that allows re-running a Task that already succeeded MUST apply these
+  rules to the re-run Task's own output values once any output value of the producer has been **consumed**, meaning
+  that a consumer has been bound with it or a Task of a consumer has started:
+    1. If the re-run succeeds and writes the same values as before, nothing changes.
+    2. If the re-run succeeds and writes different values, the re-run is marked failed, with a message that names the
+       output and a consumer that has consumed it. The committed values are unchanged.
+    3. If the re-run fails, it commits nothing, as any failed attempt, and the committed values are unchanged.
+
+  Before any value has been consumed, a successful re-run's values replace that Task's earlier values.
+
+> **TODO (deferred): cascade recompute.** A scheduler could instead invalidate and re-bind every Step that consumed
+> the changed values, transitively. That has a large blast radius and is scheduler policy, so this draft only defines
+> the safe default above. A scheduler capability for cascade recompute can be added later.
+
+### Modifications to the Expression Language
+
+CONTROL_FLOW adds no types, functions, or operators to EXPR. It adds:
+
+* The `Steps` root symbol and its `Output` and `TaskParam` members, and the `Task.OutputFile` symbol, with the types
+  and scopes of [The `Steps.*` scope](#the-steps-scope).
+* The empty-list rule of [Empty parameter spaces](#empty-parameter-spaces) for Task parameter ranges.
+* A validation warning. EXPR discards a `null` silently in three places (§1.3.2 of the Expression Language): an
+  interpolation with text around it becomes the empty string, so `"--size {{Steps.P.Output.X}}"` becomes
+  `"--size "`; a list item (such as an entry of `args`) is dropped; and an optional field is omitted. An
+  implementation of template validation MUST emit a warning (not an error) for every interpolated expression in one
+  of those three positions whose static type includes `nulltype` and that references, directly or through a `let`
+  binding, a `Steps.*` symbol of a conditional Step. The warning names the expression and suggests a conditional
+  expression or an `or` default. An expression whose type has no `nulltype`, such as
+  `'frames only' if x == null else string(x)`, draws no warning, and neither does *enableIf*, where `null` is an
+  error.
+
+Symbol collection (RFC 0005) is how an implementation finds a Step's `Steps.*` references, both to check them and to
+decide whether the Step needs step input binding.
+
+> **TODO (deferred): functions for correlating results.** Finding the Task that produced the best value currently
+> needs a comprehension over indices (see the sweep example). `argmin(list[T]) -> int` and `argmax`, or a list
+> `index(list, item)`, would make it direct. They are a change to RFC 0006 and don't depend on this RFC.
+
+### Step input binding
+
+#### Materialization expressions
+
+A Step's **materialization expressions** are its format strings that the scheduler must evaluate to know whether the
+Step runs and what its Tasks are. They are, in evaluation order:
+
+1. *enableIf*;
+2. *let*;
+3. *hostRequirements*;
+4. the `range` of each Task parameter in *parameterSpace*, in declaration order, then the other format strings of
+   *parameterSpace* (with `TASK_CHUNKING`, the `chunks` fields such as `defaultTaskCount`);
+5. with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies* (see
+   [Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies));
+6. the TEMPLATE-scope format strings of each of its *stepEnvironments*, in order, each starting with its *enableIf*;
+7. the TEMPLATE-scope format strings of its *script*, such as an action's `timeout` and `cancelation` fields.
+
+These are all of the Step's format strings that are resolved at Job creation today (those not annotated
+`@fmtstring[host]`), plus the new *enableIf* fields. A format string that a future extension adds to a Step and that
+is resolved at Job creation is a materialization expression too, evaluated after those above. Format strings resolved on the worker host are not
+materialization expressions, even if they reference `Steps.*`: a Step's `dependencies` already guarantee that the
+values they read are concrete before any of its Tasks runs.
+
+#### When a Step is bound
+
+A Step is bound once, at the earliest moment every `Steps.*` symbol referenced by its materialization expressions is
+concrete:
+
+* If its materialization expressions reference no `Steps.*` symbol, or only symbols that are concrete at Job
+  creation, it is bound at Job creation, as every Step is today.
+* Otherwise it enters `PENDING_INPUTS` at Job creation and is bound when the last of those symbols becomes concrete.
+* If a Step whose `Steps.*.Output` symbols it references fails, or can never run because one of its own dependencies
+  failed, the Step can never be bound. It stays blocked and never runs, as a Step whose dependency failed does today.
+
+#### What binding does
+
+Binding evaluates the Step's materialization expressions in the order above, with the referenced `Steps.*` symbols
+concrete, and then:
+
+1. If *enableIf* is `false`, the Step becomes `SKIPPED`. Nothing after *enableIf* is evaluated, so a disabled Step's
+   *let* bindings may assume the Step runs (for example, `min(...)` of a list that is only non-empty when it does).
+2. Otherwise the Step's parameter space is materialized from the evaluated ranges and its `combination`, and the
+   scheduler checks it, and with `TASK_DEPENDENCIES` the Task graph, against its limits.
+3. If every evaluation and check succeeds, the Step becomes `READY` with its Tasks enumerable. Its Tasks are then
+   scheduled as today: when every dependency is satisfied and a Worker Host meets its host requirements. A Step with
+   zero Tasks completes successfully when its dependencies are satisfied.
+4. If any evaluation fails (including a `fail(...)` call and a `null` where a value is required) or any check fails
+   (a Task count over the scheduler's limit, or with `TASK_DEPENDENCIES` a cycle or an out-of-range index), the Step
+   becomes `FAILED` before any of its Tasks is dispatched. The failure message names the field and the expression.
+
+Binding is atomic: either every materialization expression succeeds and the Step's Tasks exist, or none of its Tasks
+runs.
+
+#### Implementation strategy
+
+A scheduler may create a `PENDING_INPUTS` Step's Tasks only when it is bound (deferred creation), or create the Step
+first and fill in its Tasks when it is bound (create-then-update). The observable contract is the same: a Step's
+Tasks are enumerable if and only if it has been bound and is not `SKIPPED`. A scheduler or tool that reports a
+`PENDING_INPUTS` Step SHOULD report its Task count as not yet known and name the outputs it is waiting for, for
+example "determined at run time from `Steps.VideoToFrames.Output.FrameCount`".
+
+### Conditional execution: `enableIf`
+
+* **Static or dynamic.** An *enableIf* that references no `Steps.*` symbol is decided at Job creation. One that does
+  is decided at the Step's binding. A statically disabled Step is still part of the Job and is shown as `SKIPPED`, so
+  every Job created from a template has the same Steps, whatever its parameter values.
+* **A skipped Step** runs no Tasks and enters no Environments. It satisfies the `dependsOn` of the Steps that depend
+  on it once its own dependencies are satisfied, and its `Steps.*.Output` and `Steps.*.TaskParam` symbols are
+  `null`. Its dependents run, and those that read its outputs must handle `null`, which the `T?` type of the symbols
+  makes visible:
+
+  ```yaml
+  let:
+    - video_bytes = Steps.EncodeVideo.Output.VideoBytes or 0
+  ```
+
+  A consumer that should not run when its producer was skipped says so:
+
+  ```yaml
+  enableIf: "{{Steps.EncodeVideo.Output.VideoBytes != null}}"
+  ```
+
+* **Only the skipped Step's own symbols are `null`.** A Step that ran after a skipped Step has ordinary outputs.
+* **A disabled Environment** is left out of the Session's Environment stack: it is not entered, its `variables` are
+  not set, and Sessions are matched to Tasks as if it were not defined. A disabled Job Environment is disabled for
+  every Session of the Job; a disabled Step Environment for every Session that runs that Step's Tasks.
+* **Failure is not skipping.** A Step that fails, or can never run because a dependency failed, does not satisfy
+  `dependsOn`, as today. A Step that is `SKIPPED` but one of whose own dependencies fails never satisfies `dependsOn`
+  either. Its `null` symbols are concrete as soon as it is skipped, so a consumer may be bound with them, but the
+  consumer stays blocked behind the failure, as any Step behind a failed dependency does.
+
+### Reductions
+
+A multi-Task producer's output is a list with one element per Task, and the Steps that read it reduce it with the
+existing EXPR function library:
+
+```yaml
+let:
+  - total = sum(Steps.Transcode.Output.OutputBytes)
+  - best = min(Steps.Sweep.Output.mpjpe_mm)
+  - best_i = [i for i in range(len(Steps.Sweep.Output.mpjpe_mm)) if Steps.Sweep.Output.mpjpe_mm[i] == best][0]
+  - best_window = Steps.Sweep.TaskParam.Window[best_i]
+```
+
+1. **Order.** The list is in the producer's parameter-space iteration order: the order in which the producer's
+   `combination` expression enumerates its Tasks (or the default combination when it has none), independent of the
+   order in which Tasks ran, finished, or were retried. A multi-dimensional space is flattened in that order (CWL's
+   `flat_crossproduct`). For example, with `combination: "A * B"` the last parameter varies fastest.
+2. **Alignment.** Element `i` of every `Steps.P.Output.*` list and every `Steps.P.TaskParam.*` list belongs to the
+   same Task.
+3. **Completeness.** The list is concrete only when every Task of the producer has succeeded, so there are no partial
+   values. A producer with zero Tasks has empty lists.
+4. **Nesting.** A per-Task `LIST[T]` output becomes `list[list[T]]`. A per-Task `LIST[LIST[INT]]` output is not
+   allowed on a multi-Task producer (see [`<OutputVariableDefinition>`](#outputvariabledefinition)).
+5. **Cost.** An implementation may assemble a list when it is first used rather than when the producer finishes.
+
+> **TODO (deferred): partial reductions.** Values from the Tasks of a producer that have finished, before all of them
+> have, would let a consumer start early. "Iteration order" is not well defined for an incomplete set, and such a
+> value would make a consumer's structure depend on scheduling. A separate symbol can be added later.
+
+### Modifications to How Jobs Are Run
+
+> A modification to [How Jobs Are Run](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run)
+
+#### Step states
+
+A scheduler tracks, for each Step of a Job, a state from the diagram in [Step states](#step-states). The states this
+RFC adds to the model are:
+
+* `PENDING_INPUTS` — The Step's materialization expressions reference a `Steps.*` symbol that is not concrete. Its
+  Tasks are not enumerable and none can be scheduled.
+* `SKIPPED` — The Step's *enableIf* evaluated to `false`. It is terminal and runs nothing. A dependency on it is
+  satisfied once the skipped Step's own dependencies are satisfied, so ordering stays transitive.
+
+A Step that has been bound and is not `SKIPPED` is gated by its dependencies exactly as today. A Step whose binding
+fails is `FAILED`, which, like any failed Step, does not satisfy `dependsOn`.
+
+#### Session Environment Variables
+
+> A modification to [Session Environment Variables](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#session-environment-variables)
+
+| **Environment Variable** | **Value** | **Corresponding Template Variable** |
+|---|---|---|
+| `OPENJD_TASK_OUTPUT_FILE` | The absolute path to the current Task's output file. Set only for the `onRun` action of a Task of a Step that declares `outputVariables`. `CONTROL_FLOW` only. | `Task.OutputFile` |
+
+How Jobs Are Run asks that new environment variables be weighed against the "Tooling parseable" tenet. This one passes
+the test `OPENJD_SESSION_WORKING_DIR` passed: the data flow is declared in `outputVariables`, whichever way a script
+reaches the file, so tooling loses nothing. The variable exists for nested subprocesses, such as an adaptor, that
+cannot see template variables.
+
+#### Stdout messages
+
+No stdout message is added. A runtime does not recognize `openjd_output_var:` or any other stdout line as setting an
+output, with or without `CONTROL_FLOW`.
+
+> **TODO (deferred): a stdout directive.** #111 proposed `openjd_output_var: <Name>=<JSON>`. This draft leaves it
+> out for security (see [Design Choices](#2-outputs-go-to-a-session-supplied-file-not-a-stdout-directive)). If the
+> discussion shows a runtime where writing a file is impractical, a directive with the same line grammar could be
+> added later as a second channel, restricted to declared names.
+
+### Composition with `TASK_DEPENDENCIES`
+
+`TASK_DEPENDENCIES` is a separate extension, not yet specified, for dependencies between individual Tasks (#82). It
+does not depend on `CONTROL_FLOW`, and `CONTROL_FLOW` does not depend on it. When a template lists both:
+
+1. The subspace ranges of a Step's *dependencies* are materialization expressions of that Step, evaluated at its
+   binding after its parameter space is materialized, once per Task of the Step. They may reference the `Steps.*`
+   symbols of the Step's direct whole-Step dependencies.
+2. At binding the scheduler builds the Step's Task-level dependency graph from those ranges and checks it. A cycle,
+   or an index outside the depended-upon Step's parameter space where `TASK_DEPENDENCIES` makes that an error, fails
+   the Step before any of its Tasks runs. An empty subspace selects no Tasks.
+3. A dependency with a subspace does not satisfy rule 1 of [The `Steps.*` scope](#the-steps-scope), because it lets
+   the Step's Tasks start before every Task of the producer has finished.
+
+> **TODO (depends on `TASK_DEPENDENCIES`):** the subspace field's name and schema, the scope of `Task.Param.*` inside
+> it, and the treatment of out-of-range values belong to the `TASK_DEPENDENCIES` RFC. Whichever of the two RFCs is
+> accepted second states these rules unconditionally.
+
+### Validation
+
+Every rule this extension adds, and when it is checked.
+
+**At template validation** (by the model library, before submission):
+
+1. `CONTROL_FLOW` is listed only together with `EXPR`.
+2. *outputVariables*: 1 to 32 elements; names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint properties are
+   valid for the type; no `LIST[LIST[INT]]` on a Step with a `parameterSpace`; none on a Step with a `CHUNK[INT]` Task
+   parameter.
+3. Every `Steps.<StepName>.Output.<VarName>` names a Step with an `<Identifier>` name that declares output
+   `<VarName>`. Every `Steps.<StepName>.TaskParam.<ParamName>` names a Step that has Task parameter `<ParamName>`.
+4. A Step that references `Steps.<StepName>.*` lists `<StepName>` directly in its `dependencies` as a whole-Step
+   dependency, and `<StepName>` is not the Step itself.
+5. `Steps.*` appears only in the fields listed in [The `Steps.*` scope](#the-steps-scope), and a `PATH`
+   `Steps.*.TaskParam.*` only in format strings resolved on the worker host.
+6. `Task.OutputFile` appears only in the script of a Step that declares *outputVariables*.
+7. *enableIf* references only the symbols its location allows, and does not appear in an Environment Template.
+8. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types; *enableIf* has type
+   `bool`.
+9. The warning of [Modifications to the Expression Language](#modifications-to-the-expression-language) for an
+   optional-typed expression that reads a conditional Step's `Steps.*` symbol where EXPR discards `null`.
+10. The Step dependency graph is acyclic, as today.
+
+**At step input binding** (by the scheduler, before any Task of the Step runs): every materialization expression
+evaluates; ranges are valid (a range string may not be empty; a list may be); the Task count is within the
+scheduler's limit; and with `TASK_DEPENDENCIES`, the Task graph is acyclic.
+
+**When a Task's output file is read** (by the runtime, after `onRun` succeeds): the rules of
+[Reading the output file](#reading-the-output-file), including type conversion, constraint properties, missing
+outputs, and the size limit.
+
+**On re-run** (by the scheduler): the rules of [Retries and re-runs](#retries-and-re-runs).
+
+## Prior Art
+
+Comparable workflow systems split into two families. **Fixed graph, late-bound width** systems (Argo Workflows,
+Apache Airflow, GitHub Actions, Tekton, AWS Step Functions, CWL) fix the set of units when a run is created, and let
+only the number of instances of a fanned-out unit, and whether a unit is skipped, depend on run-time data. **Graph
+re-evaluation** systems (Snakemake checkpoints, HTCondor DAGMan `SUBDAG EXTERNAL`, Slurm self-submission, Nextflow
+streaming) let running work generate new structure, at the cost of static validation and of any view of total work
+before the run. CONTROL_FLOW is in the first family, which is the line discussion #22 drew for OpenJD.
+
+| System | Outputs declared and typed | Emitted through | Referenced as | Fan-out from data | Dependents of a skipped unit | Fan-in |
+|---|---|---|---|---|---|---|
+| Argo Workflows | `outputs.parameters`, strings | file (`valueFrom.path`) or stdout (`result`) | `{{tasks.A.outputs.parameters.p}}` | `withParam` over a JSON array | run; outputs resolve to `""` | looped outputs as a JSON array |
+| Apache Airflow | implicit return value, untyped | return value → XCom | `XComArg` argument | `.expand()`, `max_map_length` 1024 fails the producer | skip cascades; joins need trigger rules | lazy sequence of results |
+| GitHub Actions | `jobs.<id>.outputs`, strings | file `$GITHUB_OUTPUT` (stdout `::set-output` deprecated) | `${{ needs.A.outputs.x }}`, needs a `needs` edge | `matrix` from `fromJSON(...)`, max 256 | skip cascades unless `always()` | none; outputs collide |
+| Tekton | `results[]` typed `string`/`array`/`object` | file `$(results.r.path)` | `$(tasks.A.results.r)` | `matrix` over array results, max 256 | ordering dependents run; result consumers skip | `results.r[*]` array |
+| AWS Step Functions | none; JSON state | task result JSON | JSONPath / JSONata | `Map` over an array or S3 | n/a (branching is a transition) | ordered array |
+| CWL | typed, including optional `T?`, arrays, records | `outputBinding` glob or `cwl.output.json` | `source: stepA/out` | `scatter` over array inputs | outputs are `null` | arrays; `pickValue` for conditional sources |
+| Snakemake | file patterns | files | input patterns | `checkpoint` re-evaluates the DAG | n/a | aggregation rule |
+| Slurm | none | files | convention | `--array` fixed at submission | n/a | `afterok:<array>`; `aftercorr` is per-element |
+| HTCondor DAGMan | none | files, exit codes | `VARS` macros | `SUBDAG EXTERNAL` generated at run time | `PRE_SKIP` | `PARENT ... CHILD` |
+
+What this RFC takes from them:
+
+* **Typed outputs** (Tekton, CWL). Declared types let a validator check every reference, every range built from it,
+  and every condition before the run. Systems with string outputs (Argo, GitHub Actions) find those errors at run
+  time.
+* **A file for emission** (GitHub Actions, Tekton, Argo, CWL). GitHub Actions moved from `::set-output` on stdout to
+  the `$GITHUB_OUTPUT` file because any tool that echoed attacker-influenced text could forge outputs.
+* **An explicit edge to read outputs** (GitHub Actions `needs`, Argo `dependencies`). Airflow, Tekton, and CWL derive
+  edges from references instead; OpenJD already has explicit `dependencies`.
+* **`null` for a skipped unit's outputs** (CWL). CWL's `pickValue` is the explicit answer to "which of these
+  possibly-skipped producers supplies the value"; in EXPR the `or` operator and conditional expressions do the same.
+  The surveyed alternatives each have a pitfall: Airflow and GitHub Actions cascade skips and need special trigger
+  rules at joins, Argo and GitHub Actions turn missing outputs into an empty string, and Tekton skips consumers of a
+  skipped task along an edge that is implicit in its expressions.
+* **Fail the producer** on a missing output (CWL, Nextflow, Snakemake, Argo without a default) and on an oversized
+  fan-out (Airflow's `max_map_length`). Tekton fails the consumer on a missing result, which is harder to diagnose.
+* **Ordered lists for fan-in** (Step Functions `Map`, Tekton `[*]`, Argo loop outputs, CWL scatter), with a defined
+  flattening of multi-dimensional fan-outs (CWL's `flat_crossproduct`).
+* **Limits with a guaranteed minimum.** GitHub Actions allows 1 MB of outputs per job, Step Functions 256 KiB per
+  state, Tekton 4 KB per TaskRun by default. This RFC guarantees at least 1 MiB per Task.
+
+What this RFC does differently:
+
+* **An empty fan-out succeeds** rather than being skipped (Airflow, Argo, Tekton) or failing (GitHub Actions), so a
+  computed parameter space never makes a Step's outputs optional (see
+  [Design Choices](#7-an-empty-computed-parameter-space-is-a-zero-task-success)).
+* **Re-runs are specified.** Render farms routinely requeue Tasks that succeeded, and the surveyed DAG systems mostly
+  treat a run as one-shot (Airflow's "clear downstream" is the exception). This RFC defines a safe default.
+
+The full survey, with per-system notes and references, is in
+[02-external-prior-art.md](../docs/control-flow-investigation/02-external-prior-art.md).
+
+Within OpenJD, the draft `SERVICE` RFC (0009, discussion #145) is the closest precedent for a late-bound symbol scope
+(`Service.*`, `unresolved` until a later stage), and RFC 0008's `WrappedStep` root is the precedent for naming a Step
+other than the current one without overloading `Step`.
+
+## Implementation Impact
+
+- **Python (openjd-model)**: New schema fields (`outputVariables`, `enableIf` on Steps and Environments) gated on the
+  extension, and the `Steps` symbol family in the template-validation symbol table with types derived from the
+  producer. The validation rules are graph checks over existing data (direct dependency, identifier names, field
+  scopes) plus the format-string warning. Job creation must stop treating every TEMPLATE-scope field as resolvable at
+  creation: it reports which Steps need binding and exposes a function that binds one Step given the concrete
+  `Steps.*` values, which schedulers and the CLI call. The parameter-space iterator already defines the order
+  reductions need.
+- **Rust (openjd-rs)**: The same model changes. Two existing behaviors change under the extension: a computed range
+  may be empty, and the 1024-element cap that `crates/openjd-model/src/job/create_job/ranges.rs` applies to computed list ranges
+  (`max_task_param_range_len`) applies only to YAML list literals, with a scheduler-supplied Task count limit taking
+  its place.
+- **Sessions (openjd-sessions, Python and Rust)**: Before `onRun` of a producer's Task, create the output file and set
+  `OPENJD_TASK_OUTPUT_FILE`; after a successful exit, read, parse, convert, and validate it, and return the values with
+  the Task result. This happens once per Task at the end of `run_task`, not in the stdout filter. A size limit joins
+  the existing session limits. No stdout parsing changes.
+- **CLI (`openjd run`)**: Runs Steps in dependency order already, so it binds each Step just before running it, passes
+  the collected values in, and prints each Task's outputs. `openjd summary` reports a Step that would need binding as
+  having a Task count determined at run time.
+- **Schedulers**: The largest work: storing committed output values for the life of the Job, the `PENDING_INPUTS` and
+  `SKIPPED` states, triggering binding when producers finish, displaying outputs and pending Steps, and the re-run
+  rule. A scheduler that creates every Task at submission today must either defer creating a pending Step's Tasks or
+  support adding them later.
+
+No part of the design is harder in one language than another: the parsing is JSON, the evaluation is EXPR, and the
+graph checks are the ones implementations already run on Step dependencies. Output values are small by design, and a
+reduction is evaluated once per consumer, at binding or at Task start.
+
+## Rejected Ideas
+
+### `openjd_output_var:` on stdout as the emission channel
+
+Proposed in #111 and designed in detail during this investigation. Rejected as the channel for v1 because a Task's stdout carries text from
+third-party tools, so a stdout channel lets that text forge the values that shape the rest of the Job (see
+[Design Choices](#2-outputs-go-to-a-session-supplied-file-not-a-stdout-directive)). It could be added later as an
+alternative channel if the discussion shows a runtime where writing a file is impractical.
+
+### `Step.<StepName>.<VarName>`
+
+Proposed in #111. Rejected because `Step` already means the current Step, a Step named `Name` would be unreachable,
+and every future `Step.<Property>` would be a breaking change (see
+[Design Choices](#3-a-new-steps-root-with-output-and-taskparam-levels)).
+
+### Transitive access to outputs
+
+Letting any downstream Step read `Steps.P.*` saves a `dependsOn` line in long chains but hides data flow from readers
+and tools. Rejected in favor of direct dependents only.
+
+### References that create dependency edges
+
+Airflow, Tekton, and CWL infer an edge from a data reference. OpenJD Steps declare their edges, and having two
+sources of edges would make it harder to read a template's structure. A reference without an edge is an error that
+names the fix.
+
+### Skipping the consumers of a skipped Step (Tekton's rule)
+
+Rejected because enablement would flow along an edge that exists only in expression text, and because the explicit
+form is one line (see [Design Choices](#6-a-skipped-step-satisfies-ordering-and-yields-null-data)).
+
+### Treating an empty computed parameter space as skipped
+
+Rejected because every Step with a computed parameter space would then have optional outputs (see
+[Design Choices](#7-an-empty-computed-parameter-space-is-a-zero-task-success)).
+
+### Declared reductions
+
+`reduce: MAX | MIN | SUM | LIST` on each output was implied by #111. Rejected because the full list plus EXPR
+functions does everything a declared reduction does, lets consumers reduce differently, and keeps the correlation
+between results and configurations that the sweep needs.
+
+### An outputs-only extension first
+
+folouiseAWS's two-part plan. Rejected as a split of the specification, though not of implementation work (see
+[Design Choices](#1-variable-data-flow-is-part-of-control_flow-not-a-standalone-extension)).
+
+### Task-task dependencies inside CONTROL_FLOW
+
+Rejected in favor of a separate `TASK_DEPENDENCIES` extension that composes with this one (see
+[Design Choices](#10-task-task-dependencies-are-a-separate-extension)).
+
+### A record or map type for structured outputs
+
+Passing a Task's three metrics and its configuration as one record would make the sweep read more naturally. RFC 0007
+rejected map types for EXPR, and parallel lists aligned by index cover the use cases with no new type.
+
+### Tasks that add Steps to a running Job
+
+Houdini PDG-style dynamic work (U15) needs the step graph itself to change. Every surveyed system that allows this
+loses static validation and the view of total work at the dynamic boundary. Discussion #22 pointed that use case at a
+separate mechanism, standalone StepTemplates submitted into a running Job, which this RFC neither replaces nor
+precludes.
+
+## Open Questions
+
+These are to be raised on discussion #111 before this RFC leaves draft. Each has the answer this draft adopts. The
+reasoning is in [04-design-space.md §6](../docs/control-flow-investigation/04-design-space.md#6-open-questions-for-the-discussion-thread).
+
+1. **Emission channel.** A session-supplied file, not stdout. Does anyone have a runtime where writing a file is
+   harder than printing a line?
+2. **Namespace.** `Steps.<Name>.Output.<Var>` and `Steps.<Name>.TaskParam.<Param>`, with referenced Steps required to
+   have `<Identifier>` names. Alternative: drop `.Output` and reserve a short list of property names.
+3. **Direct dependents only.** Adopted.
+4. **Output shape.** Scalar for a producer without `parameterSpace`, a list in iteration order otherwise; reductions
+   are ordinary EXPR.
+5. **Correlating a reduced value with its Task.** `Steps.*.TaskParam` lists now, and a separate RFC 0006 addendum for
+   `argmin`/`argmax`, or a list `index`, or `zip`. Which is preferred?
+6. **Fields that may reference outputs.** The materialization expressions plus host-scope script fields; not
+   `combination`, job-level fields, or Environment Templates.
+7. **Emission rules.** Only `onRun`; last line wins; missing, malformed, undeclared, mistyped, or out-of-constraint
+   values fail the Task; failed attempts commit nothing; outputs are not secrets. Does anyone need outputs from an
+   Environment's `onEnter`?
+8. **Chunked producers.** Deferred; coordinate the format with #169.
+9. **Limits.** At least 1 MiB per Task, constraints checked at the producer, an optional scheduler Task-count limit
+   checked at binding. Is 1 MiB the right floor?
+10. **Range length.** This draft lifts the 1024-element cap for ranges given as format strings in `CONTROL_FLOW`
+    templates, in favor of the scheduler's Task-count limit, as `<IntRangeExpr>` already does. Should the relaxation
+    apply only to ranges that read `Steps.*`?
+11. **Empty parameter spaces.** A zero-Task success; range strings still can't be empty. Separately from this RFC,
+    the specification and implementations disagree on a descending range such as `1-0`: §3.4.1.1.1 defines it as
+    `[1]`, and openjd-rs rejects it. That should be settled on its own.
+12. **`enableIf`.** `SKIPPED` satisfies `dependsOn` once the skipped Step's own dependencies are satisfied; a skipped
+    Step's symbols are `null` and typed `T?`; evaluated before step `let`; on Steps and Environments; shipped in
+    `CONTROL_FLOW`. Is a warning enough where EXPR silently discards a conditional Step's `null`, or should
+    it be an error? Do issue #80 users need static `enableIf` sooner than `CONTROL_FLOW` can ship?
+13. **Re-runs.** A differing re-run after consumption fails; cascade recompute is a possible scheduler capability.
+    Is "fail the re-run" acceptable to render-farm operators?
+14. **`TASK_DEPENDENCIES` beside, not inside.** Adopted.
+15. **Output file encoding.** UTF-8 only, with a leading BOM ignored. Should UTF-16 with a BOM be accepted, given
+    Windows PowerShell 5.1's defaults?
+16. **Coercion strictness.** This draft converts JSON values with EXPR's implicit coercion, so `S=123` is the string
+    `"123"` for a `STRING` output. Should output conversion be stricter than EXPR's?
+17. **Number of outputs per Step.** This draft allows up to 32. Is a limit needed, and is that the right one?
+18. **Standalone StepTemplates (#22).** Not replaced by this RFC. May a Step appended to a running Job reference
+    `Steps.*`?
+
+## Future Work
+
+Each of these was deferred from this draft and can be added later without breaking templates written against it.
+Each has a **TODO** block at the place in the specification it would change.
+
+| Deferred | Why it can wait |
+|---|---|
+| Outputs from Steps with a `CHUNK[INT]` Task parameter | Needs a per-Task record format inside a chunk; shares a design with #169 checkpointing. |
+| `PATH` and `LIST[PATH]` outputs | Path mapping of a value produced on another host is unspecified; a `STRING` joined to a `PATH` parameter covers the cases. |
+| Producer-declared `default` | `or` and conditional expressions cover the cases. |
+| Partial reductions | Iteration order is ill-defined for an incomplete set. |
+| Cascade recompute on re-run | Large blast radius; scheduler policy. |
+| `enableIf` on individual host requirements | Computed amounts and attribute lists cover U7. |
+| `argmin`/`argmax`, list `index`, `zip`/`enumerate` | Comprehensions work; belongs to RFC 0006. |
+| Outputs from Environment actions | No use case yet. |
+| `Steps.*.TaskRawParam` | No use case yet. |
+| Task-task dependencies | A separate `TASK_DEPENDENCIES` RFC, from #82. |
+| An `openjd_output_var:` stdout directive | Left out for security; addable as a second channel if needed. |
+| Standalone StepTemplates appended to a running Job (#22) | A different mechanism, for a separate RFC. |
+
+## Copyright
+
+This document is placed in the public domain or under the CC0-1.0-Universal license, whichever is more permissive.
