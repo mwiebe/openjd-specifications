@@ -1515,8 +1515,8 @@ The runtime processes each directive when it reads the line:
 A directive that fails any of these checks is **invalid**. The runtime MUST NOT ignore an invalid directive. As soon
 as it finds one, it MUST cancel the Action it is attributed to and fail it (for a Task's `onRun`, the Task's
 attempt), whatever the exit code, with a message that names the output, the problem, and the offending text.
-Cancelling at once avoids spending the rest of the run on an attempt that can't succeed, and makes the outcome the
-same in every runtime. The cancel is the Action's normal cancelation, including its notify period. Specifically, a
+Canceling at once avoids spending the rest of the run on an attempt that can't succeed, and makes the outcome the
+same in every runtime. The cancel is the Action's normal cancelation, with its notify period, if any. Specifically, a
 directive is invalid if:
 
 1. the text after `openjd_output_var:` does not match the grammar, or `<JSON>` is not valid JSON;
