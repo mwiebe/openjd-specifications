@@ -998,8 +998,9 @@ often change after the Job has run, and may reasonably differ between schedulers
 (`Step.Name`), so reusing it would make a Step named `Name` unreachable and turn every future `Step.<Property>` into a
 breaking change. RFC 0008 avoided the same problem with a separate `WrappedStep` root. This RFC uses:
 
-* `Steps.<StepName>.Output.<VarName>` for an output value, and
-* `Steps.<StepName>.TaskParam.<ParamName>` for the producer's Task parameter values, aligned with its output lists.
+* `Steps.<StepName>.Output.<VarName>` for an output value,
+* `Steps.<StepName>.TaskParam.<ParamName>` for the producer's Task parameter values, aligned with its output lists,
+  and
 * `Steps.<StepName>.RawOutput.<VarName>` and `Steps.<StepName>.TaskRawParam.<ParamName>` for the same values with no
   path mapping applied, as `RawParam.*` is to `Param.*` (see
   [Design Choices](#14-path-values-are-stored-in-the-submission-path-context)).
@@ -1125,8 +1126,8 @@ correctly. Deadline Cloud, for example, reverses the mapping from the worker's c
 
 A path for which the runtime can find no submission-context form is invalid when the Session has rules, because it
 names a location that only that worker can see, most often the Session Working Directory, which is deleted when the Session ends. When a Session has no
-rules, as with `openjd run` on one host, the worker and submission contexts are the same and the value is stored
-unchanged.
+rules, as with `openjd run` on one host, the worker and submission contexts are the same and an absolute value is
+stored unchanged.
 
 Read in a format string resolved on the worker host, `Steps.P.Output.X` has the consuming Session's rules applied, as
 `Param.X` does. Everywhere else the unmapped value is read as `Steps.P.RawOutput.X`, as `RawParam.X` is. The same
@@ -1733,12 +1734,14 @@ mapping rules applied to the paths it was given. A consumer may run on another h
 output is read by the submitter. So the runtime stores a `PATH` value in the **submission path context**, the form in
 which `PATH` job parameter values are given, by applying the Session's path mapping rules in reverse.
 
-The requirements are on the outcome:
+The requirements are on the outcome. They assume, as forward mapping of `PATH` job parameters already does, that a
+Session's path mapping rules map from the Job's submission path context; a runtime that knows the submission path
+format SHOULD use only rules from that format.
 
 * A relative path is invalid: it would be relative to a Session Working Directory that no consumer can see.
 * A URI value (EXPR's URI form, such as `s3://bucket/key`) is stored unchanged, as a URI job parameter value is
   given unchanged.
-* If the Session has no path mapping rules, any other value is stored unchanged.
+* If the Session has no path mapping rules, any other (absolute) value is stored unchanged.
 * Otherwise the stored value MUST be in the submission path context, and forward mapping it with the producing
   Session's own rules MUST give back the reported path, where two paths are equal if they are equal after lexical
   normalization (`.` removed, `..` applied, trailing separators dropped) and compared under the rules of the worker
@@ -1753,12 +1756,14 @@ than the rules alone. A runtime that has only the rules SHOULD use this referenc
 2. Any other value must be an absolute path. A relative path is invalid: it would be relative to a Session Working
    Directory that no consumer can see.
 3. The path is lexically normalized: `.` components are removed and `..` components applied, without resolving
-   symbolic links, and trailing separators are dropped. Each rule's `destination_path` is normalized the same way.
+   symbolic links, and trailing separators are dropped, except that a root (`/`, `C:\`) keeps its separator. Each
+   rule's `destination_path` is normalized the same way.
    Paths in the worker host's format are compared with that format's rules: a Windows path case-insensitively, with
    `\` and `/` both separators; a POSIX path case-sensitively, with `/`. A rule matches when its `destination_path` is
    the path, or a prefix of it that ends on a component boundary.
-4. Each matching rule gives a candidate: its `source_path`, then one separator of the rule's `source_path_format`
-   (`/` for `URI`), then the rest of the path with its separators converted to that format. Candidates are tried in
+4. Each matching rule gives a candidate: the rest of the path after `destination_path`, with its separators
+   converted to the rule's `source_path_format` (`/` for `URI`), joined to `source_path` with one separator of that
+   format unless `source_path` already ends with one. If the rest is empty, the candidate is `source_path`. Candidates are tried in
    order of decreasing `destination_path` length, then in the order the rules are listed, and the first candidate
    that forward-maps back to the reported path is stored. Forward mapping can choose a different rule when rules
    nest: with `P:\` → `/mnt/p` and `P:\x` → `/data/x`, the worker path `/mnt/p/x/f` can't be stored as `P:\x\f`,
@@ -1800,7 +1805,7 @@ Output values are stored, logged, and may be displayed, so they are not redacted
    size counted is that of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>`
    text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST`
    value (a value it replaces stops counting), and every `APPEND` element. For each `PATH` value or `LIST[PATH]`
-   element, the larger of the reported and the stored form counts. A directive that takes the size over the runtime's limit is invalid.
+   element, the larger of the reported bytes and the JSON serialization of the stored value counts. A directive that takes the size over the runtime's limit is invalid.
 3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
    list outputs that feed a parameter space, and on `APPEND` outputs.
 4. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
@@ -2000,7 +2005,8 @@ an expression over the Job's parameters and its Steps' outputs. A Task never wri
 3. **Failure.** If evaluating an output fails (including a `fail(...)` call, a value that doesn't convert to *type*,
    or a violated constraint property), the scheduler MUST fail the Job: it marks the Job failed with a message that
    names the output, the expression, and the problem, dispatches no further Tasks, and SHOULD cancel Tasks that are
-   running. Failing at once puts the error next to its cause and doesn't spend the rest of the Job's run time on
+   running. A job output evaluated at Job creation that fails makes Job creation fail, as an invalid job parameter
+   value does. Failing at once puts the error next to its cause and doesn't spend the rest of the Job's run time on
    results that can't be reported.
 4. **Missing producers.** If a Step that an output references fails, or can never run because one of its
    dependencies failed, the output is not evaluated while that remains so (if a requeue later makes the Step
@@ -2015,8 +2021,10 @@ an expression over the Job's parameters and its Steps' outputs. A Task never wri
    output that references the Task's Step and replaces its value. If a re-evaluation fails, the re-run's values stay
    committed, the job output keeps its earlier value and is marked stale, and the Job fails as in item 3, including a
    Job that had already succeeded.
-6. **Paths.** A `PATH` or `LIST[PATH]` job output is in the submission path context, because every `PATH` value it
-   can read there (`RawParam.*`, `Steps.*.RawOutput.*`, `Steps.*.TaskRawParam.*`) is. A caller can use it directly
+6. **Paths.** A `PATH` or `LIST[PATH]` job output built from `PATH` values is in the submission path context,
+   because every `PATH` value it can read (`RawParam.*`, `Steps.*.RawOutput.*`, `Steps.*.TaskRawParam.*`) is. A value
+   built from a `STRING`, which EXPR converts implicitly to `path`, is whatever that string holds, so a path that a
+   Task reports belongs in a `PATH` output variable. A caller can use it directly
    on the submitting host, for example to download or open the results.
 7. **Limits.** A scheduler MUST accept job output values totaling at least 1 MiB per Job, measured as their JSON
    serialization, and MAY accept more. Exceeding its limit fails the Job, as in item 3.
@@ -2111,12 +2119,13 @@ Every rule this extension adds, and when it is checked.
    properties are valid for the type; *collect* is an `<OutputCollectMode>`, and `APPEND` only with a `LIST[...]`
    type; *unit* is 1 to 32 characters with no control characters; no `LIST[LIST[INT]]` on a Step with a
    `parameterSpace`; none on a Step with a `CHUNK[INT]` Task parameter.
-3. Every `Steps.<StepName>.Output.<VarName>` names a Step with an `<Identifier>` name that declares output
-   `<VarName>`. Every `Steps.<StepName>.TaskParam.<ParamName>` names a Step that has Task parameter `<ParamName>`.
+3. Every `Steps.<StepName>.Output.<VarName>` and `RawOutput.<VarName>` names a Step with an `<Identifier>` name
+   that declares output `<VarName>`. Every `Steps.<StepName>.TaskParam.<ParamName>` and `TaskRawParam.<ParamName>`
+   names a Step that has Task parameter `<ParamName>`.
 4. A Step that references `Steps.<StepName>.*` lists `<StepName>` directly in its `dependencies` as a whole-Step
    dependency, and `<StepName>` is not the Step itself.
-5. `Steps.*` appears only in the fields listed in [The `Steps.*` scope](#the-steps-scope), and a `PATH`
-   `Steps.*.Output.*` or `Steps.*.TaskParam.*` only in format strings resolved on the worker host.
+5. `Steps.*` appears only in the fields listed in [The `Steps.*` scope](#the-steps-scope), and a `Steps.*.Output.*`
+   or `Steps.*.TaskParam.*` whose type is or contains `path` only in format strings resolved on the worker host.
 6. *enableIf* references only the symbols its location allows, and does not appear in an Environment Template.
 7. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types; *enableIf* has type
    `bool`.

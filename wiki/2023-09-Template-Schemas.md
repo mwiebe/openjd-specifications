@@ -911,7 +911,7 @@ concrete, or at Job creation if it references none, and keeps the result for the
 the referenced Steps to be dependencies of anything. If evaluation
 fails, including a conversion error, a constraint violation, or a value over the implementation's size limit (which
 must be at least 1 MiB for all of a Job's outputs), the Job fails: no further Tasks are dispatched. If a Step the
-output references fails, the output is not evaluated while that Step is failed. A Job does not succeed until every Job
+output references fails, the output is not evaluated while that Step is failed or cannot run because a dependency failed. A Job does not succeed until every Job
 output whose inputs are concrete has been evaluated. When a re-run of a Task commits new values, the outputs that
 reference its Step are evaluated again; if that fails, the output keeps its earlier value, marked stale, and the Job
 fails, even if it had already succeeded. A `PATH` Job output is in the submission path context. Job outputs are not
@@ -1745,7 +1745,7 @@ recognized messages may hide a valid directive, but an invalid one always stays 
 
 A `PATH` value, or each element of a `LIST[PATH]` value, is stored in the **submission path context**, the form in which
 `PATH` Job Parameter values are given, by applying the Session's path mapping rules in reverse. A relative path is
-invalid. A URI is stored unchanged, and so is any value when the Session has no path mapping rules. Otherwise the stored
+invalid. A URI is stored unchanged, and so is any absolute value when the Session has no path mapping rules. Otherwise the stored
 value must map forward, with the producing Session's rules, back to the reported path (compared after lexical
 normalization, Windows paths case-insensitively with `\` or `/` separators, POSIX paths case-sensitively); if the
 runtime finds no such form, the value is invalid. How the inverse is computed is implementation-defined. The reference
