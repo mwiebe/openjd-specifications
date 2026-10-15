@@ -134,8 +134,8 @@ example as metrics beside the Task's parameters. See the
 A Job Template may also declare Job outputs (`jobOutputDefinitions`), the counterpart of Job Parameters: values
 computed from the Job Parameters and the Steps' output variables that the scheduler reports to the Job's submitter
 and other callers. The scheduler evaluates each one as soon as every Step value it reads is known, or at Job creation
-if it reads none, so that each can be shown as soon as it is known. A Job output that fails to evaluate fails the
-Job. See the [Template Schemas](2023-09-Template-Schemas#217-joboutputdefinition-extension-control_flow).
+if it reads none, so that each can be shown as soon as it is known. A Job does not succeed until its Job outputs
+whose inputs are known have been evaluated, and a Job output that fails to evaluate fails the Job. See the [Template Schemas](2023-09-Template-Schemas#217-joboutputdefinition-extension-control_flow).
 
 
 ## Host Requirements
@@ -261,6 +261,6 @@ decreasing length of the source path, and processing stops for particular value 
 With the CONTROL_FLOW extension, a **PATH** value that a Task reports as an output variable is mapped in the other
 direction before it is stored, giving the value in the submission path context, the form in which **PATH** Job
 Parameters are given; the stored value must map forward with the same rules back to the reported path. It is then
-mapped forward, as a **PATH** parameter is, in each **Session** that reads it. A value that no rule matches is
-invalid when the **Session** has rules, and is kept as it is when the **Session** has none. See the
+mapped forward, as a **PATH** parameter is, in each **Session** that reads it. A value for which no such form can be
+found is invalid when the **Session** has rules, and is kept as it is when the **Session** has none. See the
 [Template Schemas](2023-09-Template-Schemas#371-reporting-output-values).
