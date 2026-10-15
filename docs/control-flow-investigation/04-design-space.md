@@ -2,6 +2,12 @@
 
 Status: investigation note, input to the CONTROL_FLOW RFC draft. Not normative.
 
+> **Superseded in part.** After review, the emission-channel decision in T1 was reversed: outputs are reported with
+> an `openjd_output_var:` stdout directive, with an `@<file>` form for large values, and Task metrics were folded in
+> as output variables with no consumer. See [§8](#8-addendum-emission-channel-collect-modes-and-metrics). The rest of
+> this note, including its samples, still reflects the earlier file-based design where it mentions emission;
+> [RFC 0010](../../rfcs/0010-control-flow.md) is current.
+
 This note synthesizes the three earlier notes into one design for a `CONTROL_FLOW` extension:
 
 * [01-prior-art.md](01-prior-art.md): OpenJD discussions #111, #81, #82, #22, #79, the use cases U1–U15, and what
@@ -54,6 +60,8 @@ design tenets.
 | T8 | Task-task deps placement | — | Proven pattern (L9) | Static case could stand alone (Q7) | **Separate extension**, composed through the materialization rule. |
 
 ### T1. Session-supplied output file instead of `openjd_output_var:` on stdout
+
+> Superseded by [§8](#8-addendum-emission-channel-collect-modes-and-metrics).
 
 03 shows that a stdout directive slots into the `openjd-sessions` pipeline next to `openjd_env`. 02 counters with
 the GitHub Actions precedent. The decision rests on what a forged value can do, which differs from the existing
@@ -1123,3 +1131,46 @@ run time and name the outputs it waits on. Source: 01 M5, #22.
 
 The tensions worth stating in the RFC's design-tenet section are readability of correlation (until Q5 lands), the
 silent `null`-to-`""` case for skipped producers, and the loss of a fully known task count at submission.
+
+## 8. Addendum: emission channel, collect modes, and metrics
+
+Recorded after review of the RFC draft. These decisions replace T1 and Q1, and the corresponding parts of the
+samples in §4 and the tenet check in §7.
+
+**Stdout directive, with `@file`.** A Task reports an output with `openjd_output_var: <Name>=<JSON>`, as #111
+proposed, or `openjd_output_var: <Name>=@<Path>` for a value in a file. T1's argument was that third-party text could
+forge an output. Review rejected it as a security argument: code in `onRun` already runs as the Job's user, so a value
+it prints grants nothing new, and GitHub's `::set-output` deprecation was about untrusted pull-request text steering
+more privileged steps, which OpenJD lacks. What remains is a correctness and reliability concern, and strictness
+answers it: a directive must name a declared output and be well formed and well typed, or the Task fails. The stdout
+channel keeps one protocol for everything an Action reports, needs no per-attempt file, and lets the runtime validate
+and forward values while the Task runs. `@<Path>` removes the 64 KiB line limit.
+
+**`@` files are read immediately.** The runtime reads the file when it reads the directive, not when the Action exits,
+so it can forward the value at once and reduce the latency between a producer finishing and its consumers being
+bound. The Action must finish writing the file before printing the directive.
+
+**The one security rule.** The runtime must read an `@` file with no more access than the Action's user. The runtime
+may run as a different user from the Action, and without the rule a Task could copy a file it can't read, for example
+through a hard link, into stored, displayed outputs. Separately, an `@` path must resolve to a regular file inside the
+Session's Working Directory, which settles how relative paths work inside a container under WRAP_ACTIONS.
+
+**Collect modes.** Each output declares `collect: ONCE | LAST | APPEND`, default `ONCE`:
+
+* `ONCE` — exactly one directive; a repeat fails the Task. Replaces T1's last-write-wins, which would let a stray
+  directive silently replace a value.
+* `LAST` — the last of one or more directives, for running figures.
+* `APPEND` — zero or more directives, each one element of a `LIST[T]`, in the order read. Append rather than
+  concatenate, because concatenation is ambiguous for `LIST[LIST[INT]]`.
+
+No mode reduces at the producer; consumers reduce with EXPR, as §3.5 already decided for reductions across Tasks.
+
+**Metrics are output variables.** The Task metrics proposal (`TASK_METRICS`, `openjd_metric: <name>=<number>`) and
+folouiseAWS's use case on #111 are covered by output variables with no consumer. Output declarations gain an optional
+`unit` for display. Metrics follow the same strict rules as other outputs, rather than the proposal's
+ignore-with-a-warning, so the system has one mechanism with one set of rules. A split into an outputs-only extension
+was reconsidered for metrics and rejected again, for the same reason.
+
+**Consequences.** `Task.OutputFile` and `OPENJD_TASK_OUTPUT_FILE` are removed. The runtime work moves back to the
+action filter (03's design), plus reading `@` files, and the Rust stdout framer must stop truncating over-long lines
+silently, because a truncated directive must be invalid rather than parsed.
