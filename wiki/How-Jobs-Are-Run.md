@@ -131,6 +131,12 @@ committed when the Task succeeds, and the scheduler keeps them for the life of t
 example as metrics beside the Task's parameters. See the
 [Template Schemas](2023-09-Template-Schemas#371-reporting-output-values) for the rules.
 
+A Job Template may also declare Job outputs (`jobOutputDefinitions`), the counterpart of Job Parameters: values
+computed from the Job Parameters and the Steps' output variables that the scheduler reports to the Job's submitter
+and other callers. The scheduler evaluates each one as soon as the Steps it reads have completed, or at Job creation
+if it reads none, so that each can be shown as soon as it is known. A Job output that fails to evaluate fails the
+Job. See the [Template Schemas](2023-09-Template-Schemas#217-joboutputdefinition-extension-control_flow).
+
 
 ## Host Requirements
 
@@ -271,3 +277,10 @@ components. The rest of the path, after the source path, is appended to the dest
    same number of names both apply (only a path such as `//srv/share/x` can match both), the `WINDOWS` rule is
    used. Rules whose source paths have the same components name the same location (for example `/mnt/p` and
    `/mnt/p/`), and the rule that appears last in the list is used.
+
+With the CONTROL_FLOW extension, a **PATH** value that a Task reports as an output variable is mapped in the other
+direction before it is stored: the rule with the longest `destination_path` that prefixes the value is applied in
+reverse, giving the value in the submission path context, the form in which **PATH** Job Parameters are given. It is
+then mapped forward, as a **PATH** parameter is, in each **Session** that reads it. A value that no rule matches is
+invalid when the **Session** has rules, and is kept as it is when the **Session** has none. See the
+[Template Schemas](2023-09-Template-Schemas#371-reporting-output-values).

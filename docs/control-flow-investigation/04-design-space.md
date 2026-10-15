@@ -5,7 +5,8 @@ Status: investigation note, input to the CONTROL_FLOW RFC draft. Not normative.
 > **Superseded in part.** After review, the emission-channel decision in T1 was reversed: outputs are reported with
 > an `openjd_output_var:` stdout directive, with an `@<file>` form for large values, and Task metrics were folded in
 > as output variables with no consumer. See [§8](#8-addendum-emission-channel-collect-modes-and-metrics). The rest of
-> this note, including its samples, still reflects the earlier file-based design where it mentions emission;
+> this note, including its samples, still reflects the earlier file-based design where it mentions emission, and
+> [§9](#9-addendum-path-outputs-and-job-outputs) adds `PATH` outputs and job outputs;
 > [RFC 0010](../../rfcs/0010-control-flow.md) is current.
 
 This note synthesizes the three earlier notes into one design for a `CONTROL_FLOW` extension:
@@ -1174,3 +1175,25 @@ was reconsidered for metrics and rejected again, for the same reason.
 **Consequences.** `Task.OutputFile` and `OPENJD_TASK_OUTPUT_FILE` are removed. The runtime work moves back to the
 action filter (03's design), plus reading `@` files, and the Rust stdout framer must stop truncating over-long lines
 silently, because a truncated directive must be invalid rather than parsed.
+
+## 9. Addendum: `PATH` outputs and job outputs
+
+Recorded after further review. These decisions replace the deferral of `PATH`-typed outputs (Q15) and add job
+outputs, which this note did not consider.
+
+**`PATH` outputs are stored in the submission path context.** A Task reports a path in its worker's form; the runtime
+applies the Session's path mapping rules in reverse and stores the result in the form `PATH` job parameters are given
+in. Each consumer maps it forward with its own rules, as for `Param.*`. How the inverse is computed is
+implementation-defined; Deadline Cloud reverses the mapping from the worker's context to the job's submission
+context. A path no rule covers is invalid when the Session has rules (it is worker-local, typically in the Session
+Working Directory) and is stored unchanged when it has none. `Steps.P.RawOutput.*` and `Steps.P.TaskRawParam.*` read
+the unmapped forms, as `RawParam.*` does, which replaces the `STRING`-joined-to-`PATH` workaround recommended in Q15.
+
+**Job outputs.** A Job Template declares `jobOutputDefinitions`, the counterpart of `parameterDefinitions`. Each is a
+typed *value* expression over job parameters and the `Steps.*` symbols of any Step, never written by a Task:
+
+* evaluated as soon as possible, one output at a time, so a user interface can show values before the Job finishes;
+* a failure to evaluate fails the Job at once, matching the strict handling of invalid directives;
+* not available as symbols in the template, since nothing in a Job runs after them;
+* re-evaluated when a re-run of a producer commits new values; job outputs are not consumers for the re-run rule;
+* part of `CONTROL_FLOW`, not a separate extension.
