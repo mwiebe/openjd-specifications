@@ -458,7 +458,7 @@ jobOutputDefinitions:
   - name: VideoCount
     type: INT
     value: "{{len(Steps.Discover.Output.Videos)}}"            # available when Discover succeeds
-  - name: BestTaskErrorMm
+  - name: BestSingleTaskErrorMm
     type: FLOAT
     unit: mm
     value: "{{min(Steps.Sweep.Output.mpjpe_mm)}}"             # available when the whole sweep succeeds
@@ -561,8 +561,10 @@ steps:
   runtime maps it back to the submission path context before storing it, so `ResultDirs` names the directories as the
   submitter sees them: given the farm's path mapping rule for `P:\`, a Windows workstation that submitted with
   `OutputDir` set to `P:\results` gets `P:\results\...` paths even though the Tasks ran on Linux (see [Path values](#path-values)).
-* The job outputs appear one at a time: `VideoCount` when `Discover` succeeds, `BestTaskErrorMm` when the sweep
-  does, and `ResultDirs` when `RunWinner` does. If any of them failed to evaluate, the Job would fail at that point.
+* The job outputs appear one at a time: `VideoCount` when `Discover` succeeds, `BestSingleTaskErrorMm` (the lowest error of any
+  one Task, not the winner's mean) when the sweep does, and `ResultDirs` when `RunWinner` does. If any of them failed to evaluate, the Job would fail at that point. Reporting the winning configuration itself as a
+  job output would need `RunWinner` to report it as an output variable, because a job output can't read a Step's
+  `let`.
 * The `Sweep` Step alone is useful: a scheduler can show all 270 Tasks' `mpjpe_mm` and `fps` with no consumer (see
   [Task metrics from a parameter sweep](#task-metrics-from-a-parameter-sweep)).
 
@@ -1121,8 +1123,8 @@ runtime and scheduler that already have the rules, and `PATH` values behave the 
 parameters or Task outputs. How a runtime computes the inverse is up to it, provided the stored value maps forward
 correctly. Deadline Cloud, for example, reverses the mapping from the worker's context to the job's submission context.
 
-A path that no rule covers is invalid when the Session has rules, because it names a location that only that worker
-can see, most often the Session Working Directory, which is deleted when the Session ends. When a Session has no
+A path for which the runtime can find no submission-context form is invalid when the Session has rules, because it
+names a location that only that worker can see, most often the Session Working Directory, which is deleted when the Session ends. When a Session has no
 rules, as with `openjd run` on one host, the worker and submission contexts are the same and the value is stored
 unchanged.
 
@@ -1367,7 +1369,8 @@ Where:
    symbols of any Step of the Job, with `PATH` values read through `RawOutput` and `TaskRawParam`. It may not reference `Step.Name`,
    `Task.*`, `Session.*`, or names bound by `let`.
 4. *description* and *unit* — For display, as on `<OutputVariableDefinition>`.
-5. Constraint properties — Checked against the value when it is evaluated. A violation fails the Job.
+5. Constraint properties — Checked against the value when it is evaluated. A violation fails the Job. A `null`
+   value is not checked.
 
 There is no `collect`: a job output is evaluated, not reported. See [Job outputs](#job-outputs).
 
@@ -1506,7 +1509,9 @@ A `PATH` or `LIST[PATH]` value of `Steps.<StepName>.Output.<VarName>` or `Steps.
 available only in format strings resolved on the worker host (`@fmtstring[host]`), as `PATH` `Param.*` values are,
 because path mapping depends on the consuming Session. Format strings resolved earlier, including the materialization
 expressions and job output *value*s, use `RawOutput` and `TaskRawParam` instead, as they use `RawParam.*` for a job
-parameter.
+parameter. A consumer's `PATH` Task parameter whose `range` comes from `RawOutput` or `TaskRawParam` holds
+submission-context values, and its `Task.Param.*` is mapped forward on the worker host, as a range from `RawParam.*`
+is.
 
 `<StepName>` must be an `<Identifier>`: a Step whose name is not of that form cannot be referenced through `Steps.`
 (the Step itself is still valid). `<VarName>` must name an output declared by the Step, and `<ParamName>` a Task
@@ -1679,7 +1684,8 @@ directive is invalid if:
 8. it is attributed to an Action of the Job Template other than the `onRun` of a Task of a Step that declares
    *outputVariables*;
 9. the line is not valid UTF-8; or
-10. a `PATH` value can't be reverse-mapped, under the rules of [Path values](#path-values).
+10. a `PATH` value is relative, or the runtime finds no submission-context form for it, under the requirements of
+    [Path values](#path-values).
 
 When the Action exits successfully, the runtime also checks that every `ONCE` and `LAST` output has a value and that
 every `APPEND` output's list satisfies its `minLength`. A missing value or a list that is too short fails the Task.
@@ -1727,10 +1733,20 @@ mapping rules applied to the paths it was given. A consumer may run on another h
 output is read by the submitter. So the runtime stores a `PATH` value in the **submission path context**, the form in
 which `PATH` job parameter values are given, by applying the Session's path mapping rules in reverse.
 
-The requirement is on the outcome. The stored value MUST be in the submission path context, and forward mapping it
-with the producing Session's own rules MUST give back the reported path, after the normalization of step 3 below. How
-a runtime computes the inverse is up to it; a runtime with more knowledge of the farm's storage may do better than
-the rules alone. A runtime that has only the rules SHOULD use this reference inverse:
+The requirements are on the outcome:
+
+* A relative path is invalid: it would be relative to a Session Working Directory that no consumer can see.
+* A URI value (EXPR's URI form, such as `s3://bucket/key`) is stored unchanged, as a URI job parameter value is
+  given unchanged.
+* If the Session has no path mapping rules, any other value is stored unchanged.
+* Otherwise the stored value MUST be in the submission path context, and forward mapping it with the producing
+  Session's own rules MUST give back the reported path, where two paths are equal if they are equal after lexical
+  normalization (`.` removed, `..` applied, trailing separators dropped) and compared under the rules of the worker
+  host's path format: Windows paths case-insensitively with `\` and `/` both separators, POSIX paths
+  case-sensitively. If the runtime can find no such form, the value is invalid.
+
+How a runtime finds the stored form is up to it; a runtime with more knowledge of the farm's storage may do better
+than the rules alone. A runtime that has only the rules SHOULD use this reference inverse:
 
 1. A value that is a URI (EXPR's URI form, such as `s3://bucket/key`) is stored unchanged, as a URI job parameter
    value passes through forward mapping unchanged when no rule matches it.
@@ -1746,7 +1762,7 @@ the rules alone. A runtime that has only the rules SHOULD use this reference inv
    order of decreasing `destination_path` length, then in the order the rules are listed, and the first candidate
    that forward-maps back to the reported path is stored. Forward mapping can choose a different rule when rules
    nest: with `P:\` → `/mnt/p` and `P:\x` → `/data/x`, the worker path `/mnt/p/x/f` can't be stored as `P:\x\f`,
-   which maps forward to `/data/x/f`. A candidate from a rule whose `source_path_format` is `URI` is a URI, and a
+   which maps forward to `/data/x/f`; no other rule matches, so the value is invalid (step 5). A candidate from a rule whose `source_path_format` is `URI` is a URI, and a
    consumer whose Session has no rule for it receives it as a URI.
 5. If no candidate maps back and the Session has path mapping rules, the value is invalid. Most often the path is on
    the worker only, for example under the Session Working Directory, which is deleted when the Session ends.
@@ -1783,8 +1799,8 @@ Output values are stored, logged, and may be displayed, so they are not redacted
 2. A runtime MUST accept at least 1 MiB (1,048,576 bytes) of output values per Task attempt, and MAY accept more. The
    size counted is that of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>`
    text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST`
-   value (a value it replaces stops counting), and every `APPEND` element. For a `PATH` value, the larger of the
-   reported and the stored form counts. A directive that takes the size over the runtime's limit is invalid.
+   value (a value it replaces stops counting), and every `APPEND` element. For each `PATH` value or `LIST[PATH]`
+   element, the larger of the reported and the stored form counts. A directive that takes the size over the runtime's limit is invalid.
 3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
    list outputs that feed a parameter space, and on `APPEND` outputs.
 4. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
@@ -1973,9 +1989,10 @@ an expression over the Job's parameters and its Steps' outputs. A Task never wri
 1. **When an output is evaluated.** Each job output is evaluated on its own, as soon as every `Steps.*` symbol its
    *value* references is concrete (see [The `Steps.*` scope](#the-steps-scope)), by the same rule that decides when a
    Step is bound. An output that references no `Steps.*` symbol, or only `TaskParam` and `TaskRawParam` symbols of
-   Steps bound at Job creation, is evaluated at Job creation. An output that reads `Output` or `RawOutput` of a
-   multi-Task Step is evaluated when that Step completes, because its lists are concrete only then
-   ([Reductions](#reductions) item 3). A user interface can therefore show each output as soon as it exists, before
+   Steps bound at Job creation, is evaluated at Job creation. An output that reads `Output` or `RawOutput` of a Step
+   is evaluated when that Step succeeds or is skipped, because its values are concrete only then
+   ([Reductions](#reductions) item 3). A Job does not succeed until every job output whose inputs are concrete has
+   been evaluated, so a Job never reports success and then fails on a job output, except after a re-run (item 5). A user interface can therefore show each output as soon as it exists, before
    the Job finishes.
 2. **Commit and display.** An evaluated output is committed at once and retained by the scheduler for the life of
    the Job. A scheduler SHOULD make job outputs visible to users and return them to callers, using *description* and
@@ -1986,11 +2003,12 @@ an expression over the Job's parameters and its Steps' outputs. A Task never wri
    running. Failing at once puts the error next to its cause and doesn't spend the rest of the Job's run time on
    results that can't be reported.
 4. **Missing producers.** If a Step that an output references fails, or can never run because one of its
-   dependencies failed, the output is never evaluated, and a scheduler SHOULD show it as unavailable, naming the
+   dependencies failed, the output is not evaluated while that remains so (if a requeue later makes the Step
+   succeed, the output is evaluated then), and a scheduler SHOULD show it as unavailable, naming the
    Step, rather than as pending. If the Step is `SKIPPED`, its symbols are `null` and the output is evaluated with
    them; a `null` result means the output has no value, which is not an error. A Step with zero Tasks gives empty
    lists, so `min(Steps.P.Output.X)` fails the Job when the space is empty; write
-   `min(x) if len(x) > 0 else null` where emptiness is expected (see
+   `min(Steps.P.Output.X) if len(Steps.P.Output.X) > 0 else null` where emptiness is expected (see
    [Design Choices](#9-an-empty-computed-parameter-space-is-a-zero-task-success)).
 5. **Re-runs.** Job outputs do not count as consumers for [Retries and re-runs](#retries-and-re-runs): a caller
    outside the Job can't be tracked. When a re-run commits new values for a Task, the scheduler re-evaluates every job
