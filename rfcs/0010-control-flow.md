@@ -1742,7 +1742,8 @@ format SHOULD use only rules whose `source_path_format` is that format or `URI`.
 * A relative path is invalid: it would be relative to a Session Working Directory that no consumer can see.
 * A URI value (EXPR's URI form, such as `s3://bucket/key`) is stored unchanged, as a URI job parameter value is
   given unchanged.
-* If the Session has no path mapping rules, any other (absolute) value is stored unchanged.
+* If the Session has no path mapping rules (before any filtering by source format), any other (absolute) value is
+  stored unchanged.
 * Otherwise the stored value MUST be in the submission path context, and forward mapping it with the producing
   Session's own rules MUST give back the reported path, where two paths are equal if they are equal after lexical
   normalization (`.` removed, `..` applied, trailing separators dropped except at a root) and compared under the rules of the worker
@@ -1764,7 +1765,8 @@ than the rules alone. A runtime that has only the rules SHOULD use this referenc
    the path, or a prefix of it that ends on a component boundary.
 4. Each matching rule gives a candidate: the remaining components of the path after `destination_path`, joined with
    the separator of the rule's `source_path_format` (`/` for `URI`), then joined to `source_path` with one such
-   separator unless `source_path` already ends with one. If no components remain, the candidate is `source_path`. Candidates are tried in
+   separator unless `source_path` already ends with one. If no components remain, the candidate is `source_path`.
+   Components are appended unchanged, including to a URI. Candidates are tried in
    order of decreasing `destination_path` length, then in the order the rules are listed, and the first candidate
    that forward-maps back to the reported path is stored. Forward mapping can choose a different rule when rules
    nest: with `P:\` → `/mnt/p` and `P:\x` → `/data/x`, the worker path `/mnt/p/x/f` can't be stored as `P:\x\f`,
@@ -1805,9 +1807,9 @@ Output values are stored, logged, and may be displayed, so they are not redacted
 2. A runtime MUST accept at least 1 MiB (1,048,576 bytes) of output values per Task attempt, and MAY accept more. The
    size counted is that of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>`
    text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST`
-   value (a value it replaces stops counting), and every `APPEND` element. For each `PATH` value or `LIST[PATH]`
-   element, the larger of the reported bytes and the JSON serialization of the stored value counts, measured for the
-   whole `PATH` or `LIST[PATH]` value. A directive that takes the size over the runtime's limit is invalid.
+   value (a value it replaces stops counting), and every `APPEND` element. For a `PATH` or `LIST[PATH]` value, or a
+   `PATH` element under `APPEND`, the larger of its reported bytes and the JSON serialization of its stored form
+   counts. A directive that takes the size over the runtime's limit is invalid.
 3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
    list outputs that feed a parameter space, and on `APPEND` outputs.
 4. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
