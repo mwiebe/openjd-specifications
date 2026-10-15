@@ -1689,7 +1689,8 @@ printed by any action of the Job Template other than the `onRun` of a Task of a 
 cancels and fails that action. Under `WRAP_ACTIONS`, a line from a wrap hook counts as output of the action it runs in
 place of, so `onWrapTaskRun` reports the Task's outputs whichever template defines it. For an action of an Environment
 Template, a directive is ordinary output. If the attempt fails for any reason, it has no outputs. Like the other
-messages, a directive line appears in the action's log.
+messages, a directive line appears in the action's log by default, and a runtime option to hide recognized messages
+applies to it too.
 
 The values are committed when the Task succeeds, and are retained by the render management system for the life of the
 Job. They may be forwarded as soon as they are reported, and displayed before then if marked as not yet committed. They are not redacted and must not be used to

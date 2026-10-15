@@ -163,7 +163,9 @@ filesystems `"movie-A"`, `"shared-assets"`, and `"software"` all mounted.
 
 Open Job Description defines some special messages that can be emitted on stdout or stderr as a single line by an
 **Action** when it is running within a **Session**. The application that is running the **Action** may intercept these
-messages to convey information about the **Action** to the render management system. These special lines contain one of:
+messages to convey information about the **Action** to the render management system. These lines appear in the
+**Action**'s output log like any other line. An application may offer an option to hide recognized messages from the
+log, which then applies to all of them. These special lines contain one of:
 
 * `openjd_progress: <number>` where `<number>` is a percentile between 0 and 100 that indicates what the progress of
   the **Action** is.

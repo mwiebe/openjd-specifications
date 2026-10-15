@@ -393,7 +393,7 @@ steps:
         print(f"openjd_output_var: fps={score.fps}")
 ```
 
-The Task's log contains the directives, which stay in the log as other stdout messages do:
+By default the Task's log contains the directives, as it does the other stdout messages:
 
 ```
 0:00:00.812004  openjd_output_var: frames_done=0
@@ -1441,7 +1441,7 @@ Environment. In a Session running a Job that lists `CONTROL_FLOW`:
 
 * a directive attributed to any other Action defined in the Job Template, such as a Job or Step Environment's
   `onEnter` or `onExit` (whether or not a wrap hook runs in its place), or the `onRun` of a Step that declares no
-  *outputVariables*, fails that Action;
+  *outputVariables*, is invalid, and cancels and fails that Action;
 * a directive attributed to an Action defined in an Environment Template, which has not opted in to `CONTROL_FLOW`, is
   ordinary output.
 
@@ -1786,6 +1786,12 @@ fails is `FAILED`, which, like any failed Step, does not satisfy `dependsOn`.
 
 > A modification to [Stdout/Stderr Messages](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#stdoutstderr-messages)
 
+Add a sentence after the introduction of the list of special messages, stating what implementations already do for
+all of them:
+
+> These lines appear in the **Action**'s output log like any other line. An application may offer an option to hide
+> recognized messages from the log, which then applies to all of them.
+
 Add the following item to the list of special messages:
 
 * `openjd_output_var: <name>=<json>` or `openjd_output_var: <name>=@<path>` where `<name>` is the name of an output
@@ -2093,7 +2099,7 @@ and for the emission channel, collect modes, and metrics in [§8](../docs/contro
    `argmin`/`argmax`, or a list `index`, or `zip`. Which is preferred?
 6. **Fields that may reference outputs.** The materialization expressions plus host-scope script fields; not
    `combination`, job-level fields, or Environment Templates.
-7. **Emission rules.** Only a Task's `onRun`; a directive anywhere else fails its Action; `collect: ONCE` by default,
+7. **Emission rules.** Only a Task's `onRun`; a directive anywhere else cancels and fails its Action; `collect: ONCE` by default,
    with `LAST` and `APPEND` declared; missing, malformed, undeclared, mistyped, repeated `ONCE`, or out-of-constraint
    values fail the Task, and an invalid directive cancels the Action at once; failed attempts commit nothing; outputs
    are not secrets. Does anyone need outputs from an Environment's `onEnter`?
