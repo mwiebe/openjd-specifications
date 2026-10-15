@@ -1185,7 +1185,7 @@ outputs, which this note did not consider.
 applies the Session's path mapping rules in reverse and stores the result in the form `PATH` job parameters are given
 in. Each consumer maps it forward with its own rules, as for `Param.*`. How the inverse is computed is
 implementation-defined; Deadline Cloud reverses the mapping from the worker's context to the job's submission
-context. A path no rule covers is invalid when the Session has rules (it is worker-local, typically in the Session
+context. A path with no submission-context form that maps back is invalid when the Session has rules (it is worker-local, typically in the Session
 Working Directory) and is stored unchanged when it has none. `Steps.P.RawOutput.*` and `Steps.P.TaskRawParam.*` read
 the unmapped forms, as `RawParam.*` does, which replaces the `STRING`-joined-to-`PATH` workaround recommended in Q15.
 

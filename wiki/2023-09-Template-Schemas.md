@@ -899,22 +899,22 @@ Where:
    expression types, and constraint properties. `LIST[LIST[INT]]` is allowed.
 3. *value* — The output's value, whose target type is the expression type of *type*, made optional: a `null` result
    means the output has no value, which is not an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]`
-   parameters),
-   `RawParam.*`, `Job.Name`, and the `Steps.*` values of any Step of the Job, with `PATH` values read through
-   `Steps.<StepName>.RawOutput.*` and `Steps.<StepName>.TaskRawParam.*`. It may not reference `Step.Name`, `Task.*`,
+   parameters), `RawParam.*`, `Job.Name`, and the `Steps.*` values of any Step of the Job, with values whose type is or
+   contains `path` read through `Steps.<StepName>.RawOutput.*` and `Steps.<StepName>.TaskRawParam.*`. It may not reference `Step.Name`, `Task.*`,
    `Session.*`, or names bound by `let`.
 4. *description*, *unit* — For display only, as on `<OutputVariableDefinition>`.
 5. Constraint properties — Checked against the value when it is evaluated. A `null` value is not checked.
 
 The render management system evaluates each Job output as soon as every `Steps.*` value its *value* references is
-concrete, or at Job creation if it references none, and keeps the result for the life of the Job. It does not need
-the referenced Steps to be dependencies of anything. If evaluation
-fails, including a conversion error, a constraint violation, or a value over the implementation's size limit (which
-must be at least 1 MiB for all of a Job's outputs), the Job fails: no further Tasks are dispatched. If a Step the
-output references fails, the output is not evaluated while that Step is failed or cannot run because a dependency failed. A Job does not succeed until every Job
-output whose inputs are concrete has been evaluated. When a re-run of a Task commits new values, the outputs that
-reference its Step are evaluated again; if that fails, the output keeps its earlier value, marked stale, and the Job
-fails, even if it had already succeeded. A `PATH` Job output is in the submission path context. Job outputs are not
+concrete, which is at Job creation if it references none or only Task parameters of Steps bound then, and keeps the
+result for the life of the Job. It does not need the referenced Steps to be dependencies of anything. If evaluation
+fails, including a conversion error, a constraint violation, or a value over the implementation's size limit (which must
+be at least 1 MiB for all of a Job's outputs), the Job fails: no further Tasks are dispatched, and an output evaluated
+at Job creation makes Job creation fail. If a Step the output references fails or can never run because a dependency
+failed, the output is not evaluated while that remains so. A Job does not succeed until every Job output whose inputs
+are concrete has been evaluated. When a re-run of a Task commits new values, the outputs that reference its Step are
+evaluated again; if that fails, the output keeps its earlier value, marked stale, and the Job fails, even if it had
+already succeeded. A `PATH` Job output built from `PATH` values is in the submission path context. Job outputs are not
 redacted and must not be used to pass secrets.
 
 ## 3. `<StepTemplate>`
@@ -1745,13 +1745,14 @@ recognized messages may hide a valid directive, but an invalid one always stays 
 
 A `PATH` value, or each element of a `LIST[PATH]` value, is stored in the **submission path context**, the form in which
 `PATH` Job Parameter values are given, by applying the Session's path mapping rules in reverse. A relative path is
-invalid. A URI is stored unchanged, and so is any absolute value when the Session has no path mapping rules. Otherwise the stored
-value must map forward, with the producing Session's rules, back to the reported path (compared after lexical
-normalization, Windows paths case-insensitively with `\` or `/` separators, POSIX paths case-sensitively); if the
-runtime finds no such form, the value is invalid. How the inverse is computed is implementation-defined. The reference
-inverse matches each rule's `destination_path` against the path on a component boundary, tries the matching rules
-longest `destination_path` first and then in the order listed, replaces that prefix with the rule's `source_path` in its
-`source_path_format`, and stores the first result that maps forward back to the reported path.
+invalid. A URI is stored unchanged, and so is any absolute value when the Session has no path mapping rules. Otherwise
+the stored value must map forward, with the producing Session's rules, back to the reported path (compared after lexical
+normalization, a root keeping its separator, Windows paths case-insensitively with `\` or `/` separators, POSIX paths
+case-sensitively); if the runtime finds no such form, the value is invalid. How the inverse is computed is
+implementation-defined. The reference inverse matches each rule's `destination_path` against the path on a component
+boundary, tries the matching rules longest `destination_path` first and then in the order listed, replaces that prefix
+with the rule's `source_path` in its `source_path_format`, and stores the first result that maps forward back to the
+reported path.
 
 The values are committed when the Task succeeds, and are retained by the render management system for the life of the
 Job. They may be forwarded as soon as they are reported, and displayed before then if marked as not yet committed. They are not redacted and must not be used to
