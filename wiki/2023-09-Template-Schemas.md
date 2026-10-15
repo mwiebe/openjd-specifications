@@ -57,8 +57,11 @@ Where:
          [FEATURE_BUNDLE_1](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0004-enhanced-limits-and-capabilities.md),
          [EXPR](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0005-expression-language.md),
          [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md),
-         [ENV_PARAMS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-environment-parameters.md)
+         [ENV_PARAMS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-environment-parameters.md),
+         [CONTROL_FLOW](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md) (draft)
       * A document that lists `ENV_PARAMS` without `EXPR` must be rejected.
+      * A template that lists `CONTROL_FLOW` must also list `EXPR`. Schedulers must reject templates that list
+        `CONTROL_FLOW` without `EXPR`.
 4. *name* — The name to give to a Job that is created from the template. See: [&lt;JobName&gt;](#111-jobname).
 5. *description* — A description to apply to all Jobs that are created from the template. It has no functional purpose,
    but may appear in UI elements. See: [&lt;Description&gt;](#72-description).
@@ -924,11 +927,13 @@ A `<StepTemplate>` is the object:
 ```yaml
 name: <StepName>
 description: <Description> # @optional
+enableIf: <bool> | <FormatString> # @optional @fmtstring @extension CONTROL_FLOW
 let: <LetBindings> # @optional @extension EXPR
 dependencies: [ <StepDependency>, ... ] # @optional
 stepEnvironments: [ <Environment>, ... ] # @optional
 hostRequirements: <HostRequirements> # @optional
 parameterSpace: <StepParameterSpaceDefinition> # @optional
+outputVariables: [ <OutputVariableDefinition>, ... ] # @optional @extension CONTROL_FLOW
 script: <StepScript>
 ```
 
@@ -938,10 +943,19 @@ Where:
    the names of all other Steps in the same Job Template. See: [&lt;StepName&gt;](#31-stepname).
 2. *description* — A description to apply to the step. It has no functional purpose, but may appear in UI elements.
    See: [&lt;Description&gt;](#72-description).
-3. *let* — An ordered list of expression bindings evaluated once per step. Bound names are available in
+3. *enableIf* — `@extension CONTROL_FLOW`. Whether the Step runs; the expression's target type is `bool`, and a `null`
+   result is an error rather than an omitted field. If it evaluates to `false`, the Step is *skipped*: none of its Tasks runs, its Step Environments are not entered, and every
+   `Steps.<name>.*` value of the Step (see [Value References](#731-value-references)) is `null`. A skipped Step
+   satisfies the dependencies of the Steps that depend on it once its own dependencies are satisfied. If omitted, the
+   Step is always enabled. Constraints:
+    1. It may reference `Param.*` (except `PATH` parameters), `RawParam.*`, `Job.Name`, `Step.Name`, and the
+       `Steps.*` values of the Step's direct dependencies. It may not reference names bound by the Step's own *let*, `Task.*`, or `Session.*`.
+    2. If it references no `Steps.*` value, it is evaluated at Job creation. Otherwise it is evaluated at step input
+       binding (see [Template Processing Stages](#74-template-processing-stages)), before the Step's *let*.
+4. *let* — An ordered list of expression bindings evaluated once per step. Bound names are available in
    *stepEnvironments*, *hostRequirements*, *parameterSpace*, and *script* fields, and with the `ENV_PARAMS` extension in
    the *parameters* values and *enableIf* of *dependencies* entries. See: [&lt;LetBindings&gt;](#36-letbindings).
-4. *dependencies* — A list of the dependencies of this Step. These dependencies must be resolved before the Tasks of the
+5. *dependencies* — A list of the dependencies of this Step. These dependencies must be resolved before the Tasks of the
    Step run. A dependency on a Step is resolved before the Tasks are scheduled. With the `ENV_PARAMS` extension, an
    entry may instead name an Environment for the Step's Sessions to enter, with the Step's parameter values for it,
    before they run the Step's Tasks. Such an entry is resolved in each Session, so it does not delay scheduling.
@@ -950,7 +964,9 @@ Where:
     * Maximum number of elements: There is no maximum defined, though implementations may choose to constrain the number of
     dependencies. With the `ENV_PARAMS` extension, an implementation that constrains it must accept a Step with at
     least 50 *environment* entries, besides its entries that name Steps.
-5. *stepEnvironments* — An ordered list of the environments that are required to run Tasks in this Step.
+    * With the `CONTROL_FLOW` extension, listing a Step here is also what makes its `Steps.*` values available to this
+      Step.
+6. *stepEnvironments* — An ordered list of the environments that are required to run Tasks in this Step.
   These are entered in the order provided at the start of every Session for Tasks in the Step, and exited in the reverse
   order at the end of those Sessions. With the `ENV_PARAMS` extension, one whose *enableIf* is `false` for the Step is
   not entered.
@@ -962,12 +978,25 @@ Where:
     * Note: The scope of a Step Environment's `name` is the Step that defines it. Different Steps may each define a
       Step Environment with the same `name`; a Session only ever contains the Step Environments of a single Step, so
       these names never collide.
-6. *hostRequirements* — Describes the requirements on Worker host's capabilities that must be satisfied for the Task(s) of
+7. *hostRequirements* — Describes the requirements on Worker host's capabilities that must be satisfied for the Task(s) of
    the Step to be scheduled to the host. See: [&lt;HostRequirements&gt;](#33-hostrequirements).
-7. *parameterSpace* — Defines the parameterization of the Step's action; the available parameters, the values that they
+8. *parameterSpace* — Defines the parameterization of the Step's action; the available parameters, the values that they
    take on, and how those parameters' values are combined to produce the Tasks of the Step. Absent this property the Step
    is run a single time.
-8. *script* — The action that is taken by this Step's Tasks when they are run on a Worker host.
+9. *outputVariables* — `@extension CONTROL_FLOW`. The output variables that every Task of the Step writes to its output
+   file, `Task.OutputFile`. See: [&lt;OutputVariableDefinition&gt;](#37-outputvariabledefinition-extension-control_flow).
+    * Minimum number of elements: If provided, then this list must contain at least one element.
+    * Maximum number of elements: 32.
+    * No two elements in this list may have the same value for the `name` property.
+    * A Step whose parameter space contains a `CHUNK[INT]` Task parameter may not declare *outputVariables*.
+10. *script* — The action that is taken by this Step's Tasks when they are run on a Worker host.
+
+With the `CONTROL_FLOW` extension, the Step's format strings that are resolved at Job creation (those not annotated
+`@fmtstring[host]`, in *enableIf*, *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, and *script*) are
+the Step's *materialization expressions*, evaluated in that order. They may reference the `Steps.*` values of the Step's direct dependencies, and
+a Step whose materialization expressions do so is evaluated at step input binding instead of at Job creation. See
+[Template Processing Stages](#74-template-processing-stages) and
+[How Jobs Are Run](How-Jobs-Are-Run#step-states-and-step-input-binding).
 
 ### 3.1. `<StepName>`
 
@@ -1278,6 +1307,10 @@ Session exits Environments, in the reverse of the order it entered them, and ent
 Environment again with that Step's values; or the render management system runs the Step in another Session (see
 [How Jobs Are Run](How-Jobs-Are-Run#environment-parameters)).
 
+With the `CONTROL_FLOW` extension, a dependency is also satisfied by a depended-upon Step that completed with zero
+Tasks, or that was skipped by its *enableIf*, once that Step's own dependencies are satisfied. A Step that failed, or
+that can never run because one of its own dependencies failed, never satisfies a dependency.
+
 ### 3.3. `<HostRequirements>`
 
 This entity is used by the template author to describe the requirements on Worker host and/or render manager's available
@@ -1565,6 +1598,18 @@ Where:
 2. *combination* — An expression that defines how the task parameters are combined to produce the parameter space that
    maps a Step to a set of Tasks. Each Task has a single value for each task parameter that specifies its coordinates in
    the defined space. If not provided, then the default is all possible combinations of task parameter values.
+
+With the `CONTROL_FLOW` extension:
+
+1. A task parameter `range` given as a Format String may reference the `Steps.*` values of the Step's direct
+   dependencies. The *combination* may not.
+2. A task parameter `range` given as a Format String may evaluate to an empty list. Combined by product, it makes the
+   parameter space empty; associated with a non-empty range, it is an error. A Step with an empty parameter space has
+   zero Tasks and completes successfully once its dependencies are satisfied. A range expression string such as
+   `"1-{{N}}"` cannot be empty, and a `range` written as a list literal must have at least one item as written.
+3. The maximum of 1024 elements on a task parameter range list applies to list literals only. The number of values a
+   `range` given as a Format String evaluates to is not constrained by this specification, as for
+   [&lt;IntRangeExpr&gt;](#34111-intrangeexpr); an implementation bounds it with its own limit on the Task count.
 
 #### 3.4.1. `<TaskParameterDefinition>`
 
@@ -1940,6 +1985,9 @@ The format string scopes available to format strings within a `<StepScript>` are
 2. `Session.*` — Values such as the Session's working directory.
 3. `Task.*` — Values of embedded file locations defined within the `<StepScript>`, and Task Parameters.
 4. Names bound by `let` in the enclosing `<StepTemplate>` and `<StepScript>`. Available with the `EXPR` extension.
+5. `Steps.*` — Output variables and Task parameter values of the Step's direct dependencies, and `Task.OutputFile` in
+   a Step that declares *outputVariables*. Available with the `CONTROL_FLOW` extension.
+   See [Value References](#731-value-references).
 
 #### 3.5.1. `<StepActions>`
 
@@ -2021,6 +2069,11 @@ and where the bound names are available:
 Note: `Task.Param.*` and `Task.RawParam.*` are only available in `<StepScript>` and `<SimpleAction>` contexts because task parameter
 values are not known until task execution time.
 
+Note: With the `CONTROL_FLOW` extension, `<StepTemplate>.let`, `<StepScript>.let`, and `<SimpleAction>.let` may also
+reference the `Steps.*` values of the Step's direct dependencies, and `<StepScript>.let` and `<SimpleAction>.let` may
+reference `Task.OutputFile` in a Step that declares `outputVariables`. A `<StepTemplate>.let` that references `Steps.*`
+is evaluated at step input binding.
+
 Note: `Task.File.*` symbols in `<StepScript>.let` and `Env.File.*` symbols in `<EnvironmentScript>.let` refer to
 embedded files defined in the same script. The file path is determined before evaluation, so `let` bindings can
 reference the path where the file will be written, even though the file content (which may also contain format
@@ -2030,6 +2083,96 @@ Note: `Job.Name` is concrete at job creation, so it is available in every `let` 
 Step Template (see [7.3.1](#731-value-references)), so it is available in the Step-side `let` scopes but not in
 `<EnvironmentScript>.let`, which may also appear in a Job-level environment or a standalone environment template where
 no enclosing Step exists.
+
+### 3.7. `<OutputVariableDefinition>` `@extension CONTROL_FLOW`
+
+Defines a value that every Task of a Step writes to its output file, for the Steps that depend on it to read. Introduced
+in [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md) (draft).
+
+An `<OutputVariableDefinition>` is the object:
+
+```yaml
+name: <Identifier>
+type: <OutputVariableType>
+description: <Description> # @optional
+# @optional constraint properties: see the table below.
+```
+
+```bnf
+<OutputVariableType> ::= "INT" | "FLOAT" | "STRING" | "BOOL" | "RANGE_EXPR" |
+                         "LIST[INT]" | "LIST[FLOAT]" | "LIST[STRING]" | "LIST[BOOL]" |
+                         "LIST[LIST[INT]]"
+```
+
+Where:
+
+1. *name* — The name by which the value is written to the output file and referenced as
+   `Steps.<StepName>.Output.<name>`. See: [&lt;Identifier&gt;](#71-identifier).
+2. *type* — The type of the value each Task writes. Type names are case-insensitive. Each type maps to the expression
+   type of the job parameter type of the same name, and accepts that job parameter definition's constraint properties
+   with the same meaning:
+
+   | `<OutputVariableType>` | Expression type of one Task's value | Constraint properties, as on |
+   |---|---|---|
+   | `INT` | `int` | [§2.3](#23-jobintparameterdefinition): `allowedValues`, `minValue`, `maxValue` |
+   | `FLOAT` | `float` | [§2.4](#24-jobfloatparameterdefinition): `allowedValues`, `minValue`, `maxValue` |
+   | `STRING` | `string` | [§2.1](#21-jobstringparameterdefinition): `allowedValues`, `minLength`, `maxLength` |
+   | `BOOL` | `bool` | [§2.9](#29-jobboolparameterdefinition-extension-expr): none |
+   | `RANGE_EXPR` | `range_expr` | [§2.10](#210-jobrangeexprparameterdefinition-extension-expr): `minLength`, `maxLength` |
+   | `LIST[INT]` | `list[int]` | [§2.13](#213-joblistintparameterdefinition-extension-expr): `minLength`, `maxLength`, `item` |
+   | `LIST[FLOAT]` | `list[float]` | [§2.14](#214-joblistfloatparameterdefinition-extension-expr): `minLength`, `maxLength`, `item` |
+   | `LIST[STRING]` | `list[string]` | [§2.11](#211-jobliststringparameterdefinition-extension-expr): `minLength`, `maxLength`, `item` |
+   | `LIST[BOOL]` | `list[bool]` | [§2.15](#215-joblistboolparameterdefinition-extension-expr): `minLength`, `maxLength` |
+   | `LIST[LIST[INT]]` | `list[list[int]]` | [§2.16](#216-joblistlistintparameterdefinition-extension-expr): `minLength`, `maxLength`, `item` |
+
+3. *description* — A description of the value. It has no functional purpose, but may appear in UI elements.
+   See: [&lt;Description&gt;](#72-description).
+4. Constraint properties — Checked against each Task's value when the Task's output file is read. A value that
+   violates one fails the Task. The `default` and `userInterface` properties of job parameter definitions are not
+   available.
+
+Constraints:
+
+1. `LIST[LIST[INT]]` may only be declared by a Step without a *parameterSpace*.
+2. A constraint property must be valid for the declared type, with the same rules as on the job parameter definition
+   of that type.
+
+`PATH` and `LIST[PATH]` outputs are not available.
+
+#### 3.7.1. The output file
+
+Before each attempt to run the `onRun` action of a Task of a Step that declares *outputVariables*, the runtime creates
+an empty file and makes its absolute path available as the template value `Task.OutputFile` and as the environment
+variable `OPENJD_TASK_OUTPUT_FILE`. The action appends a `<Name>=<JSON>` line for each output variable:
+
+```bnf
+<OutputFile> ::= <BOM>? ( <Line> <EOL> )* <Line>?
+<Line>       ::= <OutputLine> | <WS>*
+<OutputLine> ::= <Identifier> "=" <WS>* <JSON> <WS>*
+<EOL>        ::= "\n" | "\r\n"
+<WS>         ::= " " | "\t"
+<BOM>        ::= U+FEFF        ; a leading byte order mark is ignored
+```
+
+Where `<JSON>` is one JSON value containing no line break. Names are case-sensitive. The file is UTF-8. For
+example:
+
+```bash
+echo "FrameCount=$count" >> {{repr_sh(Task.OutputFile)}}
+```
+
+After the action exits successfully, the runtime reads the file. Each JSON value is given its natural expression type
+(a number without a fraction or exponent that fits in a signed 64-bit integer is an `int`; any other number a `float`; a string a `string`;
+`true`/`false` a `bool`; an array a list) and is converted to the declared type with the
+[implicit type coercion](2026-02-Expression-Language#123-implicit-type-coercion) rules of the Expression Language. If
+a variable has more than one line, the last one is used. `null` and objects are not accepted anywhere in a value. The Task fails if the file is not valid UTF-8 or contains
+NUL; a line is malformed; a line names an undeclared variable; a value is `null`, an object, or does not convert to
+the declared type; a value violates a constraint property; a declared variable has no line; or the file exceeds the
+runtime's size limit, which must be at least 1 MiB. If the action fails, the file is discarded and the attempt has no
+outputs.
+
+Output values are retained by the scheduler for the life of the Job and may be displayed. They are not redacted and
+must not be used to pass secrets.
 
 ## 4. `<Environment>`
 
@@ -2047,6 +2190,7 @@ activation: <EnvironmentActivation> # @optional @extension ENV_PARAMS
 hostRequirements: <HostRequirements> # @optional @extension ENV_PARAMS
 enableIf: <Expression> # @optional @expr bool @extension ENV_PARAMS
 exclusiveGroup: <Identifier> # @optional @extension ENV_PARAMS
+enableIf: <bool> | <FormatString> # @optional @fmtstring @extension CONTROL_FLOW
 script: <EnvironmentScript> # @optional
 variables: <EnvironmentVariables> # @optional
 ```
@@ -2138,12 +2282,22 @@ Where:
    Environments are attached decides which of them a Step uses, and a Step for which the first is disabled uses the
    next. Available with the `ENV_PARAMS` extension. Constraints:
     1. An Environment whose *activation* is `ALWAYS` must not have an *exclusiveGroup*.
-8. *script* — The action that is taken by this Environment when it is run on a Worker host.
-9. *variables* — A set of environment variable name/value pairs, with the values being
+8. *enableIf* — `@extension CONTROL_FLOW`. Whether the Environment is entered; the expression's target type is
+   `bool`, and a `null` result is an error. A disabled Environment is not entered or exited in any Session, its
+   *variables* are not set, and it is not part of the Session's Environment stack. If omitted, the Environment is always enabled. Constraints:
+    1. In a Job Environment, it may reference `Param.*` (except `PATH` parameters), `RawParam.*`, and `Job.Name`,
+       and is evaluated at Job creation.
+    2. In a Step Environment, it may also reference `Step.Name` and the `Steps.*` values of the enclosing Step's direct
+       dependencies, and is evaluated with the Step's other materialization expressions
+       (see [&lt;StepTemplate&gt;](#3-steptemplate)).
+    3. It may not reference `Session.*`, `Env.*`, or names bound by `let`.
+    4. Not available in an Environment Template.
+9. *script* — The action that is taken by this Environment when it is run on a Worker host.
+10. *variables* — A set of environment variable name/value pairs, with the values being
    [Format Strings](#73-format-strings) that are resolved when entering the environment. The specified variables must be
    set prior to running either `onEnter` or `onExit` for the environment, and for all actions that are run with the
    environment active.
-10. At least one of "script" or "variables" must be provided.
+11. At least one of "script" or "variables" must be provided.
 
 *envParameterDefinitions*, *activation*, *hostRequirements*, and *exclusiveGroup* are permitted on a Job Template's
 *jobEnvironments* entries and on an Environment Template's *environment*. They are not permitted on a
@@ -2182,6 +2336,8 @@ The format string scopes available to format strings within an Environment are:
    and *cancelation*, which are resolved when the Job is created. A Step's own script cannot reference `Env.Param.*`,
    and no Environment can reference another Environment's parameters.
 4. Names bound by `let` in the enclosing `<EnvironmentScript>`. Available with the `EXPR` extension.
+   In a Step Environment with the `CONTROL_FLOW` extension, also the `Steps.*` values of the enclosing Step's direct
+   dependencies.
 5. `WrappedAction.*` — Available within `onWrapEnvEnter`, `onWrapTaskRun`, and `onWrapEnvExit` only. Carries
    the wrapped `<Action>`'s fields. Available with the `WRAP_ACTIONS` extension.
    See [Wrap hook template variables](#431-wrap-hook-template-variables) for the available fields.
@@ -2724,9 +2880,12 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Job.Name`|The resolved name of the Job. This is a `string` type. Requires the `EXPR` extension.|Available in every Format String in the Job Template, except the `name` field of the Job Template itself.|
 |`Job.EnvNames`|The `name` of each Environment of the Job, in the order a Session that entered all of them would enter them. This is a `list[string]` type. Requires the `ENV_PARAMS` extension.|See below the table.|
-|`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`, and with the `ENV_PARAMS` extension the *parameters* values and *enableIf* of `dependencies` entries.|
+|`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`, and with the `ENV_PARAMS` extension the *parameters* values and *enableIf* of `dependencies` entries, and with the `CONTROL_FLOW` extension `enableIf`.|
 |`Session.HasPathMappingRules`|This value can be used to determine whether path mapping rules are available to the Session. Without the `EXPR` extension, it is string valued, with values "true" or "false". With the `EXPR` extension enabled, it is a `bool` type. "true"/`True` means that the path mapping JSON contains path mapping rules. "false"/`False` means that the contents of the path mapping JSON are the empty object.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Session.PathMappingRulesFile`|This is a string whose value is the location of a JSON file on the worker node's local disk that contains the path mapping rule substitutions for the Session.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
+|`Steps.<StepName>.Output.<VarName>`|The value of output variable `<VarName>` of Step `<StepName>`. If the Step has no *parameterSpace* its type is the declared type `T`; otherwise it is `list[T]`, one element per Task in parameter-space iteration order. If the Step has an *enableIf*, the type is optional (`T?` or `list[T]?`) and the value is `null` when the Step was skipped. `<StepName>` must be an `<Identifier>`. Requires the `CONTROL_FLOW` extension.|Available in the Step Template scope (*enableIf*, *let*, *hostRequirements*, *parameterSpace* ranges, *stepEnvironments*, *script*) of a Step that lists `<StepName>` directly in its *dependencies*. Not available in *combination*, job-level fields, or Environment Templates.|
+|`Steps.<StepName>.TaskParam.<ParamName>`|A `list` of the values of Task parameter `<ParamName>` for every Task of Step `<StepName>`, in parameter-space iteration order, aligned element-for-element with the Step's `Output` lists. The element type is the Task parameter's type (`int` for `CHUNK[INT]`). Optional, and `null` when skipped, if the Step has an *enableIf*. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.Output.*`. For a `PATH` Task parameter, only in format strings annotated `@fmtstring[host]`, with path mapping rules applied.|
+|`Task.OutputFile`|The location of the current Task's output file, as a `path`. See [The output file](#371-the-output-file). Requires the `CONTROL_FLOW` extension.|Available within the Step Script Actions, Embedded Files, and `let` bindings of a Step that declares *outputVariables*.|
 |`<name>` (let binding)|Names bound by `let` in `<StepTemplate>`, `<StepScript>`, `<SimpleAction>`, or `<EnvironmentScript>`. Names must start with a lowercase letter or underscore (see `<UserIdentifier>`). The type is determined by the expression. Available with the `EXPR` extension.|See [Let Binding Scope Summary](#362-let-binding-scope-summary) for detailed scoping rules.|
 
 `Job.EnvNames` lists the Environments attached from Environment Templates, in the order they are attached, followed by
@@ -2766,9 +2925,10 @@ different sets of values are known, which determines which format strings can be
 
 | Stage | When | Known Values | Unknown Values | What Happens |
 |-------|------|-------------|----------------|--------------|
-| **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Env.Param.*`, `Job.EnvNames` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `ENV_PARAMS` extension: `Env.Param.*` is type-checked against the Environment's *envParameterDefinitions* and `Job.EnvNames` is `unresolved[list[string]]`; literal Environment parameter `default`s, and literal `environment:` values for Job Environments in entries whose *enableIf* is absent or known to be `true`, for an Environment known not to be disabled for the Step ([§7.6](#76-expression-fields) rule 5, and for an Environment with an *exclusiveGroup* the bullets of [&lt;Environment&gt;](#4-environment) on what is known before the Job is created), are checked against their definitions. |
-| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*`; with `ENV_PARAMS`, at the end of this stage, each Step's Environment parameter effective values | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` Job Parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `ENV_PARAMS` extension, the steps of [§7.4.1](#741-job-creation-with-env_params) are taken. |
-| **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Env.Param.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters, including PATH and LIST[PATH] Environment parameters (`ENV_PARAMS`). Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. |
+| **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Env.Param.*`, `Job.EnvNames`, and with `CONTROL_FLOW` `Steps.*` and `Task.OutputFile` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `ENV_PARAMS` extension: `Env.Param.*` is type-checked against the Environment's *envParameterDefinitions* and `Job.EnvNames` is `unresolved[list[string]]`; literal Environment parameter `default`s, and literal `environment:` values for Job Environments in entries whose *enableIf* is absent or known to be `true`, for an Environment known not to be disabled for the Step ([§7.6](#76-expression-fields) rule 5, and for an Environment with an *exclusiveGroup* the bullets of [&lt;Environment&gt;](#4-environment) on what is known before the Job is created), are checked against their definitions. With the `CONTROL_FLOW` extension: `Steps.*` values are available as `unresolved` values of the types derived from the producing Steps' *outputVariables* and Task parameters, and references to them are checked against the referencing Step's *dependencies*. |
+| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*`; with `ENV_PARAMS`, at the end of this stage, each Step's Environment parameter effective values | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Task.OutputFile` and the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` Job Parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `ENV_PARAMS` extension, the steps of [§7.4.1](#741-job-creation-with-env_params) are taken. With the `CONTROL_FLOW` extension: an *enableIf* that references no `Steps.*` is evaluated, and a Step whose materialization expressions reference a `Steps.*` value that is not yet concrete is not evaluated here but waits for step input binding. |
+| **Step input binding** (`CONTROL_FLOW` only) | Once per Step whose materialization expressions reference `Steps.*`, when every referenced `Steps.*` value is concrete | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The Step's materialization expressions (its format strings not annotated `@fmtstring[host]`: *enableIf*, *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, and *script*) are evaluated in that order. If *enableIf* is `false` the Step is skipped and nothing after it is evaluated. If any evaluation fails, or the Task count exceeds the implementation's limit, the Step fails before any of its Tasks runs. Until it is bound the Step is pending inputs. |
+| **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Env.Param.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters, including PATH and LIST[PATH] Environment parameters (`ENV_PARAMS`). Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. With the `CONTROL_FLOW` extension: the `Steps.*` values of the Step's direct dependencies are concrete, and the output file is created before `onRun` and read after it succeeds. |
 
 The `@fmtstring` and `@fmtstring[host]` annotations in this specification indicate which stage
 a format string is resolved in. An expression field, marked `@expr <type>` (see [§7.6](#76-expression-fields)),
