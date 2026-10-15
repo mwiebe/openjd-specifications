@@ -1460,6 +1460,8 @@ with `@<FilePath>`:
    links. Otherwise the directive is invalid. A runtime checks this on the file it actually opened, for example by
    resolving the path beneath a handle to the Working Directory (Linux `openat2` with `RESOLVE_BENEATH`) or by
    checking the opened handle's final path, so that the Action can't swap a link in between a check and the read.
+   A runtime SHOULD open the path without blocking and check that it is a regular file before reading, because
+   opening a FIFO for reading blocks until a writer appears.
 3. The runtime MUST read the file with no more access than the Action's user has. The runtime may run as a different
    operating-system user from the Action, and without this rule a directive could copy a file that the Action's user
    cannot read, for example through a hard link placed in the Working Directory, into outputs that are stored and
@@ -1947,9 +1949,10 @@ other than the current one without overloading `Step`.
   result. The Session must be given the Step's output declarations along with its script, whether the Job lists
   `CONTROL_FLOW`, and for each Environment it enters, whether the Job Template or an Environment Template defines it. A runtime that runs
   Actions as another user reads `@` files through its cross-user helper. One existing behavior must change: openjd-rs
-  truncates over-long lines silently in three places (`truncate_line` in `crates/openjd-sessions/src/subprocess.rs`,
-  and `decode_and_truncate` and `fit_out_payload` in `crates/openjd-sessions/src/helper/src/framer.rs`, the last of
-  which can cut a line under 64 KiB that grows when escaped), and each must instead mark the line as truncated so that
+  truncates over-long lines silently in four places (`truncate_line` in `crates/openjd-sessions/src/subprocess.rs`,
+  and `LineFramer::accumulate`, `decode_and_truncate`, and `fit_out_payload` in
+  `crates/openjd-sessions/src/helper/src/framer.rs`, the last of which can cut a line under 64 KiB that grows when
+  escaped), and each must instead mark the line as truncated so that
   an over-long directive is invalid. No file is created before the Action runs.
 - **CLI (`openjd run`)**: Runs Steps in dependency order already, so it binds each Step just before running it, passes
   the collected values in, and prints each Task's outputs, with their units. `openjd summary` reports a Step that would need binding as
