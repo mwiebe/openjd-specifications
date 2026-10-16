@@ -1697,6 +1697,7 @@ A Task reports a value by printing one of these lines to stdout or stderr from i
 ```
 openjd_output_var: <Name>=<JSON>
 openjd_output_var: <Name>=@<FilePath>
+openjd_output_var: <Name>[<Int>]=<JSON>        # in a Step with a CHUNK[INT] parameter
 ```
 
 ```bnf
@@ -1720,7 +1721,8 @@ In a Step with a `CHUNK[INT]` Task parameter, one action runs a chunk of Tasks, 
 `<TaskSelector>`: the decimal value of the `CHUNK[INT]` parameter for the Task it reports for, which must be a value in
 the chunk being run. In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
 size limit apply to each Task of the chunk separately, and when the action exits successfully each Task must have its
-required values. If the action fails, no Task of the chunk commits any output.
+required values; if any Task doesn't, or the action fails, the whole chunk fails and no Task of it commits any
+output. The selector is matched by integer value and is required even in a chunk of one Task.
 
 A relative `<FilePath>` is resolved against the Session's Working Directory; an absolute one is used as written. Either
 way, the file the runtime opens must be a regular file inside the Session's Working Directory, after following symbolic links, and the runtime must read it
