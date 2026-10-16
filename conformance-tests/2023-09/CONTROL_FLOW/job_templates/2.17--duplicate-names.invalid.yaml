@@ -1,0 +1,23 @@
+# RFC 0010 §Job Template, jobOutputDefinitions constraint 3: names are unique.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: X
+  type: INT
+  value: '{{1}}'
+- name: X
+  type: INT
+  value: '{{2}}'
+steps:
+- name: S
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

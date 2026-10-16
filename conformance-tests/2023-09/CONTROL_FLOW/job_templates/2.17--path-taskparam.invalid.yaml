@@ -1,0 +1,29 @@
+# RFC 0010 §<JobOutputDefinition> item 3 / §Validation item 10: a job output may read values
+# whose type contains path only through RawOutput and TaskRawParam, so TaskParam of a PATH
+# Task parameter is invalid. Differs from 2.17--path-taskrawparam only in that symbol.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: Files
+  type: LIST[PATH]
+  value: '{{Steps.P.TaskParam.F}}'
+steps:
+- name: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: F
+      type: PATH
+      range:
+      - /mnt/in/a.exr
+      - /mnt/in/b.exr
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print()

@@ -1,0 +1,35 @@
+# RFC 0010 §The Steps.* scope / Validation item 5: a PATH Steps.P.Output value is available
+# only in format strings resolved on the worker host; a step-level let is resolved earlier.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: F
+    type: PATH
+  - name: Fs
+    type: LIST[PATH]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: F="/mnt/out/a.exr"'); print('openjd_output_var: Fs=["/mnt/out/a.exr"]')
+- name: C
+  let:
+  - d = Steps.P.Output.F
+  dependencies:
+  - dependsOn: P
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{repr_py(d)}})

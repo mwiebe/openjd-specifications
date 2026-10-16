@@ -1,0 +1,42 @@
+# RFC 0010 §File values item 5: the value is the file's content when the runtime processes
+# the directive; later changes have no effect. The Action waits 3 s before overwriting
+# the file, which assumes the runtime processes a flushed line within that time.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json, time
+            with open('v.json', 'w') as f: json.dump(111, f)
+            print('openjd_output_var: V=@v.json', flush=True)
+            time.sleep(3)
+            with open('v.json', 'w') as f: json.dump(222, f)
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.V))}})))
+expected:
+  output:
+  - GOT:111
+  forbidden:
+  - GOT:222

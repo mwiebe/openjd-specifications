@@ -1,0 +1,25 @@
+# RFC 0010 Type conversion table: RANGE_EXPR R=[1, 3, 5] is invalid; a list[int] does not
+# implicitly coerce to range_expr. The invalid directive fails the producer.
+# V is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: RANGE_EXPR
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V="1-2"')
+            print('openjd_output_var: V=[1, 3, 5]')

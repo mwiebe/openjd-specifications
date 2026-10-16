@@ -1,0 +1,20 @@
+# RFC 0010 §<OutputVariableDefinition> item 3: collect APPEND is valid on a LIST[...] type.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: E
+    type: LIST[FLOAT]
+    collect: APPEND
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: E=1.5')

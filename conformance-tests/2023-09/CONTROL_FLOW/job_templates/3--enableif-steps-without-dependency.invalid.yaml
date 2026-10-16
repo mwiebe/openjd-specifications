@@ -1,0 +1,30 @@
+# RFC 0010 §<StepTemplate> enableIf constraint 1: only the Steps.* symbols of the Step's
+# direct dependencies.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: Go
+    type: BOOL
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Go=true')
+- name: C
+  enableIf: '{{Steps.P.Output.Go}}'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

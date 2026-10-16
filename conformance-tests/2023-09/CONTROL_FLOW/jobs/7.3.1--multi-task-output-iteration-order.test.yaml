@@ -1,0 +1,53 @@
+# RFC 0010 §Reductions items 1-2: a multi-Task producer's outputs are lists in iteration
+# order (combination "B * A": A varies fastest), aligned with its TaskParam lists.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: A
+        type: INT
+        range:
+        - 1
+        - 2
+      - name: B
+        type: INT
+        range:
+        - 10
+        - 20
+        - 30
+      combination: B * A
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: X={{Task.Param.A * 100 + Task.Param.B}}')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('OUT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.X))}})))
+            import json; print('TPA:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.TaskParam.A))}})))
+            import json; print('TPB:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.TaskParam.B))}})))
+expected:
+  output:
+  - OUT:[110, 210, 120, 220, 130, 230]
+  - TPA:[1, 2, 1, 2, 1, 2]
+  - TPB:[10, 10, 20, 20, 30, 30]

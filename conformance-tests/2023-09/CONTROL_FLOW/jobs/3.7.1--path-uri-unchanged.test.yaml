@@ -1,0 +1,43 @@
+# RFC 0010 §Path values: a URI value is stored unchanged, and with no URI rule it reaches
+# the consumer unchanged.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: F
+      type: PATH
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: F="s3://bucket/key.exr"')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('RAW:' + {{repr_py(Steps.P.RawOutput.F)}})
+            print('MAPPED:' + {{repr_py(Steps.P.Output.F)}})
+pathMapping:
+- source_path_format: POSIX
+  source_path: /mnt/submit
+  destination_path: /worker/root
+runOn:
+- posix
+expected:
+  output:
+  - RAW:s3://bucket/key.exr
+  - MAPPED:s3://bucket/key.exr

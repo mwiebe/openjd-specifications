@@ -1,0 +1,47 @@
+# RFC 0010 §<JobOutputDefinition>: typed outputs whose value reads job parameters and the
+# Steps.* of any Step, with description, unit, and constraint properties.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: OutputVideo
+  type: PATH
+  default: out/v.mp4
+jobOutputDefinitions:
+- name: VideoCount
+  type: INT
+  value: '{{len(Steps.P.Output.Videos)}}'
+  minValue: 0
+  description: How many videos were found.
+- name: Bytes
+  type: INT
+  value: '{{40 + 2}}'
+  unit: bytes
+- name: OutputVideo
+  type: PATH
+  value: '{{RawParam.OutputVideo}}'
+  objectType: FILE
+steps:
+- name: P
+  outputVariables:
+  - name: Videos
+    type: LIST[STRING]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Videos=["a.mp4"]')
+- name: Q
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

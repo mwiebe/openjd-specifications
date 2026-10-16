@@ -1,0 +1,40 @@
+# RFC 0010 §Conditional execution: a Step whose enableIf is false runs no Tasks; its
+# dependents run and see its outputs as null, handled with == null and 'or'.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    enableIf: false
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: X=1')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('ISNULL:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.X == null))}})))
+            import json; print('DEFAULT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.X or 7))}})))
+expected:
+  output:
+  - ISNULL:true
+  - DEFAULT:7
+  forbidden:
+  - P_RAN

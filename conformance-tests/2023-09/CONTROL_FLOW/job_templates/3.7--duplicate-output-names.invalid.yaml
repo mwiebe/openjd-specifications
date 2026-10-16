@@ -1,0 +1,21 @@
+# RFC 0010 §<StepTemplate> outputVariables constraint 3: names are unique.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: N
+    type: INT
+  - name: N
+    type: STRING
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')

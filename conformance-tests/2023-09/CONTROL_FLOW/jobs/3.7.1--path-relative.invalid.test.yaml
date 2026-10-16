@@ -1,0 +1,31 @@
+# RFC 0010 §Path values: a relative PATH value is invalid (it would be relative to a
+# Working Directory no consumer can see).
+# F is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: F
+      type: PATH
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: F="/worker/root/ok"')
+            print('openjd_output_var: F="out/a.exr"')
+pathMapping:
+- source_path_format: POSIX
+  source_path: /mnt/submit
+  destination_path: /worker/root
+runOn:
+- posix

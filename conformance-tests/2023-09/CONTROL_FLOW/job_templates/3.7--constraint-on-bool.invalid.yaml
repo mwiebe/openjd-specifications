@@ -1,0 +1,21 @@
+# RFC 0010 §<OutputVariableDefinition> item 2 table: BOOL has no constraint properties.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: B
+    type: BOOL
+    allowedValues:
+    - true
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: B=true')

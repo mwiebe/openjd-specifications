@@ -1,0 +1,23 @@
+# RFC 0010 §Processing a directive step 5: under APPEND, a directive that makes the list
+# exceed maxLength is invalid.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: LIST[INT]
+      collect: APPEND
+      maxLength: 2
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1'); print('openjd_output_var: V=2'); print('openjd_output_var: V=3')
