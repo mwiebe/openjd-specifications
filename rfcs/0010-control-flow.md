@@ -1687,7 +1687,9 @@ has its own outputs. A directive says which Task it is for with a `<TaskSelector
       done
 ```
 
-1. **Which Tasks.** The selector must be a value in the chunk being run. A scheduler may form chunks differently from
+1. **Which Tasks.** The `CHUNK[INT]` parameter's values must be distinct in a Step that declares *outputVariables*,
+   so that a value names exactly one Task; a duplicate fails the Step when its parameter space is materialized, at Job
+   creation or at step input binding. The selector must be a value in the chunk being run. A scheduler may form chunks differently from
    one run to the next, for example under `targetRuntimeSeconds`, so the check is against the chunk the runtime was
    given, not the parameter's whole range.
 2. **Per Task.** Collect modes, constraint properties, and the size limit of [Limits](#limits) apply to each Task's
@@ -2182,7 +2184,8 @@ Every rule this extension adds, and when it is checked.
 **At template validation** (by the model library, before submission):
 
 1. `CONTROL_FLOW` is listed only together with `EXPR`.
-2. *outputVariables*: 1 to 32 elements; names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint
+2. *outputVariables*: 1 to 32 elements; with a `CHUNK[INT]` parameter whose `range` is a literal list, its values are
+   distinct (computed ranges are checked when materialized); names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint
    properties are valid for the type; *collect* is an `<OutputCollectMode>`, and `APPEND` only with a `LIST[...]`
    type; *unit* is 1 to 32 characters with no control characters; no `LIST[LIST[INT]]` on a Step with a
    `parameterSpace`.
