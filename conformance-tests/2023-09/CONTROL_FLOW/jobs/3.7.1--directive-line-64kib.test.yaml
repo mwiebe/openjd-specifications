@@ -1,0 +1,35 @@
+# RFC 0010 §Limits item 1: a runtime MUST accept a directive line of at least 64 KiB. This
+# line is 65,023 bytes.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: STRING
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V="' + 'a' * 65000 + '"')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(len(Steps.P.Output.V)))}})))
+expected:
+  output:
+  - GOT:65000

@@ -1,0 +1,22 @@
+# RFC 0010 §<JobOutputDefinition> item 2: the same constraint properties as
+# <OutputVariableDefinition>; minValue is not a STRING constraint.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: S
+  type: STRING
+  value: '{{''a''}}'
+  minValue: 1
+steps:
+- name: S
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

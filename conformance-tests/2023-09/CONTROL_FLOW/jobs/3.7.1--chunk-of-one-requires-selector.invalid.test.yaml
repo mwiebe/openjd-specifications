@@ -1,0 +1,34 @@
+# RFC 0010 §Chunked Steps item 3: the selector is required whatever the chunk's size,
+# including chunks of one Task.
+# X is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  - TASK_CHUNKING
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range: 1-1
+        chunks:
+          defaultTaskCount: 1
+          rangeConstraint: CONTIGUOUS
+    outputVariables:
+    - name: X
+      type: INT
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            for f in {{repr_py(list(Task.Param.Frame))}}: print('openjd_output_var: X[%d]=1' % f)
+            print('openjd_output_var: X=10')

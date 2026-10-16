@@ -1,0 +1,28 @@
+# RFC 0010 §<OutputVariableDefinition> items 4-5: description and unit are display-only
+# strings; unit may hold any non-Cc characters, such as '%', '/', and non-ASCII.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: Coverage
+    type: FLOAT
+    unit: '%'
+    description: Share of frames covered.
+  - name: Rate
+    type: FLOAT
+    unit: frames/s
+  - name: Temp
+    type: FLOAT
+    unit: °C
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Coverage=81.5'); print('openjd_output_var: Rate=15.5'); print('openjd_output_var: Temp=21.5')

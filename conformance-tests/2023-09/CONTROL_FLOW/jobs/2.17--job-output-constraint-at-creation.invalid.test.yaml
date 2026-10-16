@@ -1,0 +1,27 @@
+# RFC 0010 §Job outputs item 3: a violated constraint property fails the job output, and
+# at Job creation that makes Job creation fail.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: N
+    type: INT
+    default: 10
+  jobOutputDefinitions:
+  - name: Checked
+    type: INT
+    value: '{{Param.N}}'
+    maxValue: 5
+  steps:
+  - name: S
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print()

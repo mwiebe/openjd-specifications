@@ -1,0 +1,19 @@
+# RFC 0010 Technical Requirement 2: outputVariables is available only when CONTROL_FLOW
+# is listed in extensions. EXPR alone is not enough.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: N
+    type: INT
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')

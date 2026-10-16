@@ -1,0 +1,38 @@
+# RFC 0010 §<StepTemplate> enableIf: the target type is bool, not bool?; a null result
+# (a skipped producer's output) fails the Step at binding instead of enabling it.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    enableIf: false
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=true')
+  - name: P
+    enableIf: '{{Steps.Q.Output.Go}}'
+    dependencies:
+    - dependsOn: Q
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+expected:
+  taskFailure: {}
+  forbidden:
+  - P_RAN

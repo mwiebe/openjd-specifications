@@ -1,0 +1,48 @@
+# RFC 0010 §The Steps.* scope: a consumer's PATH Task parameter whose range comes from
+# RawOutput holds submission-context values, and Task.Param is mapped forward on the worker.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: Dirs
+      type: LIST[PATH]
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Dirs=["/worker/root/x"]')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: D
+        type: PATH
+        range: '{{Steps.P.RawOutput.Dirs}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('TASK_RAW:' + {{repr_py(Task.RawParam.D)}})
+            print('TASK_MAPPED:' + {{repr_py(Task.Param.D)}})
+pathMapping:
+- source_path_format: POSIX
+  source_path: /mnt/submit
+  destination_path: /worker/root
+runOn:
+- posix
+expected:
+  output:
+  - TASK_RAW:/mnt/submit/x
+  - TASK_MAPPED:/worker/root/x

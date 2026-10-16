@@ -1,0 +1,35 @@
+# RFC 0010 §The openjd_output_var directive: the line terminator (\n or \r\n) is not part
+# of the directive. Written as bytes so Python's newline translation doesn't interfere.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import sys; sys.stdout.buffer.write(b'openjd_output_var: V=7\r\n'); sys.stdout.flush()
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.V))}})))
+expected:
+  output:
+  - GOT:7

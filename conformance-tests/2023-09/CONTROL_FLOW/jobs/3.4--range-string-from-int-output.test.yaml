@@ -1,0 +1,46 @@
+# RFC 0010 Video frame count example: range "1-{{Steps.P.Output.FrameCount}}" gives one
+# Task per frame.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: FrameCount
+      type: INT
+      minValue: 1
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: FrameCount=3')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: INT
+        range: 1-{{Steps.P.Output.FrameCount}}
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('FRAME:' + str({{Task.Param.Frame}}))
+expected:
+  output:
+  - FRAME:1
+  - FRAME:2
+  - FRAME:3
+  forbidden:
+  - FRAME:4
+  - FRAME:0

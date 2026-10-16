@@ -1,0 +1,83 @@
+# RFC 0010 §<StepTemplate> outputVariables constraint 2: at most 32 elements.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: O1
+    type: INT
+  - name: O2
+    type: INT
+  - name: O3
+    type: INT
+  - name: O4
+    type: INT
+  - name: O5
+    type: INT
+  - name: O6
+    type: INT
+  - name: O7
+    type: INT
+  - name: O8
+    type: INT
+  - name: O9
+    type: INT
+  - name: O10
+    type: INT
+  - name: O11
+    type: INT
+  - name: O12
+    type: INT
+  - name: O13
+    type: INT
+  - name: O14
+    type: INT
+  - name: O15
+    type: INT
+  - name: O16
+    type: INT
+  - name: O17
+    type: INT
+  - name: O18
+    type: INT
+  - name: O19
+    type: INT
+  - name: O20
+    type: INT
+  - name: O21
+    type: INT
+  - name: O22
+    type: INT
+  - name: O23
+    type: INT
+  - name: O24
+    type: INT
+  - name: O25
+    type: INT
+  - name: O26
+    type: INT
+  - name: O27
+    type: INT
+  - name: O28
+    type: INT
+  - name: O29
+    type: INT
+  - name: O30
+    type: INT
+  - name: O31
+    type: INT
+  - name: O32
+    type: INT
+  - name: O33
+    type: INT
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          for i in range(1, 33): print('openjd_output_var: O%d=1' % i)

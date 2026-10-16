@@ -1,0 +1,35 @@
+# RFC 0010 §The Steps.* scope: TEMPLATE-scope fields read a PATH output through
+# Steps.P.RawOutput, as they read RawParam for a PATH job parameter.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: F
+    type: PATH
+  - name: Fs
+    type: LIST[PATH]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: F="/mnt/out/a.exr"'); print('openjd_output_var: Fs=["/mnt/out/a.exr"]')
+- name: C
+  let:
+  - d = Steps.P.RawOutput.F
+  dependencies:
+  - dependsOn: P
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{repr_py(d)}})

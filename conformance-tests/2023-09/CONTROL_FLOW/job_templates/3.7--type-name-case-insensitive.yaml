@@ -1,0 +1,19 @@
+# RFC 0010 §<OutputVariableDefinition> item 2: type names are case-insensitive.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: V
+    type: List[String]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: V=["a"]')

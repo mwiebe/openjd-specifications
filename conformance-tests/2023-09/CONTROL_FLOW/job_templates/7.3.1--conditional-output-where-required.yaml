@@ -1,0 +1,41 @@
+# RFC 0010 Design Choice 8: a conditional producer's output is T?, and EXPR accepts a T?
+# placeholder where T is required, deferring the check to the concrete value. Valid.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Run
+  type: BOOL
+  default: true
+steps:
+- name: P
+  enableIf: '{{Param.Run}}'
+  outputVariables:
+  - name: N
+    type: INT
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')
+- name: C
+  dependencies:
+  - dependsOn: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: F
+      type: INT
+      range: '{{range(Steps.P.Output.N)}}'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Task.Param.F}})

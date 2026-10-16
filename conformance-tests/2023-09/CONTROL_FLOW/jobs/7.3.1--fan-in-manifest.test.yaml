@@ -1,0 +1,47 @@
+# RFC 0010 S3 prefix example / §Reductions: a fan-in Step reads a producer's TaskParam and
+# Output lists, aligned element for element, and reduces them with sum().
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Key
+        type: STRING
+        range:
+        - a
+        - bb
+        - ccc
+    outputVariables:
+    - name: Bytes
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Bytes={{len(Task.Param.Key)}}')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('KEYS:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.TaskParam.Key))}})))
+            import json; print('BYTES:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.Bytes))}})))
+            import json; print('TOTAL:' + json.dumps(json.loads({{repr_py(repr_json(sum(Steps.P.Output.Bytes)))}})))
+expected:
+  output:
+  - KEYS:["a", "bb", "ccc"]
+  - BYTES:[1, 2, 3]
+  - TOTAL:6

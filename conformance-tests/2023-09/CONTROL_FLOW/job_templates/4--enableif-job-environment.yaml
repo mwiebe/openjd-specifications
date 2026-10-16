@@ -1,0 +1,26 @@
+# RFC 0010 §<Environment> enableIf constraint 1: a Job Environment's enableIf may reference
+# Param.*, RawParam.*, and Job.Name, and is evaluated at Job creation.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: UseEnv
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  enableIf: '{{Param.UseEnv and len(Job.Name) > 0}}'
+  variables:
+    CF_VAR: set
+steps:
+- name: S
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

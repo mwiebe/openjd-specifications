@@ -1,0 +1,15 @@
+# RFC 0010 §The Steps.* scope: Steps.* is not available anywhere in an Environment
+# Template.
+specificationVersion: environment-2023-09
+extensions:
+- EXPR
+environment:
+  name: Env
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Steps.P.Output.N}})

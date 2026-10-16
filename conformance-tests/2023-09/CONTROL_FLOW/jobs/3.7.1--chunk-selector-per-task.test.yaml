@@ -1,0 +1,46 @@
+# RFC 0010 §Chunked Steps items 2 and 4: each directive names its Task with [<value>]; ONCE
+# applies per Task; consumers see one element per Task in iteration order.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  - TASK_CHUNKING
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range: 1-4
+        chunks:
+          defaultTaskCount: 2
+          rangeConstraint: CONTIGUOUS
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            for f in {{repr_py(list(Task.Param.Frame))}}: print('openjd_output_var: X[%d]=%d' % (f, f * 10))
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('OUT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.X))}})))
+            import json; print('TP:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.TaskParam.Frame))}})))
+expected:
+  output:
+  - OUT:[10, 20, 30, 40]
+  - TP:[1, 2, 3, 4]

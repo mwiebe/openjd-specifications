@@ -1,0 +1,26 @@
+# RFC 0010 §<JobOutputDefinition> item 3: may not reference Task.*.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: F
+  type: INT
+  value: '{{Task.Param.F}}'
+steps:
+- name: S
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: F
+      type: INT
+      range:
+      - 1
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

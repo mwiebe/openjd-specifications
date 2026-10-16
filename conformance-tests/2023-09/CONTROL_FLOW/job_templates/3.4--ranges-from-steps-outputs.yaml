@@ -1,0 +1,72 @@
+# RFC 0010 §Task parameter ranges: a format-string range may read the Steps.* symbols of a
+# direct dependency: an INT range string, a STRING list, and a computed list[int].
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: FrameCount
+    type: INT
+  - name: Keys
+    type: LIST[STRING]
+  - name: Children
+    type: LIST[LIST[INT]]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: FrameCount=3'); print('openjd_output_var: Keys=["a"]'); print('openjd_output_var: Children=[[1], []]')
+- name: A
+  dependencies:
+  - dependsOn: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: INT
+      range: 1-{{Steps.P.Output.FrameCount}}
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Task.Param.Frame}})
+- name: B
+  dependencies:
+  - dependsOn: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Key
+      type: STRING
+      range: '{{Steps.P.Output.Keys}}'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{repr_py(Task.Param.Key)}})
+- name: D
+  dependencies:
+  - dependsOn: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Node
+      type: INT
+      range: '{{range(len(Steps.P.Output.Children))}}'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Task.Param.Node}})

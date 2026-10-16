@@ -1,0 +1,28 @@
+# RFC 0010 §Processing a directive, invalid item 6: a file whose content contains a NUL
+# character is invalid. The rule overlaps "not exactly one JSON value" (a NUL after the
+# value is not JSON whitespace), so a runtime may report either problem; only the failure
+# is checked.
+# V is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1')
+            with open('v.json', 'wb') as f: f.write(b'1\x00')
+            print('openjd_output_var: V=@' + 'v.json')

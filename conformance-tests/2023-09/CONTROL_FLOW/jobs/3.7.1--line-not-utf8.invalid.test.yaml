@@ -1,0 +1,25 @@
+# RFC 0010 §Processing a directive, invalid item 9: a directive line that is not valid
+# UTF-8 is invalid.
+# V is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: STRING
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V="ok"')
+            import sys; sys.stdout.buffer.write(b'openjd_output_var: V="\xff"\n'); sys.stdout.flush()

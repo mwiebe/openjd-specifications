@@ -1,0 +1,43 @@
+# RFC 0010 Design Choice 4: a metric is an output variable that no Step reads; a Step that
+# reports metrics alongside a consumed output runs normally. C reads only N, and runs only
+# after P succeeded, so its GOT line shows that the unread metrics didn't fail P.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: mpjpe_mm
+      type: FLOAT
+      unit: mm
+      minValue: 0
+    - name: fps
+      type: FLOAT
+      unit: frames/s
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: mpjpe_mm=52.6'); print('openjd_output_var: fps=15.6'); print('openjd_output_var: N=' + str(6 * 7))
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.N))}})))
+expected:
+  output:
+  - GOT:42

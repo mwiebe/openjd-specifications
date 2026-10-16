@@ -1,0 +1,50 @@
+# RFC 0010 §<Environment> enableIf constraint 2: a Step Environment's enableIf may read
+# Steps.*; when false the environment is not entered but the Step's Tasks still run.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=false')
+  - name: C
+    dependencies:
+    - dependsOn: Q
+    stepEnvironments:
+    - name: CEnv
+      enableIf: '{{Steps.Q.Output.Go}}'
+      script:
+        actions:
+          onEnter:
+            command: python
+            args:
+            - -c
+            - |-
+              print('ENV_E' + 'NTERED')
+      variables:
+        CF_VAR: set
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import os; print('VAR:' + os.environ.get('CF_VAR', 'UNSET'))
+expected:
+  output:
+  - VAR:UNSET
+  forbidden:
+  - ENV_ENTERED

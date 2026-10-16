@@ -1,0 +1,37 @@
+# RFC 0010 §Path values, reference inverse step 4 example (POSIX form): with /s/p -> /mnt/p
+# and /s/p/x -> /data/x, /mnt/p/x/f's candidate /s/p/x/f maps forward to /data/x/f. The
+# Session has rules, so the stored value MUST be in the submission path context AND MUST
+# forward-map back to the reported path; no submission-context form does both, and "If
+# the runtime can find no such form, the value is invalid." See README ambiguity 1.
+# F is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: F
+      type: PATH
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: F="/mnt/p/ok"')
+            print('openjd_output_var: F="/mnt/p/x/f"')
+pathMapping:
+- source_path_format: POSIX
+  source_path: /s/p
+  destination_path: /mnt/p
+- source_path_format: POSIX
+  source_path: /s/p/x
+  destination_path: /data/x
+runOn:
+- posix

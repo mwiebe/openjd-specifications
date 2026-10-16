@@ -1,0 +1,31 @@
+# RFC 0010 §<JobOutputDefinition> item 2: LIST[LIST[INT]] is allowed; here it collects a
+# multi-Task producer's LIST[INT] output.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: Grid
+  type: LIST[LIST[INT]]
+  value: '{{Steps.P.Output.L}}'
+steps:
+- name: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: F
+      type: INT
+      range:
+      - 1
+      - 2
+  outputVariables:
+  - name: L
+    type: LIST[INT]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: L=[{{Task.Param.F}}]')

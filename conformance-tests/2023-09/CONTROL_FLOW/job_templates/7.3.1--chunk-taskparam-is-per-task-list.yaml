@@ -1,0 +1,42 @@
+# RFC 0010 §The Steps.* scope, Types: for a CHUNK[INT] Task parameter U is int, so
+# Steps.P.TaskParam.Frame is list[int] (one element per Task) and reduces with sum().
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+- TASK_CHUNKING
+name: TestJob
+steps:
+- name: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: 1-10
+      chunks:
+        defaultTaskCount: 5
+        rangeConstraint: CONTIGUOUS
+  outputVariables:
+  - name: T
+    type: FLOAT
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          for f in {{repr_py(list(Task.Param.Frame))}}: print('openjd_output_var: T[%d]=0.5' % f)
+- name: C
+  let:
+  - total = sum(Steps.P.TaskParam.Frame) + len(Steps.P.Output.T)
+  dependencies:
+  - dependsOn: P
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{total}})

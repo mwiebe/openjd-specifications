@@ -1,0 +1,22 @@
+# RFC 0010 §<OutputVariableDefinition> constraint 2: same validity rules as the job
+# parameter definition, so minValue may not exceed maxValue.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: N
+    type: INT
+    minValue: 10
+    maxValue: 1
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')

@@ -1,0 +1,37 @@
+# RFC 0010 Type conversion table: LIST[FLOAT] L=[1, 2.5] gives [1.0, 2.5]. This proves only
+# that a mixed int/float list is accepted for a LIST[FLOAT] output with the right values:
+# 1 + 0.25 is 1.25 whether the element is int or float, so the int-to-float conversion
+# itself isn't observable here. Arithmetic avoids depending on how 1.0 is printed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: LIST[FLOAT]
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=[1, 2.5]')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json([x + 0.25 for x in Steps.P.Output.V]))}})))
+expected:
+  output:
+  - GOT:[1.25, 2.75]

@@ -1,0 +1,16 @@
+# RFC 0010 §Extension name and dependencies: CONTROL_FLOW applies to Job Templates; an
+# Environment Template cannot declare it.
+specificationVersion: environment-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+environment:
+  name: Env
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

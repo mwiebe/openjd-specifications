@@ -1,0 +1,31 @@
+# RFC 0010 §Which Actions may print it: in a CONTROL_FLOW Job, a directive from a Job
+# Environment's onEnter is invalid and fails that Action.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  jobEnvironments:
+  - name: E
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1')
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1')
