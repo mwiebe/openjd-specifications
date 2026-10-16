@@ -190,7 +190,9 @@ messages to convey information about the **Action** to the render management sys
 * `openjd_output_var: <name>=<json>` or `openjd_output_var: <name>=@<path>` where `<name>` is the name of an output
   variable that the Step declares, `<json>` is a JSON value on one line, and `<path>` names a file inside the
   **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
-  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@` file
+  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. In a Step with a
+  `CHUNK[INT]` Task parameter, the name is followed by `[<value>]`, the chunk parameter's value for the **Task** of
+  the chunk that the value is for, as in `openjd_output_var: <name>[<value>]=<json>`. The runtime reads a `@` file
   as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template, cancels
   the **Action** at once and fails it, and stays in the log with the error. Under WRAP_ACTIONS, a line from a wrap hook
   counts as output of the **Action** it runs in place of. Requires the CONTROL_FLOW extension; without it, and for
