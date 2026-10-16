@@ -1547,7 +1547,8 @@ its `onRun` action, in one of two forms:
 ```
 openjd_output_var: <Name>=<JSON>
 openjd_output_var: <Name>=@<FilePath>
-openjd_output_var: <Name>[<Int>]=<JSON>        # in a Step with a CHUNK[INT] parameter
+openjd_output_var: <Name>[<Int>]=<JSON>        # either form, in a Step with a CHUNK[INT] parameter
+openjd_output_var: <Name>[<Int>]=@<FilePath>
 ```
 
 The runtime recognizes the directive the way it recognizes the other messages of How Jobs Are Run: a line that begins
@@ -1677,6 +1678,7 @@ has its own outputs. A directive says which Task it is for with a `<TaskSelector
       unit: s
   bash:
     script: |
+      set -euo pipefail
       for frame in {{repr_sh([string(f) for f in list(Task.Param.Frame)])}}; do
         start=$(date +%s.%N)
         render --frame "$frame"
@@ -2212,7 +2214,7 @@ converts to the declared type, satisfies its constraint properties, and fits the
 **As Actions run** (by the runtime, as it reads each line of an Action's output in a Session of a `CONTROL_FLOW` Job): the rules of
 [Processing a directive](#processing-a-directive), including type conversion, constraint properties, collect modes,
 `@` file paths, reverse mapping of `PATH` values, and the limits; and when `onRun` exits successfully, that every `ONCE` and `LAST` output has a value
-and every `APPEND` list meets its `minLength`.
+and every `APPEND` list meets its `minLength` (for each Task of a chunk).
 
 **On re-run** (by the scheduler): the rules of [Retries and re-runs](#retries-and-re-runs).
 
