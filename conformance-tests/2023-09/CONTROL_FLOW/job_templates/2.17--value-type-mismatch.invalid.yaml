@@ -1,0 +1,21 @@
+# RFC 0010 §Validation item 10: each value type-checks against its type; a list[int] has
+# no conversion to int.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: X
+  type: INT
+  value: '{{[1, 2]}}'
+steps:
+- name: S
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

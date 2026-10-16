@@ -1,0 +1,53 @@
+# RFC 0010 §Empty parameter spaces: a range that evaluates to [] gives a zero-Task Step
+# that succeeds, and a Step that depends on it still runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: Keys
+      type: LIST[STRING]
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Keys=[]')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Key
+        type: STRING
+        range: '{{Steps.P.Output.Keys}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN')
+  - name: D
+    dependencies:
+    - dependsOn: C
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
+expected:
+  output:
+  - D_RAN
+  forbidden:
+  - C_TASK_RAN

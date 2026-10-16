@@ -1,0 +1,45 @@
+# RFC 0010 §<OutputVariableDefinition>: a PATH value's constraints are checked against its
+# stored (submission-context) form.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: F
+      type: PATH
+      allowedValues:
+      - /mnt/submit/a.exr
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: F="/worker/root/a.exr"')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('RAW:' + {{repr_py(Steps.P.RawOutput.F)}})
+            print('MAPPED:' + {{repr_py(Steps.P.Output.F)}})
+pathMapping:
+- source_path_format: POSIX
+  source_path: /mnt/submit
+  destination_path: /worker/root
+runOn:
+- posix
+expected:
+  output:
+  - RAW:/mnt/submit/a.exr
+  - MAPPED:/worker/root/a.exr

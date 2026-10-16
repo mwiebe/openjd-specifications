@@ -1,0 +1,32 @@
+# RFC 0010 §Chunked Steps item 1: the distinct-values rule applies only to a Step that
+# declares outputVariables. Positive control for
+# 3.7.1--chunk-literal-range-duplicates-with-outputs.invalid: the same Step without
+# outputVariables is valid.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+- TASK_CHUNKING
+name: TestJob
+steps:
+- name: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range:
+      - 1
+      - 2
+      - 2
+      - 3
+      chunks:
+        defaultTaskCount: 5
+        rangeConstraint: NONCONTIGUOUS
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{repr_py(list(Task.Param.Frame))}})

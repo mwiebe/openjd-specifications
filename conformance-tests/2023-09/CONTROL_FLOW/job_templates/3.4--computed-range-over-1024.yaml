@@ -1,0 +1,22 @@
+# RFC 0010 §Range length: with CONTROL_FLOW the 1024-element cap does not apply to the
+# values a format-string range evaluates to (here 1025). See Open Question 10.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: S
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: F
+      type: INT
+      range: '{{range(1025)}}'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Task.Param.F}})

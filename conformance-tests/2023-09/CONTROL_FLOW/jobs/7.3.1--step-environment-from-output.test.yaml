@@ -1,0 +1,39 @@
+# RFC 0010 §The Steps.* scope, Where available item 3: a Step Environment's format strings
+# may read the Steps.* symbols of the enclosing Step's direct dependencies.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: N=21')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    stepEnvironments:
+    - name: CEnv
+      variables:
+        CF_N: '{{Steps.P.Output.N}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import os; print('ENV:' + os.environ['CF_N'])
+expected:
+  output:
+  - ENV:21

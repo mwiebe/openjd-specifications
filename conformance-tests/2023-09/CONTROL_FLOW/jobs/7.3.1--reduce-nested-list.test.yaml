@@ -1,0 +1,43 @@
+# RFC 0010 §Reductions item 4: a per-Task LIST[T] output becomes list[list[T]].
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range:
+        - 1
+        - 2
+    outputVariables:
+    - name: L
+      type: LIST[INT]
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: L=[{{Task.Param.F}}, {{Task.Param.F * 10}}]')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('NESTED:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.L))}})))
+            import json; print('SUM:' + json.dumps(json.loads({{repr_py(repr_json(sum(flatten(Steps.P.Output.L))))}})))
+expected:
+  output:
+  - NESTED:[[1, 10], [2, 20]]
+  - SUM:33

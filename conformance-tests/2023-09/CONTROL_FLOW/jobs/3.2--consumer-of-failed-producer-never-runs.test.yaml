@@ -1,0 +1,44 @@
+# RFC 0010 §When a Step is bound: a consumer whose producer fails can never be bound and
+# never runs. A failed attempt commits nothing (§Processing a directive). C reads P's output
+# in its range, a binding-time field, so a runtime that committed the failed attempt's N=1
+# and bound C with it would run C's one Task.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import sys; print('openjd_output_var: N=1'); sys.exit(3)
+  - name: C
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: I
+        type: INT
+        range: '{{range(Steps.P.Output.N)}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure:
+    exitCode: 3
+  forbidden:
+  - C_RAN

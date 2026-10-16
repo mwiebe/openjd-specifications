@@ -1,0 +1,50 @@
+# RFC 0010 §Chunked Steps item 4: consumers see per-Task lists, Output aligned with
+# TaskParam, however the Tasks were chunked. Checks alignment only (see README on order).
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  - TASK_CHUNKING
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range:
+        - 5
+        - 1
+        - 3
+        - 2
+        chunks:
+          defaultTaskCount: 2
+          rangeConstraint: NONCONTIGUOUS
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            for f in {{repr_py(list(Task.Param.Frame))}}: print('openjd_output_var: X[%d]=%d' % (f, f * 10))
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            p = {{repr_py(Steps.P.TaskParam.Frame)}}
+            o = {{repr_py(Steps.P.Output.X)}}
+            print('ALIGNED:' + str(sorted(zip(p, o)) == [(1, 10), (2, 20), (3, 30), (5, 50)]))
+expected:
+  output:
+  - ALIGNED:True

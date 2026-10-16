@@ -1,0 +1,51 @@
+# RFC 0010 §Chunked Steps item 1: in a Step with outputVariables, a CHUNK[INT] range with a
+# duplicate value fails the Step when its parameter space is materialized (here at binding),
+# before any of its Tasks runs. The range is a computed list, [1, 1, 2], not a range string.
+# P prints its marker first and no directive, so the marker appears only if a runtime ran
+# a Task of P despite the duplicate.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  - TASK_CHUNKING
+  name: TestJob
+  steps:
+  - name: Q
+    outputVariables:
+    - name: L
+      type: LIST[INT]
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: L=[1, 1, 2]')
+  - name: P
+    dependencies:
+    - dependsOn: Q
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range: '{{Steps.Q.Output.L}}'
+        chunks:
+          defaultTaskCount: 3
+          rangeConstraint: NONCONTIGUOUS
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+expected:
+  taskFailure: {}
+  forbidden:
+  - P_RAN

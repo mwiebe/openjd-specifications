@@ -1,0 +1,25 @@
+# RFC 0010 §Job outputs item 3: a value that doesn't convert to the declared type fails
+# the Job (a STRING "abc" for an INT job output).
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  jobOutputDefinitions:
+  - name: Count
+    type: INT
+    value: '{{Steps.P.Output.S}}'
+  steps:
+  - name: P
+    outputVariables:
+    - name: S
+      type: STRING
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: S="abc"')

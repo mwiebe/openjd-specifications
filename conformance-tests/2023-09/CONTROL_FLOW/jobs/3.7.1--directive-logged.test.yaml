@@ -1,0 +1,38 @@
+# RFC 0010 §The openjd_output_var directive: like the other messages, a directive line
+# appears in the Action's log by default. The line is built at run time so the expected
+# text never appears in the template itself. C prints the consumed value only after P
+# succeeded, so the run also shows the directive was accepted, not just echoed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=' + str(6 * 7))
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.V))}})))
+expected:
+  output:
+  - 'openjd_output_var: V=42'
+  - GOT:42

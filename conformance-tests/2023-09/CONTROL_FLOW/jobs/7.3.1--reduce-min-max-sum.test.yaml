@@ -1,0 +1,42 @@
+# RFC 0010 §Reductions: min, max, and sum over a multi-Task producer's output list.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range:
+        - 4
+        - 1
+        - 3
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: X={{Task.Param.F * 10}}')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json([min(Steps.P.Output.X), max(Steps.P.Output.X), sum(Steps.P.Output.X)]))}})))
+expected:
+  output:
+  - GOT:[10, 40, 80]
