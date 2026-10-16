@@ -1,0 +1,58 @@
+# RFC 0010 §How a Step is bound item 1: a Step whose enableIf is false is SKIPPED with an
+# empty parameter space, and its Task enumeration group is never evaluated, so a range that
+# would fail(...) on the same producer's values doesn't fail it. D, which depends on C,
+# runs because a skipped Step satisfies dependsOn.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    outputVariables:
+    - name: Go
+      type: BOOL
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=false'); print('openjd_output_var: N=0')
+  - name: C
+    enableIf: '{{Steps.Q.Output.Go}}'
+    dependencies:
+    - dependsOn: Q
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{range(Steps.Q.Output.N) if Steps.Q.Output.N > 0 else fail(''no items'')}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN')
+  - name: D
+    dependencies:
+    - dependsOn: C
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
+expected:
+  output:
+  - D_RAN
+  forbidden:
+  - C_TASK_RAN
