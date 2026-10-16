@@ -1697,7 +1697,8 @@ A Task reports a value by printing one of these lines to stdout or stderr from i
 ```
 openjd_output_var: <Name>=<JSON>
 openjd_output_var: <Name>=@<FilePath>
-openjd_output_var: <Name>[<Int>]=<JSON>        # in a Step with a CHUNK[INT] parameter
+openjd_output_var: <Name>[<Int>]=<JSON>        # either form, in a Step with a CHUNK[INT] parameter
+openjd_output_var: <Name>[<Int>]=@<FilePath>
 ```
 
 ```bnf
