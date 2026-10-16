@@ -982,7 +982,6 @@ Where:
     * Minimum number of elements: If provided, then this list must contain at least one element.
     * Maximum number of elements: 32.
     * No two elements in this list may have the same value for the `name` property.
-    * A Step whose parameter space contains a `CHUNK[INT]` Task parameter may not declare *outputVariables*.
 10. *script* — The action that is taken by this Step's Tasks when they are run on a Worker host.
 
 With the `CONTROL_FLOW` extension, the Step's format strings that are resolved at Job creation (those not annotated
@@ -1701,8 +1700,9 @@ openjd_output_var: <Name>=@<FilePath>
 ```
 
 ```bnf
-<Directive> ::= <WS>* <Identifier> "=" <WS>* ( <JSON> | "@" <FilePath> ) <WS>*
-<WS>        ::= " " | "\t"
+<Directive>    ::= <WS>* <Identifier> <TaskSelector>? "=" <WS>* ( <JSON> | "@" <FilePath> ) <WS>*
+<TaskSelector> ::= "[" <Int> "]"
+<WS>           ::= " " | "\t"
 ```
 
 Where `<JSON>` is one JSON value on the rest of the line (`NaN` and `Infinity` are not JSON, and the line must be valid
@@ -1713,7 +1713,14 @@ are case-sensitive. For example:
 ```bash
 echo "openjd_output_var: FrameCount=$count"
 echo "openjd_output_var: Keys=@keys.json"
+echo "openjd_output_var: RenderTimeS[$frame]=$seconds"   # in a Step with a CHUNK[INT] parameter
 ```
+
+In a Step with a `CHUNK[INT]` Task parameter, one action runs a chunk of Tasks, and every directive must have a
+`<TaskSelector>`: the decimal value of the `CHUNK[INT]` parameter for the Task it reports for, which must be a value in
+the chunk being run. In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
+size limit apply to each Task of the chunk separately, and when the action exits successfully each Task must have its
+required values. If the action fails, no Task of the chunk commits any output.
 
 A relative `<FilePath>` is resolved against the Session's Working Directory; an absolute one is used as written. Either
 way, the file the runtime opens must be a regular file inside the Session's Working Directory, after following symbolic links, and the runtime must read it
@@ -1730,18 +1737,19 @@ the Expression Language. `null` and objects are not accepted anywhere in a value
 
 A directive is invalid, and cancels and fails the action it is attributed to as soon as it is read, using the action's
 normal cancelation, if it: does not match the grammar or is not valid JSON; names an undeclared output; has a value that
-is `null`, an object, or does not convert; violates a constraint property; repeats a `collect: ONCE` output; names a
-file that is not a regular file inside the Session's Working Directory, is unreadable, or is not UTF-8, contains NUL, or
-is not exactly one JSON value; is on a line that is not valid UTF-8; is longer than the runtime's line limit, which must
-be at least 64 KiB (an over-long directive is never truncated and parsed); or takes the size of the values the Task
-holds over the runtime's limit, which must be at least 1 MiB. The Task also fails if, when the action exits, a `ONCE` or
-`LAST` output has no value or an `APPEND` output has fewer elements than its *minLength*. In a Job that lists
-`CONTROL_FLOW`, a directive printed by any action of the Job Template other than the `onRun` of a Task of a Step that
-declares *outputVariables* cancels and fails that action. Under `WRAP_ACTIONS`, a line from a wrap hook counts as output
-of the action it runs in place of, so `onWrapTaskRun` reports the Task's outputs whichever template defines it. For an
-action of an Environment Template, a directive is ordinary output. If the attempt fails for any reason, it has no
-outputs. Like the other messages, a directive line appears in the action's log by default. A runtime option to hide
-recognized messages may hide a valid directive, but an invalid one always stays in the log with the error.
+is `null`, an object, or does not convert; violates a constraint property; repeats a `collect: ONCE` output (for the
+same Task, in a chunk); lacks a required `<TaskSelector>`, has one where none is allowed, or names a value not in the
+chunk; names a file that is not a regular file inside the Session's Working Directory, is unreadable, or is not UTF-8,
+contains NUL, or is not exactly one JSON value; is on a line that is not valid UTF-8; is longer than the runtime's line
+limit, which must be at least 64 KiB (an over-long directive is never truncated and parsed); or takes the size of the
+values the Task holds over the runtime's limit, which must be at least 1 MiB. The Task also fails if, when the action
+exits, a `ONCE` or `LAST` output has no value or an `APPEND` output has fewer elements than its *minLength*. In a Job
+that lists `CONTROL_FLOW`, a directive printed by any action of the Job Template other than the `onRun` of a Task of a
+Step that declares *outputVariables* cancels and fails that action. Under `WRAP_ACTIONS`, a line from a wrap hook counts
+as output of the action it runs in place of, so `onWrapTaskRun` reports the Task's outputs whichever template defines
+it. For an action of an Environment Template, a directive is ordinary output. If the attempt fails for any reason, it
+has no outputs. Like the other messages, a directive line appears in the action's log by default. A runtime option to
+hide recognized messages may hide a valid directive, but an invalid one always stays in the log with the error.
 
 A `PATH` value, or each element of a `LIST[PATH]` value, is stored in the **submission path context**, the form in which
 `PATH` Job Parameter values are given, by applying the Session's path mapping rules in reverse. A relative path is
