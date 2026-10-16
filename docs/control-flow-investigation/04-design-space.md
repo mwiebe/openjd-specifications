@@ -1197,3 +1197,8 @@ typed *value* expression over job parameters and the `Steps.*` symbols of any St
 * not available as symbols in the template, since nothing in a Job runs after them;
 * re-evaluated when a re-run of a producer commits new values; job outputs are not consumers for the re-run rule;
 * part of `CONTROL_FLOW`, not a separate extension.
+
+**Chunked producers.** Replacing Q8's deferral, a Step with a `CHUNK[INT]` parameter may declare outputs: each
+directive names its Task with a `[<value>]` selector holding that Task's chunk-parameter value
+(`RenderTimeS[12]=1.5`). Collect modes and limits apply per Task, and a failed chunk commits nothing. Committing the
+outputs of some Tasks of a failed chunk is out of scope.
