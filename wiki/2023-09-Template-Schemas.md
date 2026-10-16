@@ -1720,7 +1720,8 @@ echo "openjd_output_var: RenderTimeS[$frame]=$seconds"   # in a Step with a CHUN
 
 In a Step with a `CHUNK[INT]` Task parameter, one action runs a chunk of Tasks, and every directive must have a
 `<TaskSelector>`: the decimal value of the `CHUNK[INT]` parameter for the Task it reports for, which must be a value in
-the chunk being run. In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
+the chunk being run. The `CHUNK[INT]` parameter's values must be distinct in such a Step; a duplicate fails the Step
+when its parameter space is materialized. In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
 size limit apply to each Task of the chunk separately, and when the action exits successfully each Task must have its
 required values; if any Task doesn't, or the action fails, the whole chunk fails and no Task of it commits any
 output. The selector is matched by integer value and is required even in a chunk of one Task.
