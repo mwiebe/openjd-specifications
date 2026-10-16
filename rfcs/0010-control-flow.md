@@ -1141,7 +1141,7 @@ pair, `TaskParam` and `TaskRawParam`, applies to a producer's `PATH` Task parame
   The observable contract of
   binding allows both deferred-creation and create-then-update schedulers. The tension is that this is the most
   demanding extension for schedulers so far (persisted values, a new stage, two new states); keeping task-task
-  dependencies and chunked outputs out of it keeps the minimum smaller.
+  dependencies out of it keeps the minimum smaller.
 * **Expressive.** One mechanism, typed outputs read by EXPR expressions at a defined stage, covers fan-out,
   conditions, reductions, and (with `TASK_DEPENDENCIES`) computed DAGs. The fixed step graph rules out PDG-style work
   by design, as #22 accepted.
@@ -1250,12 +1250,9 @@ New properties:
     1. Minimum number of elements: If provided, then this list must contain at least one element.
     2. Maximum number of elements: 32.
     3. No two elements in this list may have the same value for the `name` property.
-    4. A Step whose parameter space contains a `CHUNK[INT]` Task parameter may not declare *outputVariables*.
 
-> **TODO (deferred): outputs from chunked Steps.** One `onRun` of a `TASK_CHUNKING` Step runs a whole chunk, so the
-> directive needs a way to name the Task within the chunk before a chunked Step can produce per-Task outputs. That format should
-> be designed together with the per-Task progress report proposed in discussion #169 (checkpointing). Lifting
-> constraint 4 later is backward compatible.
+  In a Step whose parameter space contains a `CHUNK[INT]` Task parameter, one `onRun` runs a whole chunk of Tasks,
+  and each directive names the Task it reports for (see [Chunked Steps](#chunked-steps)).
 
 Changed semantics of existing properties:
 
@@ -1562,16 +1559,21 @@ in the log, with the error, so that the cause of the failure can be seen.
 The text after `openjd_output_var:` has the grammar:
 
 ```bnf
-<Directive> ::= <WS>* <Identifier> "=" <WS>* <Value> <WS>*
-<Value>     ::= <JSON> | "@" <FilePath>
-<WS>        ::= " " | "\t"
+<Directive>    ::= <WS>* <Identifier> <TaskSelector>? "=" <WS>* <Value> <WS>*
+<TaskSelector> ::= "[" <Int> "]"
+<Value>        ::= <JSON> | "@" <FilePath>
+<WS>           ::= " " | "\t"
 ```
 
 Where:
 
 * The line terminator (`\n` or `\r\n`) is not part of the directive.
 * `<Identifier>` is the output's name, matched case-sensitively against the Step's declared output names. There is no
-  whitespace between it and the `=`.
+  whitespace between it, the `<TaskSelector>`, and the `=`.
+* `<TaskSelector>` names the Task of a chunk that the directive reports for, by its value of the Step's `CHUNK[INT]`
+  parameter. `<Int>` is a decimal integer, optionally negative, with no whitespace inside the brackets. It is
+  required in a Step with a `CHUNK[INT]` parameter and not allowed in any other Step (see
+  [Chunked Steps](#chunked-steps)).
 * `<JSON>` is one JSON value (RFC 8259). It is on one line, because a directive is a line, so a string that contains a
   line break is written with the escape `\n`. `NaN`, `Infinity`, and `-Infinity` are not JSON and are invalid. Tools
   that write JSON on one line, such as Python's `json.dumps` with default arguments, produce valid values directly for
@@ -1650,13 +1652,60 @@ Under `APPEND`, a `<FilePath>` value supplies one element, as an inline value do
 the runtime reads the lines. A runtime that reads stdout and stderr separately does not define their relative order,
 so a Task should print all the directives for an `APPEND` or `LAST` output on one stream.
 
+#### Chunked Steps
+
+With `TASK_CHUNKING`, a Step may have one `CHUNK[INT]` Task parameter, and each `onRun` runs a chunk: a set of that
+parameter's values, with the Step's other Task parameters fixed. Each value in the chunk is one Task, and each Task
+has its own outputs. A directive says which Task it is for with a `<TaskSelector>` holding that Task's value of the
+`CHUNK[INT]` parameter:
+
+```yaml
+- name: Render
+  parameterSpace:
+    taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range: "1-240"
+        chunks:
+          defaultTaskCount: 10
+          rangeConstraint: CONTIGUOUS
+  outputVariables:
+    - name: RenderTimeS
+      type: FLOAT
+      unit: s
+  bash:
+    script: |
+      for frame in {{repr_sh([string(f) for f in list(Task.Param.Frame)])}}; do
+        start=$(date +%s.%N)
+        render --frame "$frame"
+        echo "openjd_output_var: RenderTimeS[$frame]=$(echo "$(date +%s.%N) - $start" | bc)"
+      done
+```
+
+1. **Which Tasks.** The selector must be a value in the chunk being run. A scheduler may form chunks differently from
+   one run to the next, for example under `targetRuntimeSeconds`, so the check is against the chunk the runtime was
+   given, not the parameter's whole range.
+2. **Per Task.** Collect modes, constraint properties, and the size limit of [Limits](#limits) apply to each Task's
+   values separately: under `ONCE`, `RenderTimeS[12]` may be reported once and `RenderTimeS[13]` once. When the
+   Action exits successfully, every Task in the chunk must have each of its `ONCE` and `LAST` outputs, and each of its
+   `APPEND` outputs meets its `minLength`.
+3. **The chunk is one attempt.** If the Action fails, is canceled, or times out, or a directive is invalid, no Task in
+   the chunk commits any output, as no Task in a failed chunk succeeds under `TASK_CHUNKING`.
+4. **Consumers see Tasks, not chunks.** `Steps.<Name>.Output.*` and `Steps.<Name>.TaskParam.*` have one element per
+   Task in parameter-space iteration order, however the Tasks were chunked.
+
+A value, not a position within the chunk, identifies the Task, so a directive keeps its meaning however the scheduler
+splits or merges chunks. A selector on each line, rather than a directive that sets a current Task for the lines
+after it, can't be attributed to the wrong Task when stdout and stderr interleave.
+
 #### Processing a directive
 
 The runtime processes each directive when it reads the line:
 
 1. It checks that the Action may print directives, parses the directive, and checks that the name is a declared
-   output of the Step.
-2. It applies the collect mode: under `ONCE`, a second directive for the same name is invalid.
+   output of the Step, and in a chunked Step that the selector names a Task of the chunk.
+2. It applies the collect mode: under `ONCE`, a second directive for the same name, and in a chunked Step the same
+   Task, is invalid.
 3. For `@<FilePath>`, it opens the file under the rules of [File values](#file-values) and reads at most as many bytes
    as remain of the Task's limit (see [Limits](#limits)), not counting the current value of a `LAST` output that this
    directive replaces, plus one to detect a file that exceeds it.
@@ -1685,12 +1734,15 @@ directive is invalid if:
 7. it exceeds a limit of [Limits](#limits);
 8. it is attributed to an Action of the Job Template other than the `onRun` of a Task of a Step that declares
    *outputVariables*;
-9. the line is not valid UTF-8; or
+9. the line is not valid UTF-8;
 10. a `PATH` value is relative, or the runtime finds no submission-context form for it, under the requirements of
-    [Path values](#path-values).
+    [Path values](#path-values); or
+11. it has no `<TaskSelector>` in a Step with a `CHUNK[INT]` parameter, has one in any other Step, or names a value
+    that is not in the chunk being run.
 
 When the Action exits successfully, the runtime also checks that every `ONCE` and `LAST` output has a value and that
-every `APPEND` output's list satisfies its `minLength`. A missing value or a list that is too short fails the Task.
+every `APPEND` output's list satisfies its `minLength`, for each Task of a chunk. A missing value or a list that is too
+short fails the Task.
 
 If the attempt fails for any reason, including an invalid directive, a missing value, or an `onRun` action that
 fails, is canceled, or times out, it has no outputs. Values from it that the runtime has already forwarded are
@@ -1804,12 +1856,12 @@ Output values are stored, logged, and may be displayed, so they are not redacted
    `openjd_output_var:` and is longer than the runtime's line limit is invalid: the runtime MUST NOT truncate a
    directive and parse what remains, and MUST NOT recognize the discarded remainder of an over-long line as a
    directive. Larger values use `@<FilePath>`.
-2. A runtime MUST accept at least 1 MiB (1,048,576 bytes) of output values per Task attempt, and MAY accept more. The
-   size counted is that of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>`
-   text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST`
-   value (a value it replaces stops counting), and every `APPEND` element. For a `PATH` or `LIST[PATH]` value, or a
-   `PATH` element under `APPEND`, the larger of its reported bytes and the JSON serialization of its stored form
-   counts. A directive that takes the size over the runtime's limit is invalid.
+2. A runtime MUST accept at least 1 MiB (1,048,576 bytes) of output values per Task attempt (per Task of a chunk), and
+   MAY accept more. The size counted is that of the values the Task currently holds, as the bytes that reported them
+   (the inline `<JSON>` text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the
+   current `LAST` value (a value it replaces stops counting), and every `APPEND` element. For a `PATH` or `LIST[PATH]`
+   value, or a `PATH` element under `APPEND`, the larger of its reported bytes and the JSON serialization of its stored
+   form counts. A directive that takes the size over the runtime's limit is invalid.
 3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
    list outputs that feed a parameter space, and on `APPEND` outputs.
 4. A scheduler MAY impose a maximum number of Tasks per Step. A Step whose materialized parameter space exceeds it
@@ -2122,7 +2174,7 @@ Every rule this extension adds, and when it is checked.
 2. *outputVariables*: 1 to 32 elements; names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint
    properties are valid for the type; *collect* is an `<OutputCollectMode>`, and `APPEND` only with a `LIST[...]`
    type; *unit* is 1 to 32 characters with no control characters; no `LIST[LIST[INT]]` on a Step with a
-   `parameterSpace`; none on a Step with a `CHUNK[INT]` Task parameter.
+   `parameterSpace`.
 3. Every `Steps.<StepName>.Output.<VarName>` and `RawOutput.<VarName>` names a Step with an `<Identifier>` name
    that declares output `<VarName>`. Every `Steps.<StepName>.TaskParam.<ParamName>` and `TaskRawParam.<ParamName>`
    names a Step that has Task parameter `<ParamName>`.
@@ -2431,7 +2483,10 @@ and for the emission channel, collect modes, and metrics in [§8](../docs/contro
    default, with `LAST` and `APPEND` declared; missing, malformed, undeclared, mistyped, repeated `ONCE`, or
    out-of-constraint values fail the Task, and an invalid directive cancels the Action at once; failed attempts commit
    nothing; outputs are not secrets. Does anyone need outputs from an Environment's `onEnter`?
-8. **Chunked producers.** Deferred; coordinate the format with #169.
+8. **Chunked producers.** Each directive names its Task with a `[<value>]` selector on the output name. Should the
+   selector name the parameter as well (`[Frame=12]`) in case a Step ever allows more than one `CHUNK[INT]`
+   parameter? Committing the outputs of some Tasks of a failed chunk is out of scope here; it belongs with the
+   per-Task progress of #169.
 9. **Limits.** At least 1 MiB per Task, constraints checked at the producer, an optional scheduler Task-count limit
    checked at binding. Is 1 MiB the right floor?
 10. **Range length.** This draft lifts the 1024-element cap for ranges given as format strings in `CONTROL_FLOW`
@@ -2472,7 +2527,6 @@ Each has a **TODO** block at the place in the specification it would change.
 
 | Deferred | Why it can wait |
 |---|---|
-| Outputs from Steps with a `CHUNK[INT]` Task parameter | Needs a per-Task record format inside a chunk; shares a design with #169 checkpointing. |
 | Producer-declared `default` | `or` and conditional expressions cover the cases. |
 | Partial reductions | Iteration order is ill-defined for an incomplete set. |
 | Cascade recompute on re-run | Large blast radius; scheduler policy. |
