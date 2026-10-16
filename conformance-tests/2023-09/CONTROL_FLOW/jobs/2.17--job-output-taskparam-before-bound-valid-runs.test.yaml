@@ -1,0 +1,52 @@
+# RFC 0010 §Job outputs items 1 and 4: the companion of
+# 2.17--job-output-taskparam-before-bound-fails-job-creation, with a guard that never holds.
+# The job output reads Steps.P.TaskParam.X while P's hostRequirements wait for Q, and
+# everything runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - FEATURE_BUNDLE_1
+  - CONTROL_FLOW
+  name: TestJob
+  jobOutputDefinitions:
+  - name: TaskCount
+    type: INT
+    value: '{{fail(''three Tasks'') if len(Steps.P.TaskParam.X) == 3 else len(Steps.P.TaskParam.X)}}'
+  steps:
+  - name: Q
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('Q_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: P
+    dependencies:
+    - dependsOn: Q
+    hostRequirements:
+      amounts:
+      - name: amount.worker.vcpu
+        min: '{{Steps.Q.Output.N}}'
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: X
+        type: INT
+        range: '1-2'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+expected:
+  output:
+  - Q_RAN
+  - P_RAN

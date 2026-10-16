@@ -85,7 +85,8 @@ section; each file's header comment cites the RFC 0010 section and rule.
   group still waits for its inputs (the failure only, not its timing); a consumer's range
   that reads `Steps.P.TaskParam.*` is evaluated at Job creation when `P`'s Tasks are known
   then, even though `P` is pending because its `hostRequirements` read another Step's output
-  (`7.4--taskparam-concrete-before-bound-*`).
+  (`7.4--taskparam-concrete-before-bound-*`), and so is a job output that reads it
+  (`2.17--job-output-taskparam-before-bound-*`).
 - **`enableIf`** (`job_templates/3--*`, `job_templates/4--*`, `jobs/3--*`, `jobs/4--*`):
   allowed and forbidden symbols per location, `bool` type, static and dynamic decisions,
   `null` outputs of a skipped Step (`== null`, `or`), skipped Steps don't evaluate their
