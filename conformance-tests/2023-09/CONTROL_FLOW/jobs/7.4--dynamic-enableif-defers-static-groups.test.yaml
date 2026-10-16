@@ -1,0 +1,61 @@
+# RFC 0010 §When groups are evaluated: a Step whose enableIf reads Steps.* evaluates nothing
+# else at Job creation. C's range reads only a job parameter and would fail(...), but C's
+# enableIf waits for Q, so Job creation succeeds; when Q reports Go=false, C is SKIPPED and
+# its range is never evaluated. An implementation that evaluated C's range at Job creation
+# would fail the run. D runs because a skipped Step satisfies dependsOn.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: N
+    type: INT
+    default: 0
+  steps:
+  - name: Q
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=false')
+  - name: C
+    enableIf: '{{Steps.Q.Output.Go}}'
+    dependencies:
+    - dependsOn: Q
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{range(Param.N) if Param.N > 0 else fail(''N must be positive'')}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN')
+  - name: D
+    dependencies:
+    - dependsOn: C
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
+expected:
+  output:
+  - D_RAN
+  forbidden:
+  - C_TASK_RAN
