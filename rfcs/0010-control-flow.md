@@ -140,23 +140,24 @@ needs it:
 ### Step states
 
 ```
-             job creation
-                  │
-      ┌───────────┴─────────────┐
-      ▼                         ▼
- PENDING_INPUTS ───bound───► READY ──► RUNNING ──► SUCCEEDED
-      │                                          ╰► FAILED
-      │  gains "Tasks known" and "host requirements known",
-      │  in either order, as its groups' inputs arrive
-      ├──enableIf false ──► SKIPPED (zero Tasks)
-      ├──a group fails: error / cycle / cap ──► FAILED, at once
-      └──a dependency FAILED ──► (blocked; never runs, as today)
+                 job creation
+                       │
+      ┌────────────────┼────────────────────┐
+      ▼                ▼                    ▼
+   SKIPPED      PENDING_INPUTS ──bound──► READY ──► RUNNING ──► SUCCEEDED
+   (zero Tasks)        │                                      ╰► FAILED
+      ▲                │  gains "Tasks known" and "host requirements known",
+      │                │  in either order, as its groups' inputs arrive
+      └─enableIf false─┤
+                       ├──a group fails: error / cycle / cap ──► FAILED, at once
+                       └──a dependency FAILED ──► (blocked; never runs, as today)
 ```
 
-`SKIPPED` and a zero-Task `SUCCEEDED` both satisfy `dependsOn`. `FAILED` does not. A Step whose `enableIf` is decided
-at Job creation goes directly to `SKIPPED` or to one of the other two paths: to `READY` if every group evaluates
-then, and to `PENDING_INPUTS` otherwise. A `PENDING_INPUTS` Step stays in that state while it gains facts: none of
-them makes its Tasks dispatchable before it is bound (see [Step input binding](#step-input-binding)).
+`SKIPPED` and a zero-Task `SUCCEEDED` both satisfy `dependsOn`. `FAILED` does not. A Step whose `enableIf` is absent
+or decided at Job creation goes directly to `SKIPPED` (if it is `false`) or to one of the other two paths: to `READY`
+if every group evaluates then, and to `PENDING_INPUTS` otherwise. A group that fails at Job creation fails Job
+creation. A `PENDING_INPUTS` Step stays in that state while it gains facts: none of them makes its Tasks dispatchable
+before it is bound (see [Step input binding](#step-input-binding)).
 
 A Step with no Tasks to run, because it is `SKIPPED` or its parameter space is empty, still respects its own
 dependencies: the Steps that depend on it are released only once its own dependencies are satisfied. So skipping a
@@ -1183,13 +1184,13 @@ than as new states:
   report errors in fields that never apply, so a Step gains no fact until its *enableIf* is decided.
 
 A scheduler SHOULD evaluate each group as soon as it can, rather than MUST, because a scheduler that does so later
-reaches the same outcome for every Step that can run, and a simple implementation can evaluate them together. It
-reports errors later, though, so other Steps may run before a failing Step fails. That claim covers only
-Steps' outcomes: which job outputs of a Job that fails have been evaluated is not specified, because it depends
-on when groups are evaluated, and partial completion is out of scope for this RFC. Groups whose inputs are concrete
-at Job creation, in a Step whose *enableIf* is `true` or absent then, are the exception: they MUST be evaluated then,
-as every TEMPLATE-scope field is today, so that an error in such a group is reported at submission on every
-scheduler.
+reaches the same outcome for that Step, and a simple implementation can evaluate them together. It reports errors
+later, though, so other Steps may run before a failing Step fails: which other Steps run before a Job fails depends on
+timing. That claim covers only Steps' outcomes: which job outputs of a Job that fails have been evaluated is not
+specified, because it depends on when groups are evaluated, and partial completion is out of scope for this RFC.
+Groups whose inputs are concrete at Job creation, in a Step whose *enableIf* is `true` or absent then, are the
+exception: they MUST be evaluated then, as every TEMPLATE-scope field is today, so that an error in such a group is
+reported at submission on every scheduler.
 
 ### 16. Design tenets
 
@@ -1469,8 +1470,8 @@ With `CONTROL_FLOW`, a `range` given as a format string may evaluate to an empty
 
 * If the Step's `combination` combines that parameter by product (`*`, the default), the parameter space is empty.
 * If it combines it by association (`(A, B)`), the usual rule that associated ranges have equal lengths applies: an
-  empty range associated with a non-empty one is an error at binding, and associated empty ranges give an empty
-  space.
+  empty range associated with a non-empty one is an error when that range is evaluated, at Job creation or at binding,
+  and associated empty ranges give an empty space.
 
 A Step with an empty parameter space has zero Tasks and completes successfully as soon as its own dependencies are
 satisfied. Its `Steps.*.Output` and `Steps.*.TaskParam` lists are `[]`.
@@ -1561,7 +1562,8 @@ the following hold:
    enough, and with `TASK_DEPENDENCIES` a dependency that selects a subspace of the producer's Tasks is not enough.
 2. `<StepName>` is not `S` itself.
 3. The format string is in one of `S`'s *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter
-   `range`s, *stepEnvironments* (any format string, including their *enableIf*), or *script*.
+   `range`s and the other format strings of *parameterSpace*, *stepEnvironments* (any format string, including their
+   *enableIf*), or *script*.
 
 In addition, the *value* of a [`<JobOutputDefinition>`](#joboutputdefinition) may read the `Steps.*` symbols of any
 Step of the Job, with no dependency required (see [Job outputs](#job-outputs)).
@@ -1598,7 +1600,7 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
 | Stage | When | Known Values | Unknown Values | What Happens |
 |---|---|---|---|---|
 | **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every rule of [Validation](#validation) is checked. |
-| **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`, in Step dependency order: every *enableIf* whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, every materialization group whose inputs are concrete; a failure fails Job creation. A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
+| **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, every materialization group whose inputs are concrete; a failure fails Job creation. A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
 | **Step input binding** (new, `CONTROL_FLOW` only) | Per materialization group of a Step, once its inputs are concrete (with `TASK_DEPENDENCIES`, the Task graph group also once the Tasks of every Step its subspace dependencies name are known), with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.*`, `Session.*` | The group's expressions are evaluated and checked. *enableIf* `false` makes the Step `SKIPPED`; Task enumeration makes its Tasks known; host selection makes its host requirements known; a failure makes it `FAILED` at once; when every group has evaluated, it is bound and `READY`. See [Step input binding](#step-input-binding). |
 | **Job output evaluation** (new, `CONTROL_FLOW` only) | Per job output, once every `Steps.*` symbol its *value* references is concrete | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted, and checked; a failure fails the Job. See [Job outputs](#job-outputs). |
 | **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies | *(none)* | As today. With `CONTROL_FLOW`, the runtime processes `onRun`'s output directives as they are printed, reverse-maps `PATH` values, and commits the values when the Task succeeds. |
@@ -2052,9 +2054,10 @@ arrive:
 
 1. **Enablement is decided first.** No other group is evaluated, and no *let* binding, until *enableIf* is decided.
    A Step without *enableIf* is decided `true` at once.
-    * If *enableIf* is `false`, the Step becomes `SKIPPED`. Its parameter space is the empty set, so it has zero
-      Tasks, and none of its other groups is evaluated, so a disabled Step's *let* bindings may assume that the Step
-      runs (for example, `min(...)` of a list that is only non-empty when it does).
+    * If *enableIf* is `false`, the Step becomes `SKIPPED`. Its parameter space is the empty set (its `Steps.*`
+      symbols are `null`, not `[]`), so it has zero Tasks, and none of its other groups is evaluated, so a disabled
+      Step's *let* bindings may assume that the Step runs (for example, `min(...)` of a list that is only non-empty
+      when it does).
     * If evaluating *enableIf* fails, including a `null` result, the Step becomes `FAILED` at once.
 2. **Each group can be evaluated when its inputs are concrete.** Once *enableIf* is `true`, every group whose inputs
    are concrete can be evaluated, in the order above, and each other group once its inputs become concrete (see
@@ -2085,29 +2088,31 @@ inputs are concrete.
 
 If a producer whose `Output` or `RawOutput` symbols are inputs of a group that has not been evaluated fails, or can
 never run because one of its own dependencies failed, that group can never be evaluated and the Step can never be
-bound. Whether or not the Step is bound, it stays blocked and never runs when any of its dependencies fails, as a
-Step whose dependency failed does today. The facts it already has remain: its Tasks may be known even though none
-of them will run.
+bound. The same holds for a group whose inputs include the `TaskParam` or `TaskRawParam` symbols of a producer that
+fails, or can never run, before its Tasks are known. Whether or not the Step is bound, it stays blocked and never runs
+when any of its dependencies fails, as a Step whose dependency failed does today. The facts it already has remain: its
+Tasks may be known even though none of them will run.
 
 #### When groups are evaluated
 
-* **At Job creation**, the scheduler MUST decide every *enableIf* whose inputs are concrete and, for each Step
-  whose *enableIf* is then `true` or absent, evaluate every group whose inputs are concrete, as it resolves every
-  TEMPLATE-scope format string today. It works through the Steps in dependency order, because a Step decided
-  `SKIPPED` there makes its `null` symbols concrete, and a Step whose Tasks become known there makes its `TaskParam`
-  symbols concrete, for the Steps that read them. An *enableIf* whose inputs are concrete at Job creation is one
-  that references no `Steps.*` symbol, or only symbols that are concrete then. If an evaluation or check fails
-  there, Job creation fails, as it does for a job output evaluated at Job creation. A Step all of whose groups
-  evaluate is bound at Job creation, as every Step is today. Every other Step that is not `SKIPPED` enters
+* **At Job creation**, the scheduler MUST decide every Step's *enableIf* (and every Job Environment's) whose inputs
+  are concrete and, for each Step whose *enableIf* is then `true` or absent, evaluate every group whose inputs are
+  concrete, as it resolves every TEMPLATE-scope format string today. It works through the Steps in dependency order,
+  because a Step decided `SKIPPED` there makes its `null` symbols concrete, and a Step whose Tasks become known there
+  makes its `TaskParam` symbols concrete, for the Steps that read them. An *enableIf* whose inputs are concrete at Job
+  creation is one that references no `Steps.*` symbol, or only symbols that are concrete then. If an evaluation or
+  check fails there, Job creation fails, as it does for a job output evaluated at Job creation. A Step all of whose
+  groups evaluate is bound at Job creation, as every Step is today. Every other Step that is not `SKIPPED` enters
   `PENDING_INPUTS`. A Step whose *enableIf* is not decided at Job creation evaluates nothing else then, so an error in
   one of its other groups fails it only once its *enableIf* is decided `true`.
 * **After Job creation**, a scheduler SHOULD evaluate each group of a `PENDING_INPUTS` Step as soon as its inputs
   become concrete, and MUST have evaluated every group before it dispatches any of the Step's Tasks. A `Steps.*`
-  symbol becomes concrete when a producer succeeds or is skipped, and, for `TaskParam`, when a producer's Tasks
-  become known, so evaluating one group can make another Step's inputs concrete in turn. A scheduler that evaluates
-  a group later than it could reaches the same outcome for every Step that can run, but it shows that Step's Tasks
-  and host requirements later and reports an error later, so other Steps may run first. A Step whose error is found
-  late may by then be blocked behind a failed producer rather than `FAILED`; it never runs in either case.
+  symbol becomes concrete when a producer succeeds or is skipped, and, for `TaskParam`, when a producer's Tasks become
+  known, so evaluating one group can make another Step's inputs concrete in turn. A scheduler that evaluates a group
+  later than it could reaches the same outcome for that Step, but it shows that Step's Tasks and host requirements
+  later and reports an error later, so other Steps may run first (which other Steps run before a Job fails depends on
+  timing; partial completion is out of scope). A Step whose error is found late may by then be blocked behind a failed
+  producer rather than `FAILED`; it never runs in either case.
 
 #### Implementation strategy
 
@@ -2669,7 +2674,7 @@ and for the emission channel, collect modes, and metrics in [§8](../docs/contro
    parameter? Committing the outputs of some Tasks of a failed chunk is out of scope here; it belongs with the
    per-Task progress of #169.
 9. **Limits.** At least 1 MiB per Task, constraints checked at the producer, an optional scheduler Task-count limit
-   checked at binding. Is 1 MiB the right floor?
+   checked when the Step's Tasks become known ([Limits](#limits) item 4). Is 1 MiB the right floor?
 10. **Range length.** This draft lifts the 1024-element cap for ranges given as format strings in `CONTROL_FLOW`
     templates, in favor of the scheduler's Task-count limit, as `<IntRangeExpr>` already does. Should the relaxation
     apply only to ranges that read `Steps.*`?

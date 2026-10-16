@@ -1,0 +1,61 @@
+# RFC 0010 §Job outputs items 1, 3 and 4: a job output that reads only Steps.P.TaskParam.*
+# is evaluated as soon as P's Tasks are known, which can be before P is bound. P's parameter
+# space is static, so its Tasks are known at Job creation, but P is PENDING_INPUTS because
+# its host selection group (hostRequirements, which openjd run accepts locally) reads
+# Steps.Q.Output.N. The job output is therefore evaluated at Job creation, and its fail(...)
+# fails Job creation before Q runs. The guard compares the list's length so that
+# validation, with X unresolved, passes. An implementation that treated TaskParam as
+# concrete only once P is bound would run Q first and print its marker. The run fails at
+# Job creation, not in a Task; expected.taskFailure is used anyway because the runner
+# ignores forbidden markers in .invalid tests.
+# 2.17--job-output-taskparam-before-bound-valid-runs is the same template with a guard that
+# never holds, so a runtime that rejects the template outright fails that test.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - FEATURE_BUNDLE_1
+  - CONTROL_FLOW
+  name: TestJob
+  jobOutputDefinitions:
+  - name: TaskCount
+    type: INT
+    value: '{{fail(''two Tasks'') if len(Steps.P.TaskParam.X) == 2 else len(Steps.P.TaskParam.X)}}'
+  steps:
+  - name: Q
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('Q_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: P
+    dependencies:
+    - dependsOn: Q
+    hostRequirements:
+      amounts:
+      - name: amount.worker.vcpu
+        min: '{{Steps.Q.Output.N}}'
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: X
+        type: INT
+        range: '1-2'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+expected:
+  taskFailure: {}
+  forbidden:
+  - Q_RAN
+  - P_RAN
