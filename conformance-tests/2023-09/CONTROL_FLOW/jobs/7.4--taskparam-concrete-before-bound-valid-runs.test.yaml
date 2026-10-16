@@ -1,0 +1,66 @@
+# RFC 0010 §The Steps.* scope (Concreteness): the companion of
+# 7.4--taskparam-concrete-before-bound-fails-job-creation, with a guard that never holds.
+# P's Tasks are known at Job creation while its hostRequirements wait for Q, C's range is
+# Steps.P.TaskParam.X, and everything runs: C has one Task per value of X, in iteration order.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - FEATURE_BUNDLE_1
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('Q_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: P
+    dependencies:
+    - dependsOn: Q
+    hostRequirements:
+      amounts:
+      - name: amount.worker.vcpu
+        min: '{{Steps.Q.Output.N}}'
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: X
+        type: INT
+        range: '1-2'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{fail(''three Tasks'') if len(Steps.P.TaskParam.X) == 3 else Steps.P.TaskParam.X}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps({{Task.Param.F}}))
+expected:
+  output:
+  - Q_RAN
+  - P_RAN
+  - GOT:1
+  - GOT:2
