@@ -1206,7 +1206,10 @@ outputs of some Tasks of a failed chunk is out of scope.
 ## 10. Addendum: progressive step input binding
 
 Recorded after further review. This replaces the all-at-once binding of §2.1 ("evaluated in a fixed order and
-validated as a unit", and "a step's tasks are enumerable if and only if its materialization inputs are concrete").
+validated as a unit", and "a step's tasks are enumerable if and only if its materialization inputs are concrete"),
+including the step input binding row of §2.1's stage table (once every referenced producer is terminal, "in a
+fixed order and validated as a unit"), and the recommendation of §6 Q6 ("evaluated at step input binding, in order,
+atomically").
 
 A step's materialization expressions are divided into groups: `enableIf`; task enumeration (`parameterSpace`);
 host selection (`hostRequirements`); with `TASK_DEPENDENCIES`, the task graph; and the rest (step environment and

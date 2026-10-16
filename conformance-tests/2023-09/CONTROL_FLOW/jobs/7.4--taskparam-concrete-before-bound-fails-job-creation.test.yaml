@@ -1,0 +1,75 @@
+# RFC 0010 §The Steps.* scope (Concreteness) and §When groups are evaluated: a producer's
+# Steps.P.TaskParam.* symbols are concrete once P's Tasks are known, which can be before P
+# is bound. P's parameter space is static, so its Tasks are known at Job creation, but P is
+# PENDING_INPUTS because its host selection group (hostRequirements, which openjd run
+# accepts locally) reads Steps.Q.Output.N. C's range reads only Steps.P.TaskParam.X, so its
+# Task enumeration group's inputs are concrete at Job creation; it MUST be evaluated then,
+# and its fail(...) fails Job creation before Q runs. The guard compares the list's length
+# so that validation, with X unresolved, passes. An implementation that treated TaskParam
+# as concrete only once P is bound would run Q first and print its marker. The run fails at
+# Job creation, not in a Task; expected.taskFailure is used anyway because the runner
+# ignores forbidden markers in .invalid tests.
+# 7.4--taskparam-concrete-before-bound-valid-runs is the same template with a guard that
+# holds, so a runtime that rejects the template outright fails that test.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - FEATURE_BUNDLE_1
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('Q_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: P
+    dependencies:
+    - dependsOn: Q
+    hostRequirements:
+      amounts:
+      - name: amount.worker.vcpu
+        min: '{{Steps.Q.Output.N}}'
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: X
+        type: INT
+        range: '1-2'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{fail(''two Tasks'') if len(Steps.P.TaskParam.X) == 2 else Steps.P.TaskParam.X}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN', {{Task.Param.F}})
+expected:
+  taskFailure: {}
+  forbidden:
+  - Q_RAN
+  - P_RAN
+  - C_TASK_RAN

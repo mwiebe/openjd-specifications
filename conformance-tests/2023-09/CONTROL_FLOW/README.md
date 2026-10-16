@@ -82,7 +82,10 @@ section; each file's header comment cites the RFC 0010 section and rule.
   are concrete at Job creation is evaluated then and its failure fails Job creation before
   any Step runs (and the same template with a valid value runs, so rejecting the template
   doesn't pass); a group that fails once `enableIf` is `true` fails the Step while another
-  group still waits for its inputs (the failure only, not its timing).
+  group still waits for its inputs (the failure only, not its timing); a consumer's range
+  that reads `Steps.P.TaskParam.*` is evaluated at Job creation when `P`'s Tasks are known
+  then, even though `P` is pending because its `hostRequirements` read another Step's output
+  (`7.4--taskparam-concrete-before-bound-*`).
 - **`enableIf`** (`job_templates/3--*`, `job_templates/4--*`, `jobs/3--*`, `jobs/4--*`):
   allowed and forbidden symbols per location, `bool` type, static and dynamic decisions,
   `null` outputs of a skipped Step (`== null`, `or`), skipped Steps don't evaluate their
