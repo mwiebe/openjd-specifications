@@ -16,7 +16,9 @@ directive. Steps that depend *directly* on the producer read the values as
 `Steps.<Step>.Output.<Var>` (plus `TaskParam`, `RawOutput`, and `TaskRawParam`), so a Step
 can compute its parameter space (dynamic fan-out), decide whether it runs (`enableIf` on
 Steps and Environments), and reduce the values of a multi-Task producer (fan-in). Fields
-that read upstream outputs are evaluated at a new stage, *step input binding*. A Job can
+that read upstream outputs are evaluated at a new stage, *step input binding*, group by
+group as the values each group reads arrive (`enableIf` first), and no Task runs until
+every group has been evaluated. A Job can
 also declare `jobOutputDefinitions`, typed values computed from parameters and Step
 outputs. `PATH` outputs are reverse-mapped to the submission path context.
 
@@ -74,7 +76,13 @@ section; each file's header comment cites the RFC 0010 section and rule.
 - **Step input binding** (`jobs/7.4--*`, `jobs/3.2--*`): `let` and `hostRequirements`
   bound from outputs; `fail(...)` or a required `null` fails the Step before any Task runs;
   a consumer that reads a failed producer's output in its `range` never runs (the failed
-  attempt's value is not committed); a skipped Step in a chain keeps ordering.
+  attempt's value is not committed); a skipped Step in a chain keeps ordering. Progressive
+  binding: a `false` `enableIf` skips a parameter space that would fail; no other group is
+  evaluated while `enableIf` is undecided, at Job creation or later; a group whose inputs
+  are concrete at Job creation is evaluated then and its failure fails Job creation before
+  any Step runs (and the same template with a valid value runs, so rejecting the template
+  doesn't pass); a group that fails once `enableIf` is `true` fails the Step while another
+  group still waits for its inputs (the failure only, not its timing).
 - **`enableIf`** (`job_templates/3--*`, `job_templates/4--*`, `jobs/3--*`, `jobs/4--*`):
   allowed and forbidden symbols per location, `bool` type, static and dynamic decisions,
   `null` outputs of a skipped Step (`== null`, `or`), skipped Steps don't evaluate their
@@ -137,7 +145,17 @@ section; each file's header comment cites the RFC 0010 section and rule.
 ## Not covered
 
 - Re-runs and retries, committed-value display, forwarding, and `PENDING_INPUTS`/`SKIPPED`
-  state reporting: scheduler behavior that `openjd run` can't show portably.
+  state reporting, including whether a pending Step's Tasks and host requirements are known:
+  scheduler behavior that `openjd run` can't show portably.
+- *When* a Step fails at step input binding after Job creation. Evaluating a group as soon as
+  its inputs are concrete is a SHOULD, an early and a late failure end the same way (the Step
+  never runs and the run fails), and the RFC doesn't say whether Steps independent of a failed
+  Step keep running, so no marker can portably show the time.
+  `7.4--failure-with-pending-remaining-group` asserts only the failure; the Job-creation case,
+  which is a MUST, is `7.4--static-group-fails-job-creation`.
+- Which error is reported when several materialization groups of a Step become evaluable at
+  once and more than one would fail: the RFC fixes the order (enablement, Task enumeration,
+  host selection, Task graph, remaining), but message text is not portable.
 - The validation *warning* for a conditional Step's `null` discarded by EXPR: warnings
   don't change `openjd check`'s exit status.
 - Line-limit and value-size *rejection* above 64 KiB / 1 MiB: runtimes MAY accept more,

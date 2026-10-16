@@ -102,28 +102,58 @@ created, and a Step's Tasks are scheduled once the Steps it depends on have comp
 With CONTROL_FLOW, a Step may compute its parameter space, its host requirements, its `let` bindings, its Step
 Environments, or whether it runs at all (`enableIf`) from the output variables of the Steps it depends on. Those values
 don't exist until the producing Steps have run, so such a Step is **pending inputs** (`PENDING_INPUTS`) from Job
-creation until they do. While it is pending inputs its Tasks are not known and none of them can be scheduled. A
-scheduler or tool that shows a pending Step should report its Task count as not yet known and name the output
-variables it is waiting for.
+creation until it is bound (every group of its fields described below has been evaluated), skipped, or failed. None
+of its Tasks can be scheduled while it is pending inputs.
 
-When every value the Step's expressions reference is available, the scheduler performs **step input binding**: it
-evaluates the Step's `enableIf`, `let`, `hostRequirements`, parameter space, Step Environments, and any other of its
-fields that are resolved before its Tasks run, in that order, as a unit. The Step then becomes one of:
+The scheduler performs **step input binding** progressively. The Step's fields that are resolved before its Tasks run
+are divided into groups, and each group can be evaluated as soon as the values it reads are available. A scheduler
+should evaluate it then, and must have evaluated every group before it schedules any of the Step's Tasks:
 
-* **Ready** — Its Tasks are now known and are scheduled as they are today, once its dependencies are satisfied. A
-  Step whose computed parameter space is empty has zero Tasks and completes successfully once its dependencies are
-  satisfied.
+1. `enableIf` is always decided first. Nothing else of the Step is evaluated until it is. If it is `false`, the Step
+   is **skipped**: it has zero Tasks, and none of its other fields is evaluated. A Step without `enableIf` is enabled
+   at once.
+2. Then, independently and in whichever order their values arrive:
+   * its parameter space is evaluated and checked against the scheduler's limit on the number of Tasks, and the
+     Step's **Tasks are known**: they can be listed and counted;
+   * its host requirements are evaluated, and its **host requirements are known**;
+   * with a future task-task dependencies extension (`TASK_DEPENDENCIES`), the dependencies between its Tasks are
+     evaluated and checked, once its Tasks, and the Tasks of the Steps those dependencies name, are known and the
+     values they read are available;
+   * the rest of its fields, such as its Step Environments and action timeouts, are evaluated.
+
+   A `let` binding of the Step is evaluated with the first group that uses it, and every one is evaluated before
+   the Step is bound.
+
+A Step whose Tasks are known is still pending inputs until every group has been evaluated, but a scheduler or tool
+can already show its Tasks to the people monitoring the Job and plan capacity for them, and a Step whose host
+requirements are known tells the scheduler which Worker Hosts it may need. A scheduler or tool that shows a pending
+Step should report, for whether it runs, its Tasks, and its host requirements, whether each is known, and for each
+that is not, what it is waiting for: the values of other Steps that are not available yet, or the Step's undecided
+`enableIf`. In a Step whose `enableIf` is decided `true` (or absent) at Job creation, the groups whose values are
+available then are evaluated then, and an error in one makes Job creation fail.
+
+The Step then becomes one of:
+
+* **Ready** — Every group has been evaluated, and the Step is bound. Its Tasks are scheduled as they are today, once
+  its dependencies are satisfied. A Step whose computed parameter space is empty has zero Tasks and completes
+  successfully once its dependencies are satisfied.
 * **Skipped** — Its `enableIf` was `false`. It runs nothing, and its output variables are `null` to the Steps that
-  read them. A Step whose `enableIf` reads only Job Parameters is decided at Job creation instead.
-* **Failed** — An expression failed, or its Task count exceeded the scheduler's limit. None of its Tasks runs.
+  read them. A Step whose `enableIf` reads only values available at Job creation, such as Job Parameters, is
+  decided at Job creation instead.
+* **Failed** — An expression in any group failed, its Task count exceeded the scheduler's limit, or (with a future
+  `TASK_DEPENDENCIES` extension) the dependencies between its Tasks have a cycle. It fails as soon as the group with
+  the error is evaluated, without waiting for the values its other groups read, and none of its Tasks runs.
+
+No Task of a Step is scheduled until every group has been evaluated, so evaluating groups early changes when a Step's
+Tasks and host requirements can be seen, not when its Tasks run.
 
 A skipped Step, and a Step that completed with zero Tasks, satisfies the dependencies of the Steps that depend on it
 once its own dependencies are satisfied, so skipping a Step never lets later work start before the work ordered ahead
 of it. A failed Step does not satisfy dependencies, and a pending Step whose producer fails never runs, as with any
 dependency on a failed Step today.
 
-A scheduler may create a pending Step's Tasks only when it is bound, or create the Step at submission and fill in its
-Tasks when it is bound. The two are equivalent to a Job's author.
+A scheduler may create a pending Step's Tasks only when it is bound, when its Tasks are known, or create the Step at
+submission and fill in its Tasks later. The three are equivalent to a Job's author.
 
 Each Task of a Step that declares `outputVariables` reports its values with `openjd_output_var:` messages (see
 [Stdout/Stderr Messages](#stdoutstderr-messages)). The runtime validates each one as it is printed, the values are

@@ -1,4 +1,4 @@
-# RFC 0010 §Materialization expressions item 4: the other format strings of parameterSpace,
+# RFC 0010 §Materialization groups item 2: the other format strings of parameterSpace,
 # such as chunks.defaultTaskCount, may read Steps.* and are evaluated at binding.
 specificationVersion: jobtemplate-2023-09
 extensions:

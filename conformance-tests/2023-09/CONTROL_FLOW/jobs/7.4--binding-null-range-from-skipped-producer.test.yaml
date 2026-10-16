@@ -1,5 +1,7 @@
-# RFC 0010 §What binding does item 4 / Design Choice 8: a skipped producer's null where a
-# value is required (a range) fails the consumer at binding; none of its Tasks runs.
+# RFC 0010 §How a Step is bound item 3 / Design Choice 8: a skipped producer's null where a
+# value is required (a range) fails the consumer; none of its Tasks runs. P is skipped at Job
+# creation, so its null is concrete then and C's range is evaluated then (§When groups are
+# evaluated), which fails Job creation; either way the run fails.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

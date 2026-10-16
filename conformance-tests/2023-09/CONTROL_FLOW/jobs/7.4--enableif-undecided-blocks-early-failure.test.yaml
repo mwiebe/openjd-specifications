@@ -1,0 +1,73 @@
+# RFC 0010 §How a Step is bound items 1 and 3: no other group of a Step is evaluated until
+# its enableIf is decided. C's range reads P, and its enableIf reads Q, which depends on P
+# and so finishes after it. When P finishes, C's range would fail(...), but C's enableIf is
+# still undecided, so the range is not evaluated; when Q finishes, enableIf is false and C is
+# SKIPPED, not FAILED. An implementation that evaluated the range as soon as P finished would
+# fail C and the run. D runs because a skipped Step satisfies dependsOn.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: N=0')
+  - name: Q
+    dependencies:
+    - dependsOn: P
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=false')
+  - name: C
+    enableIf: '{{Steps.Q.Output.Go}}'
+    dependencies:
+    - dependsOn: P
+    - dependsOn: Q
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{range(Steps.P.Output.N) if Steps.P.Output.N > 0 else fail(''no items'')}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN')
+  - name: D
+    dependencies:
+    - dependsOn: C
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
+expected:
+  output:
+  - D_RAN
+  forbidden:
+  - C_TASK_RAN

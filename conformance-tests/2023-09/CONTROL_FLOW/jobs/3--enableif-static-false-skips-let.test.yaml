@@ -1,4 +1,4 @@
-# RFC 0010 §What binding does item 1: if enableIf is false nothing after it is evaluated,
+# RFC 0010 §How a Step is bound item 1: if enableIf is false nothing else is evaluated,
 # so a disabled Step's let may assume the Step runs (here it would call fail()).
 template:
   specificationVersion: jobtemplate-2023-09

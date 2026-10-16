@@ -906,8 +906,9 @@ Where:
 5. Constraint properties — Checked against the value when it is evaluated. A `null` value is not checked.
 
 The render management system evaluates each Job output as soon as every `Steps.*` value its *value* references is
-concrete, which is at Job creation if it references none or only Task parameters of Steps bound then, and keeps the
-result for the life of the Job. It does not need the referenced Steps to be dependencies of anything. If evaluation
+concrete, which is at Job creation if it references none or only Task parameters of Steps whose Tasks are known
+then, and keeps the result for the life of the Job. It does not need the referenced Steps to be dependencies of
+anything. If evaluation
 fails, including a conversion error, a constraint violation, or a value over the implementation's size limit (which must
 be at least 1 MiB for all of a Job's outputs), the Job fails: no further Tasks are dispatched, and an output evaluated
 at Job creation makes Job creation fail. If a Step the output references fails or can never run because a dependency
@@ -950,8 +951,11 @@ Where:
    Step is always enabled. Constraints:
     1. It may reference `Param.*` (except `PATH` parameters), `RawParam.*`, `Job.Name`, `Step.Name`, and the
        `Steps.*` values of the Step's direct dependencies. It may not reference names bound by the Step's own *let*, `Task.*`, or `Session.*`.
-    2. If it references no `Steps.*` value, it is evaluated at Job creation. Otherwise it is evaluated at step input
-       binding (see [Template Processing Stages](#74-template-processing-stages)), before the Step's *let*.
+    2. If every value it references is concrete at Job creation (it references no `Steps.*` value, or only values
+       concrete then, such as those of a Step skipped at Job creation), it is evaluated at Job creation. Otherwise it
+       is evaluated at step input binding (see [Template Processing Stages](#74-template-processing-stages)) once
+       those values are concrete. Either way it is decided before the Step's *let* and every other materialization expression of the
+       Step is evaluated, and if it is `false` none of them is: the Step's parameter space is empty.
 4. *let* — An ordered list of expression bindings evaluated once per step. Bound names are available in
    *stepEnvironments*, *hostRequirements*, *parameterSpace*, and *script* fields. See: [&lt;LetBindings&gt;](#36-letbindings).
 5. *dependencies* — A list of the dependencies of this Step. These dependencies must be resolved before the Tasks of the
@@ -986,8 +990,21 @@ Where:
 
 With the `CONTROL_FLOW` extension, the Step's format strings that are resolved at Job creation (those not annotated
 `@fmtstring[host]`, in *enableIf*, *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, and *script*) are
-the Step's *materialization expressions*, evaluated in that order. They may reference the `Steps.*` values of the Step's direct dependencies, and
-a Step whose materialization expressions do so is evaluated at step input binding instead of at Job creation. See
+the Step's *materialization expressions*. They may reference the `Steps.*` values of the Step's direct dependencies.
+They are divided into *materialization groups*. *enableIf* is decided first; after it is `true` (or if it is
+absent), each other group can be evaluated as soon as the `Steps.*` values it reads (directly or through the *let*
+bindings it uses) are concrete, and should be evaluated then. Every group whose values are concrete at Job creation
+is evaluated then, except in a Step whose *enableIf* is not decided at Job creation. The groups are:
+
+1. *enableIf*, which is decided before any other group is evaluated;
+2. *parameterSpace* (its ranges, then its other format strings, such as the `chunks` fields of `TASK_CHUNKING`); once
+   it is evaluated, the Step's Tasks are known;
+3. *hostRequirements*; once it is evaluated, the Step's host requirements are known;
+4. every other materialization expression, in *stepEnvironments* and *script*.
+
+A *let* binding is evaluated with the first group that uses it, and the last group uses every *let* binding. An
+evaluation error in any group fails the Step as soon as that group is evaluated (or Job creation, for a group
+evaluated then), and no Task of the Step is dispatched until every group has been evaluated. See
 [Template Processing Stages](#74-template-processing-stages) and
 [How Jobs Are Run](How-Jobs-Are-Run#step-states-and-step-input-binding).
 
@@ -1602,7 +1619,10 @@ values are not known until task execution time.
 
 Note: With the `CONTROL_FLOW` extension, `<StepTemplate>.let`, `<StepScript>.let`, and `<SimpleAction>.let` may also
 reference the `Steps.*` values of the Step's direct dependencies. A `<StepTemplate>.let` that references `Steps.*` is
-evaluated at step input binding.
+evaluated at step input binding, with the first materialization group of the Step that uses it (see
+[&lt;StepTemplate&gt;](#3-steptemplate)). A group evaluates the bindings it uses in declaration order, so a binding
+is never evaluated before one it reads, but a later binding may be evaluated before an earlier one that it doesn't
+read.
 
 Note: `Task.File.*` symbols in `<StepScript>.let` and `Env.File.*` symbols in `<EnvironmentScript>.let` refer to
 embedded files defined in the same script. The file path is determined before evaluation, so `let` bindings can
@@ -1721,7 +1741,7 @@ echo "openjd_output_var: RenderTimeS[$frame]=$seconds"   # in a Step with a CHUN
 In a Step with a `CHUNK[INT]` Task parameter, one action runs a chunk of Tasks, and every directive must have a
 `<TaskSelector>`: the decimal value of the `CHUNK[INT]` parameter for the Task it reports for, which must be a value in
 the chunk being run. The `CHUNK[INT]` parameter's values must be distinct in such a Step; a duplicate fails the Step
-when its parameter space is materialized. In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
+when its parameter space is materialized (or fails Job creation, if that is when it is materialized). In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
 size limit apply to each Task of the chunk separately, and when the action exits successfully each Task must have its
 required values; if any Task doesn't, or the action fails, the whole chunk fails and no Task of it commits any
 output. The selector is matched by integer value and is required even in a chunk of one Task.
@@ -1799,8 +1819,8 @@ Where:
     1. In a Job Environment, it may reference `Param.*` (except `PATH` parameters), `RawParam.*`, and `Job.Name`,
        and is evaluated at Job creation.
     2. In a Step Environment, it may also reference `Step.Name` and the `Steps.*` values of the enclosing Step's direct
-       dependencies, and is evaluated with the Step's other materialization expressions
-       (see [&lt;StepTemplate&gt;](#3-steptemplate)).
+       dependencies, and is evaluated with the last of the Step's materialization groups, which holds its
+       *stepEnvironments* and *script* fields (see [&lt;StepTemplate&gt;](#3-steptemplate)).
     3. It may not reference `Session.*`, `Env.*`, or names bound by `let`.
     4. Not available in an Environment Template.
 4. *script* — The action that is taken by this Environment when it is run on a Worker host.
@@ -2326,8 +2346,8 @@ different sets of values are known, which determines which format strings can be
 | Stage | When | Known Values | Unknown Values | What Happens |
 |-------|------|-------------|----------------|--------------|
 | **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Steps.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `CONTROL_FLOW` extension: `Steps.*` values are available as `unresolved` values of the types derived from the producing Steps' *outputVariables* and Task parameters, and references to them are checked against the referencing Step's *dependencies*. |
-| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension: an *enableIf* that references no `Steps.*` is evaluated, and a Step whose materialization expressions reference a `Steps.*` value that is not yet concrete is not evaluated here but waits for step input binding. |
-| **Step input binding** (`CONTROL_FLOW` only) | Once per Step whose materialization expressions reference `Steps.*`, when every referenced `Steps.*` value is concrete | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The Step's materialization expressions (its format strings not annotated `@fmtstring[host]`: *enableIf*, *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, and *script*) are evaluated in that order. If *enableIf* is `false` the Step is skipped and nothing after it is evaluated. If any evaluation fails, or the Task count exceeds the implementation's limit, the Step fails before any of its Tasks runs. Until it is bound the Step is pending inputs. |
+| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension, in Step dependency order: every *enableIf* whose values are all concrete is evaluated; for each Step whose *enableIf* is then `true` or absent, every materialization group whose `Steps.*` values are all concrete is evaluated, and an error fails Job creation; the other groups wait for step input binding. |
+| **Step input binding** (`CONTROL_FLOW` only) | Per materialization group of a Step (see [3](#3-steptemplate)), as soon as every `Steps.*` value it reads is concrete, with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The group's format strings are evaluated. If *enableIf* is `false` the Step is skipped, with an empty parameter space, and no other group is evaluated. When *parameterSpace* is evaluated the Step's Tasks are known, and when *hostRequirements* is, its host requirements are known, in either order. If any evaluation fails, or the Task count exceeds the implementation's limit, the Step fails at once, before any of its Tasks runs. Until every group has been evaluated the Step is pending inputs, and none of its Tasks is dispatched. |
 | **Job output evaluation** (`CONTROL_FLOW` only) | Once per Job output, when every `Steps.*` value its *value* references is concrete, or at Job creation if it references none | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted to its type, and checked. A failure fails the Job. See [2.17](#217-joboutputdefinition-extension-control_flow). |
 | **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. With the `CONTROL_FLOW` extension: the `Steps.*` values of the Step's direct dependencies are concrete, and the `openjd_output_var:` directives that `onRun` prints are processed as they are printed, with `PATH` values mapped back to the submission path context (see [3.7.1](#371-reporting-output-values)). |
 

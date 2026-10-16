@@ -1,0 +1,61 @@
+# RFC 0010 §How a Step is bound: the companion of 7.4--failure-with-pending-remaining-group,
+# with N=1. C's Tasks are known once P finishes, its remaining group (which uses its let)
+# waits for Q, and C's one Task runs with the value Q reported.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: Go
+      type: BOOL
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=true'); print('openjd_output_var: N=1')
+  - name: Q
+    dependencies:
+    - dependsOn: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1')
+  - name: C
+    enableIf: '{{Steps.P.Output.Go}}'
+    let:
+    - v = Steps.Q.Output.V
+    dependencies:
+    - dependsOn: P
+    - dependsOn: Q
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{range(Steps.P.Output.N) if Steps.P.Output.N > 0 else fail(''no items'')}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN', {{v}})
+expected:
+  output:
+  - C_TASK_RAN 1
