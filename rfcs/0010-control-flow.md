@@ -883,7 +883,7 @@ This RFC is additive and gated by the `CONTROL_FLOW` extension name declared und
 9. **Implementation strategy is the scheduler's choice.** A scheduler may create a waiting Step's Tasks only once its
    inputs are known, or create the Step first and fill it in. The specification states the observable contract.
 10. **Composable.** The design composes with `TASK_CHUNKING`, `WRAP_ACTIONS`, and a future `TASK_DEPENDENCIES`
-    extension without special cases in either direction.
+    extension. The one addition for `TASK_CHUNKING` is a selector on each directive naming the Task of the chunk.
 11. **Prompt delivery.** A runtime can validate and forward each value as soon as the Task reports it, so the values
     are at the scheduler when the Task ends, and figures such as metrics can be shown while it runs.
 
@@ -1547,6 +1547,7 @@ its `onRun` action, in one of two forms:
 ```
 openjd_output_var: <Name>=<JSON>
 openjd_output_var: <Name>=@<FilePath>
+openjd_output_var: <Name>[<Int>]=<JSON>        # in a Step with a CHUNK[INT] parameter
 ```
 
 The runtime recognizes the directive the way it recognizes the other messages of How Jobs Are Run: a line that begins
@@ -1571,7 +1572,8 @@ Where:
 * `<Identifier>` is the output's name, matched case-sensitively against the Step's declared output names. There is no
   whitespace between it, the `<TaskSelector>`, and the `=`.
 * `<TaskSelector>` names the Task of a chunk that the directive reports for, by its value of the Step's `CHUNK[INT]`
-  parameter. `<Int>` is a decimal integer, optionally negative, with no whitespace inside the brackets. It is
+  parameter. `<Int>` is a decimal integer, an optional `-` then digits, with no whitespace inside the brackets, and
+  is matched by its integer value. It is
   required in a Step with a `CHUNK[INT]` parameter and not allowed in any other Step (see
   [Chunked Steps](#chunked-steps)).
 * `<JSON>` is one JSON value (RFC 8259). It is on one line, because a directive is a line, so a string that contains a
@@ -1678,7 +1680,8 @@ has its own outputs. A directive says which Task it is for with a `<TaskSelector
       for frame in {{repr_sh([string(f) for f in list(Task.Param.Frame)])}}; do
         start=$(date +%s.%N)
         render --frame "$frame"
-        echo "openjd_output_var: RenderTimeS[$frame]=$(echo "$(date +%s.%N) - $start" | bc)"
+        seconds=$(awk -v a="$start" -v b="$(date +%s.%N)" 'BEGIN { printf "%.3f", b - a }')
+        echo "openjd_output_var: RenderTimeS[$frame]=$seconds"
       done
 ```
 
@@ -1689,8 +1692,10 @@ has its own outputs. A directive says which Task it is for with a `<TaskSelector
    values separately: under `ONCE`, `RenderTimeS[12]` may be reported once and `RenderTimeS[13]` once. When the
    Action exits successfully, every Task in the chunk must have each of its `ONCE` and `LAST` outputs, and each of its
    `APPEND` outputs meets its `minLength`.
-3. **The chunk is one attempt.** If the Action fails, is canceled, or times out, or a directive is invalid, no Task in
-   the chunk commits any output, as no Task in a failed chunk succeeds under `TASK_CHUNKING`.
+3. **The chunk is one attempt.** If the Action fails, is canceled, or times out, a directive is invalid, or the exit
+   check of item 2 fails for any Task of the chunk, the whole chunk fails and no Task in it commits any output, as no
+   Task in a failed chunk succeeds under `TASK_CHUNKING`. The selector is required whatever the chunk's size,
+   including chunks of one Task.
 4. **Consumers see Tasks, not chunks.** `Steps.<Name>.Output.*` and `Steps.<Name>.TaskParam.*` have one element per
    Task in parameter-space iteration order, however the Tasks were chunked.
 
@@ -1703,7 +1708,8 @@ after it, can't be attributed to the wrong Task when stdout and stderr interleav
 The runtime processes each directive when it reads the line:
 
 1. It checks that the Action may print directives, parses the directive, and checks that the name is a declared
-   output of the Step, and in a chunked Step that the selector names a Task of the chunk.
+   output of the Step, and that a selector is present exactly when the Step is chunked and names a Task of the
+   chunk.
 2. It applies the collect mode: under `ONCE`, a second directive for the same name, and in a chunked Step the same
    Task, is invalid.
 3. For `@<FilePath>`, it opens the file under the rules of [File values](#file-values) and reads at most as many bytes
@@ -1881,7 +1887,8 @@ Output values are stored, logged, and may be displayed, so they are not redacted
        its earlier succeeded state and all of its committed values, so the Step and its consumers are unaffected.
     4. If the re-run fails, it commits nothing, as any failed attempt, and the committed values are unchanged.
 
-  The check is all or nothing: if any output falls under rule 3, nothing from the re-run is committed. Values are the
+  The check is all or nothing: if any output falls under rule 3, nothing from the re-run is committed, and in a
+  chunked Step the check covers every Task of the re-run chunk. Values are the
   same if their converted, typed values are equal.
 
   So a metric that no Step reads never blocks a re-run, but a consumed value that varies from run to run, such as a
@@ -2138,7 +2145,9 @@ Add the following item to the list of special messages:
 * `openjd_output_var: <name>=<json>` or `openjd_output_var: <name>=@<path>` where `<name>` is the name of an output
   variable that the Step declares, `<json>` is a JSON value on one line, and `<path>` names a file inside the
   **Session**'s **Working Directory** that holds one JSON value. This reports a value of an output variable of the
-  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. The runtime reads a `@` file
+  **Task** whose `onRun` **Action** printed it, and can only be emitted by that **Action**. In a Step with a
+  `CHUNK[INT]` Task parameter, the name is followed by `[<value>]`, the chunk parameter's value for the **Task** of
+  the chunk that the value is for, as in `openjd_output_var: <name>[<value>]=<json>`. The runtime reads a `@` file
   as soon as it reads the line. An invalid message, or one emitted by any other **Action** of the Job Template, cancels
   the **Action** at once and fails it, and stays in the log with the error. Under WRAP_ACTIONS, a line from a wrap hook
   counts as output of the **Action** it runs in place of. Requires the CONTROL_FLOW extension; without it, and for
