@@ -1,0 +1,40 @@
+# RFC 0010 §<Environment> enableIf: a disabled Job Environment is not entered and its
+# variables are not set.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: UseEnv
+    type: BOOL
+    default: false
+  jobEnvironments:
+  - name: E
+    enableIf: '{{Param.UseEnv}}'
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('ENV_E' + 'NTERED')
+    variables:
+      CF_VAR: set
+  steps:
+  - name: S
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import os; print('VAR:' + os.environ.get('CF_VAR', 'UNSET'))
+expected:
+  output:
+  - VAR:UNSET
+  forbidden:
+  - ENV_ENTERED

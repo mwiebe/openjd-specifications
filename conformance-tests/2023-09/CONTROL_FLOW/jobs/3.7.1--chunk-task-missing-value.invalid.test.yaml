@@ -1,0 +1,30 @@
+# RFC 0010 §Chunked Steps items 2-3: when the Action exits every Task of the chunk must
+# have its ONCE outputs; one missing value fails the whole chunk.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  - TASK_CHUNKING
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range: 1-2
+        chunks:
+          defaultTaskCount: 2
+          rangeConstraint: CONTIGUOUS
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: X[1]=10')

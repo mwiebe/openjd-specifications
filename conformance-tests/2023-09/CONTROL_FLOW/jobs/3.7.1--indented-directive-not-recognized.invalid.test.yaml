@@ -1,0 +1,21 @@
+# RFC 0010 §The openjd_output_var directive: a directive is a line that BEGINS with
+# openjd_output_var:. An indented line is ordinary output, so the ONCE output V is missing.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('  openjd_output_var: V=7')

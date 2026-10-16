@@ -1,0 +1,20 @@
+# RFC 0010 §<OutputVariableDefinition> item 5: unit is at least 1 character.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: N
+    type: INT
+    unit: ''
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')

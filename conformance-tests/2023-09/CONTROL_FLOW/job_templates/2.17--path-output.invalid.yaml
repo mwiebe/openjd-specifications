@@ -1,0 +1,26 @@
+# RFC 0010 §<JobOutputDefinition> item 3: values whose type is or contains path are read
+# through RawOutput, not Output.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: F
+  type: PATH
+  value: '{{Steps.P.Output.F}}'
+steps:
+- name: P
+  outputVariables:
+  - name: F
+    type: PATH
+  - name: Fs
+    type: LIST[PATH]
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: F="/mnt/out/a.exr"'); print('openjd_output_var: Fs=["/mnt/out/a.exr"]')

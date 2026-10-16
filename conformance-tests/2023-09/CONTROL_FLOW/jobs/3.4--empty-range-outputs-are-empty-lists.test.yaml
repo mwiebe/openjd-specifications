@@ -1,0 +1,58 @@
+# RFC 0010 §Empty parameter spaces / Design Choice 9: "{{range(1, N + 1)}}" with N = 0 is
+# an empty space; its Steps.*.Output and TaskParam lists are [] and sum([]) is 0.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: N=0')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{range(1, Steps.P.Output.N + 1)}}'
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: X=1')
+  - name: D
+    dependencies:
+    - dependsOn: C
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('OUT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.C.Output.X))}})))
+            import json; print('TP:' + json.dumps(json.loads({{repr_py(repr_json(Steps.C.TaskParam.F))}})))
+            import json; print('SUM:' + json.dumps(json.loads({{repr_py(repr_json(sum(Steps.C.Output.X)))}})))
+expected:
+  output:
+  - OUT:[]
+  - TP:[]
+  - SUM:0

@@ -1,0 +1,61 @@
+# RFC 0010 §Which Actions may print it / WRAP_ACTIONS: a line forwarded by a wrap hook is
+# output of the Action the hook runs in place of. A directive forwarded by onWrapEnvEnter
+# from a Job Template Step Environment's onEnter is a directive of that onEnter, which is
+# invalid "whether or not a wrap hook runs in its place". The directive itself is valid
+# for P, and P's onRun reports V, so only the attribution can fail the run.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    stepEnvironments:
+    - name: SEnv
+      script:
+        actions:
+          onEnter:
+            command: python
+            args:
+            - -c
+            - |-
+              print('openjd_output_var: V=1')
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1')
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  - WRAP_ACTIONS
+  environment:
+    name: WrapEnv
+    script:
+      actions:
+        onWrapEnvEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            import subprocess,sys; sys.exit(subprocess.run([{{repr_py(WrappedAction.Command)}}]+{{repr_py(WrappedAction.Args)}}).returncode)
+        onWrapTaskRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import subprocess,sys; sys.exit(subprocess.run([{{repr_py(WrappedAction.Command)}}]+{{repr_py(WrappedAction.Args)}}).returncode)
+        onWrapEnvExit:
+          command: python
+          args:
+          - -c
+          - |-
+            import subprocess,sys; sys.exit(subprocess.run([{{repr_py(WrappedAction.Command)}}]+{{repr_py(WrappedAction.Args)}}).returncode)

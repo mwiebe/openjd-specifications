@@ -1,0 +1,19 @@
+# RFC 0010 §Job Template: jobOutputDefinitions is @extension CONTROL_FLOW.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+name: TestJob
+jobOutputDefinitions:
+- name: Answer
+  type: INT
+  value: '{{40 + 2}}'
+steps:
+- name: S
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

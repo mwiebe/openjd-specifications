@@ -1,0 +1,49 @@
+# RFC 0010 §Which Actions may print it: a directive from an Action of an Environment
+# Template is ordinary output: the run succeeds, the line is logged, and P's ONCE value
+# is unaffected.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=5')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.V))}})))
+environments:
+- specificationVersion: environment-2023-09
+  environment:
+    name: EnvTemplate
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: ' + 'V=' + str(1))
+expected:
+  output:
+  - 'openjd_output_var: V=1'
+  - GOT:5

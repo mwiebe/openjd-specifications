@@ -1,0 +1,39 @@
+# RFC 0010 Design Choice 7: a producer with a parameterSpace gives list[T], whatever its
+# Task count, so integer arithmetic on Steps.P.Output.N is a type error.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: F
+      type: INT
+      range:
+      - 1
+  outputVariables:
+  - name: N
+    type: INT
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')
+- name: C
+  let:
+  - x = Steps.P.Output.N - 1
+  dependencies:
+  - dependsOn: P
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{x}})

@@ -1,0 +1,22 @@
+# RFC 0010 §Empty parameter spaces: a range written as a YAML list literal must have at
+# least one item as written, even with CONTROL_FLOW.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: S
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: F
+      type: INT
+      range: []
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Task.Param.F}})

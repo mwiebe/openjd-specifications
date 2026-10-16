@@ -1,0 +1,57 @@
+# RFC 0010 §<StepDependency>: a dependency on a SKIPPED Step is satisfied only once that
+# Step's own dependencies are, so in A -> B(skipped) -> C, C starts after A finishes.
+# Observed through a file in the temp dir, so this needs A and C on one host. It only has
+# value for a scheduler that can run Steps in parallel: one that runs Steps one at a time in
+# dependency order passes it trivially.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: A
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import os, tempfile, time
+            p = os.path.join(tempfile.gettempdir(), 'openjd-cf-chain-order.txt')
+            os.path.exists(p) and os.remove(p)
+            time.sleep(2)
+            open(p, 'w').write('A_' + 'DONE')
+  - name: B
+    enableIf: false
+    dependencies:
+    - dependsOn: A
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('B_' + 'RAN')
+  - name: C
+    dependencies:
+    - dependsOn: B
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import os, tempfile
+            p = os.path.join(tempfile.gettempdir(), 'openjd-cf-chain-order.txt')
+            v = open(p).read() if os.path.exists(p) else 'MISSING'
+            os.path.exists(p) and os.remove(p)
+            print('ORDER:' + v)
+expected:
+  output:
+  - ORDER:A_DONE
+  forbidden:
+  - B_RAN

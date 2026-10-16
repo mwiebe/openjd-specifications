@@ -1,0 +1,44 @@
+# RFC 0010 §<Environment> enableIf: the target type is bool and a null result is an error,
+# as for a Step's enableIf. A Step Environment's enableIf is a materialization expression
+# (§Materialization expressions item 6), so a null from a skipped producer's output fails
+# P at binding, before any of its Tasks runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    enableIf: false
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=true')
+  - name: P
+    dependencies:
+    - dependsOn: Q
+    stepEnvironments:
+    - name: SEnv
+      enableIf: '{{Steps.Q.Output.Go}}'
+      variables:
+        CF_X: '1'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+expected:
+  taskFailure: {}
+  forbidden:
+  - P_RAN

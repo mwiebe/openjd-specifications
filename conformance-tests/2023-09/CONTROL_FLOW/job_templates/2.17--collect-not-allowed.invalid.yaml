@@ -1,0 +1,22 @@
+# RFC 0010 §<JobOutputDefinition>: there is no collect; a job output is evaluated, not
+# reported.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: X
+  type: INT
+  value: '{{1}}'
+  collect: ONCE
+steps:
+- name: S
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

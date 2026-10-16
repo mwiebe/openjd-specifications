@@ -1,0 +1,33 @@
+# RFC 0010 Design Choice 7: a producer without a parameterSpace gives the declared type T,
+# so sum() of an INT output is a type error.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: N
+    type: INT
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')
+- name: C
+  let:
+  - x = sum(Steps.P.Output.N)
+  dependencies:
+  - dependsOn: P
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{x}})

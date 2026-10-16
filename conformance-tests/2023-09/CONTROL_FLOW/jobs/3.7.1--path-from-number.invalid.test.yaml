@@ -1,0 +1,28 @@
+# RFC 0010 Type conversion table: PATH P=7 is invalid; an int does not implicitly coerce
+# to path.
+# V is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed. POSIX only, because the valid first
+# value is a POSIX absolute path.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: PATH
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V="/worker/root/ok"')
+            print('openjd_output_var: V=7')
+runOn:
+- posix

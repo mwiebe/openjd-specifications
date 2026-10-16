@@ -1,0 +1,40 @@
+# RFC 0010 §Materialization expressions item 4: the other format strings of parameterSpace,
+# such as chunks.defaultTaskCount, may read Steps.* and are evaluated at binding.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+- TASK_CHUNKING
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: N
+    type: INT
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')
+- name: C
+  dependencies:
+  - dependsOn: P
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: Frame
+      type: CHUNK[INT]
+      range: 1-100
+      chunks:
+        defaultTaskCount: '{{Steps.P.Output.N}}'
+        rangeConstraint: CONTIGUOUS
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Task.Param.Frame}})

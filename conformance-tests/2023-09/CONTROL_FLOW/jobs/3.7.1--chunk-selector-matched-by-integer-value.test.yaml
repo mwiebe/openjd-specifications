@@ -1,0 +1,44 @@
+# RFC 0010 §The openjd_output_var directive: <Int> in the selector is matched by its
+# integer value, so [012] names the Task whose Frame is 12.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  - TASK_CHUNKING
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range: 12-12
+        chunks:
+          defaultTaskCount: 1
+          rangeConstraint: CONTIGUOUS
+    outputVariables:
+    - name: X
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: X[012]=5')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.X))}})))
+expected:
+  output:
+  - GOT:[5]

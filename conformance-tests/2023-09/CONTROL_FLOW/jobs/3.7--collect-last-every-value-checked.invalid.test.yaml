@@ -1,0 +1,23 @@
+# RFC 0010 §Processing a directive step 5: under LAST every reported value must satisfy
+# the constraints, not only the last. 50 violates maxValue 10 even though 5 follows.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+      collect: LAST
+      maxValue: 10
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=50'); print('openjd_output_var: V=5')

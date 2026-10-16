@@ -1,0 +1,35 @@
+# RFC 0010 §Path values / Design Choice 14: when the Session has path mapping rules, the
+# stored value MUST be in the submission path context AND forward mapping it MUST give back
+# the reported path; "If the runtime can find no such form, the value is invalid."
+# /elsewhere/a.exr is a worker-only path: no rule's destination_path covers it, so it has
+# no submission-context form (storing it unchanged satisfies the round trip, but is not
+# in the submission path context). See README ambiguity 1.
+# F is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: F
+      type: PATH
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: F="/worker/root/ok"')
+            print('openjd_output_var: F="/elsewhere/a.exr"')
+pathMapping:
+- source_path_format: POSIX
+  source_path: /mnt/submit
+  destination_path: /worker/root
+runOn:
+- posix

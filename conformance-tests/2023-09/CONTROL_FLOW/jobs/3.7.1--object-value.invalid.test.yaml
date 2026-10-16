@@ -1,0 +1,25 @@
+# RFC 0010 §Processing a directive, invalid item 3: a JSON object is invalid anywhere in a
+# value, even for a STRING output.
+# V is collect: LAST and gets a valid value first, so a runtime that ignored
+# the line under test would let the run succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: STRING
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V="ok"')
+            print('openjd_output_var: V={"a": 1}')

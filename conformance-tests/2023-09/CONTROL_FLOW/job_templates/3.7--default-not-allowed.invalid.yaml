@@ -1,0 +1,21 @@
+# RFC 0010 §<OutputVariableDefinition> item 6: the default property of job parameter
+# definitions is not available.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: N
+    type: INT
+    default: 0
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: N=1')

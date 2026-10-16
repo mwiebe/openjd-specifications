@@ -1,0 +1,20 @@
+# RFC 0010 §<JobOutputDefinition> item 3: may not reference Session.*.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: HasRules
+  type: BOOL
+  value: '{{Session.HasPathMappingRules}}'
+steps:
+- name: S
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')
