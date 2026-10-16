@@ -1202,3 +1202,21 @@ typed *value* expression over job parameters and the `Steps.*` symbols of any St
 directive names its Task with a `[<value>]` selector holding that Task's chunk-parameter value
 (`RenderTimeS[12]=1.5`). Collect modes and limits apply per Task, and a failed chunk commits nothing. Committing the
 outputs of some Tasks of a failed chunk is out of scope.
+
+## 10. Addendum: progressive step input binding
+
+Recorded after further review. This replaces the all-at-once binding of §2.1 ("evaluated in a fixed order and
+validated as a unit", and "a step's tasks are enumerable if and only if its materialization inputs are concrete").
+
+A step's materialization expressions are divided into groups: `enableIf`; task enumeration (`parameterSpace`);
+host selection (`hostRequirements`); with `TASK_DEPENDENCIES`, the task graph; and the rest (step environment and
+script fields). Step `let` bindings belong to no group and are evaluated with the first group that uses them; the
+last group uses every one, so all are evaluated before dispatch. After `enableIf` is decided true, a scheduler should
+evaluate each group as soon as its own inputs are concrete (a SHOULD), so a `PENDING_INPUTS` step gains the facts
+"tasks known" and "host requirements known" independently, in either order. In a step whose `enableIf` is true or absent at
+job creation, groups whose inputs are concrete then must be evaluated then, and their failure fails job creation. `Steps.P.TaskParam.*` is concrete once `P`'s
+tasks are known, which can be before `P` is bound. The state machine of
+§2.2 is unchanged: these are facts, not states. The first error in any group fails the step at once. Dispatch stays
+atomic: no task runs until every group has evaluated. The motivation is visibility and capacity planning (showing a
+step's tasks and choosing fleets before slower producers finish), not earlier dispatch, which the direct-dependency
+rule already rules out. See RFC 0010, *Step input binding* and Design Choice 15.

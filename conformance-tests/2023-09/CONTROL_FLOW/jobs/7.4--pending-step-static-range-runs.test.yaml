@@ -1,0 +1,51 @@
+# RFC 0010 §When groups are evaluated: the companion of
+# 7.4--static-group-fails-job-creation, with a valid N. C's range reads only a job parameter
+# and is evaluated at Job creation; its let, used by its remaining group, waits for P. P runs,
+# then C's two Tasks run with the value P reported.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: N
+    type: INT
+    default: 0
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: V=1')
+  - name: C
+    let:
+    - v = Steps.P.Output.V
+    dependencies:
+    - dependsOn: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{range(Param.N) if Param.N > 0 else fail(''N must be positive'')}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN', {{v}})
+parameters:
+  N: 2
+expected:
+  output:
+  - P_RAN
+  - C_TASK_RAN 1

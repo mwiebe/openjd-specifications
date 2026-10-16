@@ -1,0 +1,67 @@
+# RFC 0010 §How a Step is bound items 2 and 3: once C's enableIf is true, a failure in its
+# Task enumeration group fails C, even though its remaining group, which uses its let, still
+# waits for Q, which runs only after P. This checks only that C fails and none of its Tasks
+# runs. It does not show *when* C fails: evaluating early is a SHOULD after Job creation, and
+# the RFC doesn't say whether Steps independent of a failed Step keep running, so an
+# implementation that failed C only after Q finished also passes (see the README's Not
+# covered list). 7.4--pending-remaining-group-valid-runs is the same template with a valid N,
+# so a runtime that rejects the template outright fails that test.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: Go
+      type: BOOL
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=true'); print('openjd_output_var: N=0')
+  - name: Q
+    dependencies:
+    - dependsOn: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1')
+  - name: C
+    enableIf: '{{Steps.P.Output.Go}}'
+    let:
+    - v = Steps.Q.Output.V
+    dependencies:
+    - dependsOn: P
+    - dependsOn: Q
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: F
+        type: INT
+        range: '{{range(Steps.P.Output.N) if Steps.P.Output.N > 0 else fail(''no items'')}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_TAS' + 'K_RAN', {{v}})
+expected:
+  taskFailure: {}
+  forbidden:
+  - C_TASK_RAN
