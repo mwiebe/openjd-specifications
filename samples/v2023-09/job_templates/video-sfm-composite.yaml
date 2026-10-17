@@ -1,0 +1,220 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# ----
+# Demonstrates
+# ----
+# A multi-application pipeline in one Job, where each Step asks the queue's
+# software Environment for only the software it needs, using the ENV_PARAMS
+# extension (RFC NNNN):
+#
+#   DecodeFrames (ffmpeg) -> SolveSfM (COLMAP) -> Composite (Maya) -> EncodeVideo (ffmpeg)
+#
+# Each Step has two `environment:` dependencies, both `required: false`:
+#   - Conda, matching environment_templates/conda-env-params.yaml
+#   - Docker, matching environment_templates/docker-env-params.yaml
+# On a Conda queue the Conda entries apply, on a Docker queue the Docker
+# entries apply, and on a queue whose hosts have the software preinstalled
+# neither applies. The Job Template is the same in all three cases.
+#
+# Because each Step supplies different values, the scheduler never puts two
+# of these Steps in the same Session, and each Session installs (or pulls)
+# only one application.
+#
+# To see the Steps and their dependencies:
+#
+#   openjd summary video-sfm-composite.yaml
+#
+# ----
+# Requirements
+# ----
+# - bash shell, linux
+# - On the hosts, through an attached Conda or Docker Environment or preinstalled:
+#   - ffmpeg
+#   - COLMAP 3.x
+#   - Autodesk Maya with mayapy (not available from conda-forge; the Conda
+#     packages for Composite assume a studio channel that provides it)
+#
+# -----
+# Contributors to this template:
+#   Mark Wiebe (https://github.com/mwiebe)
+
+specificationVersion: 'jobtemplate-2023-09'
+extensions:
+- ENV_PARAMS
+name: "{{Param.JobName}}"
+description: >
+  Decode a video to frames, solve camera motion with COLMAP, composite 3D
+  objects into the solved scene with Maya, and encode the result.
+parameterDefinitions:
+- name: JobName
+  type: STRING
+  default: Video SfM Composite
+- name: InputVideo
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ./input/plate.mp4
+  description: The source video plate.
+- name: MayaScene
+  type: PATH
+  objectType: FILE
+  dataFlow: IN
+  default: ./input/objects.ma
+  description: A Maya scene containing the 3D objects to place in the shot.
+- name: WorkDir
+  type: PATH
+  objectType: DIRECTORY
+  dataFlow: INOUT
+  default: ./work
+  description: Intermediate frames, the COLMAP model, and rendered frames.
+- name: OutputVideo
+  type: PATH
+  objectType: FILE
+  dataFlow: OUT
+  default: ./output/composite.mp4
+- name: FrameRate
+  type: INT
+  default: 24
+  minValue: 1
+- name: FrameCount
+  type: INT
+  description: The number of frames to composite (frames 1 through FrameCount).
+  default: 240
+  minValue: 1
+- name: FramesPerTask
+  type: INT
+  default: 10
+  minValue: 1
+
+steps:
+- name: DecodeFrames
+  dependencies:
+  - environment: Conda
+    required: false
+    parameters:
+      Packages: "ffmpeg=7"
+  - environment: Docker
+    required: false
+    parameters:
+      Image: "docker.io/linuxserver/ffmpeg:latest"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        mkdir -p '{{Param.WorkDir}}/frames'
+        ffmpeg -y -i '{{Param.InputVideo}}' -vf fps={{Param.FrameRate}} \
+          '{{Param.WorkDir}}/frames/frame_%04d.png'
+
+- name: SolveSfM
+  dependencies:
+  - dependsOn: DecodeFrames
+  - environment: Conda
+    required: false
+    parameters:
+      Packages: "colmap=3.11"
+  - environment: Docker
+    required: false
+    parameters:
+      Image: "docker.io/colmap/colmap:latest"
+  hostRequirements:
+    amounts:
+    - name: amount.worker.gpu
+      min: 1
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        SFM='{{Param.WorkDir}}/sfm'
+        mkdir -p "$SFM/sparse"
+        colmap feature_extractor --database_path "$SFM/db.db" \
+          --image_path '{{Param.WorkDir}}/frames' --ImageReader.single_camera 1
+        colmap sequential_matcher --database_path "$SFM/db.db"
+        colmap mapper --database_path "$SFM/db.db" \
+          --image_path '{{Param.WorkDir}}/frames' --output_path "$SFM/sparse"
+        colmap model_converter --input_path "$SFM/sparse/0" \
+          --output_path "$SFM/cameras.txt" --output_type TXT
+
+- name: Composite
+  dependencies:
+  - dependsOn: SolveSfM
+  - environment: Conda
+    required: false
+    parameters:
+      Packages: "maya=2025 mtoa"
+      Channels: "studio-internal conda-forge"
+  - environment: Docker
+    required: false
+    parameters:
+      Image: "registry.example.com/studio/maya:2025"
+  parameterSpace:
+    taskParameterDefinitions:
+    - name: StartFrame
+      type: INT
+      range: "1-{{Param.FrameCount}}:{{Param.FramesPerTask}}"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        START={{Task.Param.StartFrame}}
+        END=$(( START + {{Param.FramesPerTask}} - 1 ))
+        if [ "$END" -gt {{Param.FrameCount}} ]; then END={{Param.FrameCount}}; fi
+        mkdir -p '{{Param.WorkDir}}/render'
+        # composite.py (not shown) imports the COLMAP cameras, sets the
+        # plate as the camera background, and renders the frame range.
+        mayapy '{{Param.WorkDir}}/composite.py' \
+          --scene '{{Param.MayaScene}}' \
+          --cameras '{{Param.WorkDir}}/sfm/cameras.txt' \
+          --plates '{{Param.WorkDir}}/frames' \
+          --out '{{Param.WorkDir}}/render' \
+          --start "$START" --end "$END"
+
+- name: EncodeVideo
+  dependencies:
+  - dependsOn: Composite
+  # Same values as DecodeFrames, so a scheduler may reuse a host whose
+  # Session for DecodeFrames already created this conda environment or
+  # pulled this image.
+  - environment: Conda
+    required: false
+    parameters:
+      Packages: "ffmpeg=7"
+  - environment: Docker
+    required: false
+    parameters:
+      Image: "docker.io/linuxserver/ffmpeg:latest"
+  script:
+    actions:
+      onRun:
+        command: bash
+        args: ["{{Task.File.Run}}"]
+    embeddedFiles:
+    - name: Run
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        mkdir -p "$(dirname '{{Param.OutputVideo}}')"
+        ffmpeg -y -framerate {{Param.FrameRate}} \
+          -i '{{Param.WorkDir}}/render/frame_%04d.png' \
+          -c:v libx264 -pix_fmt yuv420p '{{Param.OutputVideo}}'
