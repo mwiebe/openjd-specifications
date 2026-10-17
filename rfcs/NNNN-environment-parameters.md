@@ -754,3 +754,112 @@ Across these systems the unit of work names its own software, and the platform d
 provided. What none of them has is a provisioning layer owned by someone other than the workflow
 author, which OpenJD has in Environment Templates; this RFC is what lets a Job Template speak to that
 layer per Step.
+
+## Implementation Impact
+
+- **Rust (openjd-rs)**: `openjd-model` gains the `parameterDefinitions` field on `Environment`,
+  reusing the existing parameter-definition types with a validator that rejects the excluded fields
+  and types; the `environment` variant of `StepDependency`; and scope rules for `Env.Param.*` and
+  `Env.RawParam.*`. Job creation computes the effective values per Step and Environment and stores
+  them on the Job's Steps, alongside the existing resolved Environment list, and the external
+  resolution reuses the code that already merges Environment Template parameter definitions.
+  `openjd-sessions` takes the effective values as part of entering an Environment, the way it takes
+  Job Parameter values today, and adds them to the Environment's symbol table. `openjd run` passes the
+  values of the Step being run. The work is moderate and mostly in validation.
+- **Python (openjd-model, openjd-sessions)**: The same changes in the pydantic models and the
+  session's symbol table. As RFC 0009 notes, the Python packages are intended to become bindings over
+  openjd-rs, in which case they inherit the feature.
+- **Schedulers**: Store the effective values per Step, pass them to the Worker when a Session enters
+  each Environment, include them in the key that decides whether two Steps can share a Session, and
+  resolve external names when attaching Environment Templates. A scheduler that already groups
+  Sessions by Step needs no grouping change at all, since values are per Step. A scheduler may
+  additionally use the values for host affinity, which is an optimization and not required.
+
+Nothing here is harder in one language than the other. The effective values are a small map per
+Step and Environment, computed once at job creation, so there is no runtime cost.
+
+## Rejected Ideas
+
+### A `stepOverridable` flag on template-level Job Parameters
+
+The discussion's first sketch marked a Job Parameter such as `CondaPackages` as overridable and let a
+Step set it. Rejected for three reasons. First, a Job Parameter has one value per Job by definition,
+and every format string that reads `Param.CondaPackages` (in a Step script, a name, a host
+requirement) would then have a value that depends on where it is read, which breaks the meaning of
+`Param.*` everywhere. Second, the Job Parameter is declared by whichever template wins §1.2.1 merging,
+so the flag would have to be merged too, and a Job Template could make a queue's parameter overridable
+or not without the queue's agreement. Third, it gives the Environment no say in what a Step may
+change: every overridable parameter becomes Step-settable for every Environment that reads it. An
+Environment parameter is declared by the Environment, read only by it, and defaults to the Job
+Parameter, which gets the same compatibility without any of these effects.
+
+### A flat per-Step map of values
+
+A Step could carry `environmentParameters: { Packages: "colmap=3.11", Image: "..." }`, and each
+Environment would read the names it knows. Rejected because names collide: a Conda Environment and a
+Pip Environment can both reasonably call their input `Packages`, and a flat map would send the same
+value to both. It also cannot express `required`, cannot be checked against a definition (which
+Environment does `Image` belong to?), and gives a scheduler no way to tell which Environment a typo
+was meant for. Keying the values by Environment name in an `environment:` entry fixes all four.
+
+### Letting a Step's script read `Env.Param.*`
+
+A Step might want to read the value it supplied, for example to log the Conda packages it asked for.
+Rejected because the reference is ambiguous: two Environments wrapping the Step may declare the same
+parameter name, and `Env.*` inside an Environment already means "this Environment". A Step that needs
+the value already has it, since it wrote it; with `EXPR` it can bind it once with a Step `let` and use
+the binding in both the `environment:` entry and its script.
+
+### Values per Task
+
+Letting Task parameters feed Environment parameters would make every Task its own Session, defeating
+the amortization Environments exist for. A Step whose Tasks need different software is two Steps.
+
+### `required` defaulting to `false`
+
+With an optional default, the common case of a Job Template written for the Environments of its own
+`jobEnvironments` would carry no difference, but a misspelled external name would be silently
+ignored, and a Job written for a Conda queue would run on a non-Conda queue and fail inside its Tasks
+instead of at submission. Listing something as a dependency should mean depending on it.
+
+### Matching external Environments by something other than name
+
+An Environment Template could carry a separate "kind" (`conda`, `docker`) that entries match on, so a
+Job Template could say "any Conda-like Environment". Rejected for now: Environment names are already
+how a queue's Environments are identified and ordered, and a kind registry would need a vocabulary the
+specification does not have. The `required: false` pattern with one entry per expected name covers the
+motivating cases. A future RFC can add a matching key if queues standardize on one.
+
+### Environment parameters on Step Environments
+
+See [Not on Step Environments](#not-on-step-environments). A Step Environment's own Step is the only
+possible supplier, so the values would always be written by the same author in the same Step.
+
+## Open Questions
+
+None block acceptance. The following are noted for the review:
+
+1. **Standard names for queue Environments.** The portability of a Job Template that writes
+   `environment: Conda` depends on queues naming their Conda Environment `Conda` and its input
+   `Packages`. The samples use those names, with `CondaPackages` and `CondaChannels` as the
+   template-level Job Parameters as the Deadline Cloud sample queue environments use them; a short
+   conventions page in the wiki may be worth adding when this RFC is accepted.
+2. **Interaction with `WRAP_ACTIONS` beyond the wrapper's own values.** A wrapping Environment reads
+   its own parameters (the image to run) but not those of the Environments it wraps. No use case for
+   the latter is known; `WrappedEnv.Param.*` is listed under [Future Work](#future-work).
+
+## Future Work
+
+* **`WrappedEnv.Param.*` for wrap hooks**, so a wrapping Environment can read the effective values of
+  the inner Environment whose action it is wrapping, if a use case appears.
+* **Matching external Environments by a standard kind**, as in
+  [Rejected Ideas](#matching-external-environments-by-something-other-than-name).
+* **A Job-level default for a whole `environment:` entry**, so a Job Template could set a value once
+  for all its Steps without a Job Parameter. Today a Job Parameter plus the Environment's `default`
+  covers this for queue Environments, and a `jobEnvironments` entry's own `default` covers it for Job
+  Environments.
+
+## Copyright
+
+This document is placed in the public domain or under the CC0-1.0-Universal license, whichever is
+more permissive.
