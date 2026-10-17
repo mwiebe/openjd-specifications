@@ -979,7 +979,7 @@ Where:
    Environment when the Job is created, the entry has no effect. A *jobEnvironments* entry is always present, so
    `required: false` is not permitted on an entry that names one (constraint 8).
 4. *parameters* — The values this Step supplies, keyed by the names in the Environment's *parameterDefinitions* (see
-   [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition)). A parameter the entry omits takes its
+   [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition-extension-env_params)). A parameter the entry omits takes its
    `default`. If not provided, the entry supplies no values; it still declares the dependency.
 
 `<EnvironmentParameterValues>` is a map from [&lt;Identifier&gt;](#71-identifier) to `<EnvironmentParameterValue>`:
@@ -1001,7 +1001,7 @@ An `<EnvironmentParameterValue>` is one of:
   expression is evaluated with the parameter's type as its target type.
 
 A value for a parameter of type PATH or LIST[PATH] is a path in the Job's submission path format; see
-[&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition).
+[&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition-extension-env_params).
 
 Constraints:
 
@@ -1062,13 +1062,14 @@ is determined when the Job is created:
 2. Otherwise, the resolved `default` of the parameter.
 
 The effective values are part of the Job, and are checked against the parameter's definition when the Job is created
-(constraint 6, and see [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition) for PATH values and
+(constraint 6, and see [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition-extension-env_params) for PATH values and
 for `default`). Path mapping rules are applied to PATH-typed effective values on the Worker Host, as they are to PATH
 Job Parameters.
 
 Two effective values are **equal** when they have the same type and the same value as resolved when the Job is created,
-before any path mapping: an INT `1` equals an INT `1`, two PATH values are equal when their unmapped strings are equal,
-and two lists are equal when they have equal elements in the same order.
+before any path mapping. An INT parameter supplied as `1` by one Step and as `"1"` by another resolves to the INT 1 for
+both, so the values are equal; two PATH values are equal when their unmapped strings are equal; and two lists are equal
+when they have equal elements in the same order.
 
 A Session enters each of its Environments once, with one set of parameter values, and keeps those values until it exits
 the Environment. A Session may run Tasks of a Step only when, for every Environment the Session has entered, the Step's
@@ -1677,7 +1678,7 @@ Where:
 3. *parameterDefinitions* — The parameters that a Step whose Sessions enter this Environment may supply values for,
    through an `environment:` entry in its *dependencies* (see [&lt;StepDependency&gt;](#32-stepdependency)). Their
    values are available within this Environment as `Env.Param.<name>` and `Env.RawParam.<name>`.
-   See: [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition). Available with the `ENV_PARAMS`
+   See: [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition-extension-env_params). Available with the `ENV_PARAMS`
    extension. Constraints:
     1. Minimum number of elements: If provided, then this list must contain at least one element.
     2. Maximum number of elements: 50.
