@@ -1,0 +1,115 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# ----
+# Demonstrates
+# ----
+# A queue Docker Environment whose container image each Step of a Job can
+# choose, combining the ENV_PARAMS extension (RFC NNNN) with WRAP_ACTIONS
+# (RFC 0008). The container starts in onEnter from {{Env.Param.Image}}, and
+# every inner Environment action and Task of the Session runs inside it via
+# the wrap hooks. Image defaults to the template-level DockerImage Job
+# Parameter, so Job Templates that do not use ENV_PARAMS get one image for
+# the whole Job, as before.
+#
+# A Step selects its image with:
+#
+#   dependencies:
+#     - environment: Docker
+#       required: false
+#       parameters:
+#         Image: "docker.io/colmap/colmap:latest"
+#
+# See job_templates/video-sfm-composite.yaml.
+#
+# ----
+# Requirements
+# ----
+# - bash shell
+# - docker, with permission for the job user to run containers
+# - linux
+#
+# -----
+# Contributors to this template:
+#   Mark Wiebe (https://github.com/mwiebe)
+
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+- WRAP_ACTIONS
+- EXPR
+parameterDefinitions:
+- name: DockerImage
+  type: STRING
+  description: The container image for Steps that do not choose their own.
+  default: "docker.io/library/ubuntu:24.04"
+environment:
+  name: Docker
+  description: >
+    Runs the Session's actions inside a container started from the image the
+    Session's Step asked for.
+  parameterDefinitions:
+  - name: Image
+    type: STRING
+    minLength: 1
+    default: "{{Param.DockerImage}}"
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ["{{Env.File.Enter}}", "{{Env.Param.Image}}"]
+      # The wrapped action arrives as argv after "--", so it needs no quoting.
+      onWrapEnvEnter:
+        command: bash
+        args:
+        - "{{Env.File.Wrap}}"
+        - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+        - "--"
+        - "{{WrappedAction.Command}}"
+        - "{{WrappedAction.Args}}"
+      onWrapTaskRun:
+        command: bash
+        args:
+        - "{{Env.File.Wrap}}"
+        - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+        - "--"
+        - "{{WrappedAction.Command}}"
+        - "{{WrappedAction.Args}}"
+      onWrapEnvExit:
+        command: bash
+        args:
+        - "{{Env.File.Wrap}}"
+        - "{{ flatten([['-e', e] for e in WrappedAction.Environment]) }}"
+        - "--"
+        - "{{WrappedAction.Command}}"
+        - "{{WrappedAction.Args}}"
+      onExit:
+        command: bash
+        args: ["-c", 'docker container stop -t 30 "$DOCKER_CONTAINER_ID"']
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        # argv: <image>
+        IMAGE="$1"
+        echo "openjd_status: Starting container from $IMAGE"
+        DOCKER_CONTAINER_ID=$(docker container run --rm --detach \
+            --mount {{ repr_sh("type=bind,src=" + Session.WorkingDirectory + ",dst=" + Session.WorkingDirectory) }} \
+            --workdir {{ repr_sh(Session.WorkingDirectory) }} \
+            --entrypoint sleep \
+            "$IMAGE" infinity)
+        echo "openjd_env: DOCKER_CONTAINER_ID=$DOCKER_CONTAINER_ID"
+    - name: Wrap
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        # argv: [-e KEY=value ...] -- <command> [args ...]
+        exec_cmd=(docker container exec)
+        while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do
+            exec_cmd+=("$1")
+            shift
+        done
+        shift
+        exec "${exec_cmd[@]}" "$DOCKER_CONTAINER_ID" "$@"

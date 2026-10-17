@@ -54,7 +54,8 @@ Where:
          [REDACTED_ENV_VARS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0003-redacted-env-vars.md),
          [FEATURE_BUNDLE_1](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0004-enhanced-limits-and-capabilities.md),
          [EXPR](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0005-expression-language.md),
-         [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md)
+         [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md),
+         [ENV_PARAMS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/NNNN-environment-parameters.md)
 4. *name* — The name to give to a Job that is created from the template. See: [&lt;JobName&gt;](#111-jobname).
 5. *description* — A description to apply to all Jobs that are created from the template. It has no functional purpose,
    but may appear in UI elements. See: [&lt;Description&gt;](#72-description).
@@ -91,12 +92,18 @@ A literal string matching the following character regex: `[A-Z_0-9]{3,128}`.
 
 ```yaml
 specificationVersion: environment-2023-09
+$schema: <string> # @optional
+extensions: [ <ExtensionName>, ... ] # @optional
 parameterDefinitions: [ <JobParameterDefinition>, ... ] # @optional
 environment: <Environment>
 ```
 
 1. *specificationVersion* — A literal that identifies the document as adhering to this schema.
-2. *parameterDefinitions* — A list of the Job Parameters that are available within the Environment Template. Values
+2. *$schema* — Ignored. This property is allowed for compatibility with JSON-editing IDEs.
+3. *extensions* — If provided, is a non-empty list of extensions that this document uses, with the same available
+   names as the Job Template. An extension listed here applies to the content of this document only; a Job Template
+   does not need to list the extensions used by the Environment Templates a scheduler applies to it, and vice versa.
+4. *parameterDefinitions* — A list of the Job Parameters that are available within the Environment Template. Values
    for Job Parameters are defined when submitting a Job Template to create a Job to a render management system.
    Both the Job Template and Environment Template(s) for a submission are allowed to contain definitions for the same
    job parameter name, but the submission must be rejected if any of the definitions of the same job parameter name
@@ -106,7 +113,7 @@ environment: <Environment>
    See: [&lt;JobParameterDefinition&gt;](#2-jobparameterdefinition).
       * Minimum number of elements: If provided, then this list must contain at least one element.
       * Maximum number of elements: The list must not contain more than 50 elements.
-3. *environment* — The definition of the Environment that the Environment Template defines.
+5. *environment* — The definition of the Environment that the Environment Template defines.
    See [&lt;Environment&gt;](#4-environment).
 
 #### 1.2.1. Merging Environment Template Parameter Definitions
@@ -129,6 +136,13 @@ or submission, and the Job Template is always processed last. The exception to t
 Job Parameter Definition; the default value for a job parameter is always the last `default` value defined in the template
 processing order. The merged job parameter definition that results from this process must be internally consistent to be considered
 valid -- for example, the value of the `default` property must adhere to the constraints in the definition.
+
+This merge applies to the top-level `parameterDefinitions` of each template only. The `parameterDefinitions` of an
+[&lt;Environment&gt;](#4-environment) (`@extension ENV_PARAMS`) are never merged: each Environment's parameters are a
+namespace of their own, even when two Environments, or an Environment and a Job Parameter, use the same name. An
+Environment parameter's `default` that references `Param.<name>` or `RawParam.<name>` reads the merged Job Parameter's
+value, so a Job Template that redefines a Job Parameter's `default` changes the default of every Environment parameter
+that refers to it.
 
 ## 2. `<JobParameterDefinition>`
 
@@ -894,7 +908,9 @@ Where:
 3. *let* — An ordered list of expression bindings evaluated once per step. Bound names are available in
    *stepEnvironments*, *hostRequirements*, *parameterSpace*, and *script* fields. See: [&lt;LetBindings&gt;](#36-letbindings).
 4. *dependencies* — A list of the dependencies of this Step. These dependencies must be resolved before the Tasks of the
-   Step may be scheduled. See: [&lt;StepDependency&gt;](#32-stepdependency)
+   Step may be scheduled. With the `ENV_PARAMS` extension, an entry may instead name an Environment that this Step's
+   Sessions enter and supply values for its parameters; such an entry does not delay scheduling.
+   See: [&lt;StepDependency&gt;](#32-stepdependency)
     * Minimum number of elements: If provided, then this list must contain at least one element.
     * Maximum number of elements: There is no maximum defined, though implementations may choose to constrain the number of
     dependencies.
@@ -927,18 +943,109 @@ A string subject to the following constraints:
 
 ### 3.2. `<StepDependency>`
 
-This entity is used by the template author to specify a Step in the same Job that a Step depends upon.
+This entity is used by the template author to specify a Step in the same Job that a Step depends upon or, with the
+`ENV_PARAMS` extension, an Environment that the Step's Sessions enter with parameter values the Step supplies.
 
-A `<StepDependency>` is the object:
+A `<StepDependency>` is one of the objects:
 
 ```yaml
 dependsOn: "<StepName>"
+```
+
+```yaml
+# @extension ENV_PARAMS
+environment: "<EnvironmentName>"
+required: <bool> # @optional
+parameters: <EnvironmentParameterValues> # @optional
 ```
 
 Where:
 
 1. *dependsOn* — Provides the name of another step in the same job upon which this step depends. The Task(s) of this Step
    may be scheduled only when the depended-upon Step has fully completed successfully.
+2. *environment* — The name of an Environment that this Step's Sessions enter, and to which the Step supplies
+   parameter values. Available with the `ENV_PARAMS` extension. The name resolves, in order:
+    1. to the entry of the same Job Template's *jobEnvironments* with that `name`, if there is one;
+    2. otherwise, to an **external Environment**: the `environment` of an Environment Template that the scheduler
+       attaches to the submission, matched by `name` when the Job is created (see
+       [Resolving external Environments](#321-resolving-external-environments)).
+
+   The entry declares that the Step depends on the Environment: its Sessions need that Environment, entered with these
+   values. It does not delay scheduling the Step's Tasks.
+3. *required* — Whether the Environment must be present. Default `true`. When `false` and the name resolves to no
+   Environment when the Job is created, the entry has no effect. A *jobEnvironments* entry is always present, so for one
+   this field has no effect.
+4. *parameters* — The values this Step supplies, keyed by the names in the Environment's *parameterDefinitions* (see
+   [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition)). A parameter the entry omits takes its
+   `default`. If not provided, the entry supplies no values; it still declares the dependency.
+
+`<EnvironmentParameterValues>` is a map from [&lt;Identifier&gt;](#71-identifier) to `<EnvironmentParameterValue>`:
+
+```yaml
+<Identifier>: <EnvironmentParameterValue>, # @fmtstring
+...
+```
+
+An `<EnvironmentParameterValue>` is one of:
+
+* A literal of the parameter's type, written as the `default` of a [&lt;JobParameterDefinition&gt;](#2-jobparameterdefinition)
+  of the same type is written: a string, an integer or `<intstring>`, a float or `<floatstring>`, and with the `EXPR`
+  extension a boolean or a list.
+* A [Format String](#73-format-strings) resolved when the Job is created. Its available scopes are `RawParam.*` for
+  every Job Parameter, `Param.*` for every Job Parameter not of type PATH or LIST[PATH], and, with the `EXPR` extension,
+  `Job.Name`, `Step.Name`, and the names bound by the Step's `let`. `Task.*`, `Session.*`, and `Env.*` are not
+  available: a value is fixed for the whole Step. With the `EXPR` extension, a value consisting of a single `{{ }}`
+  expression is evaluated with the parameter's type as its target type.
+
+Constraints:
+
+1. Exactly one of *dependsOn* or *environment* must be present. *required* and *parameters* are permitted only with
+   *environment*.
+2. *environment* must not name a *stepEnvironments* entry of the same Step.
+3. No two *environment* entries of one *dependencies* list may name the same Environment.
+4. *parameters*, if provided, must contain at least one entry and at most 50 entries.
+5. Every key of *parameters* must name a parameter declared in the named Environment's *parameterDefinitions*. An
+   Environment that declares none, including one from a document that does not list `ENV_PARAMS`, accepts an entry with
+   no *parameters* and rejects one with any.
+6. Every value must be valid for the parameter it supplies: of its type, and within its `allowedValues`, `minLength`,
+   `maxLength`, `minValue`, `maxValue`, and `item` constraints.
+7. For every Environment that a Step's Sessions enter, the Step must supply every parameter of that Environment that has
+   no `default`. Since every Session enters every *jobEnvironments* entry, a Job Environment parameter without a
+   `default` must be supplied by every Step of the Job Template.
+
+Constraints 1–4 are checked at template validation. Constraints 5–7 are checked at template validation for entries that
+name a *jobEnvironments* entry (for constraint 6, against literal values), and when the Job is created for every entry,
+once format strings are resolved and external Environments are known.
+
+#### 3.2.1. Resolving external Environments
+
+When a Job is created from a Job Template and one or more Environment Templates, each *environment* entry that names no
+*jobEnvironments* entry of the Job Template is resolved against the attached Environment Templates:
+
+1. If exactly one attached Environment Template's `environment` has the entry's name, the entry refers to it, and
+   constraints 5 and 6 are checked against that Environment's *parameterDefinitions*.
+2. If none does, then with `required: true` the submission must be rejected, naming the entry and the missing
+   Environment; with `required: false` the entry is ignored.
+3. If two or more do, the submission must be rejected, naming the entry and the ambiguous name.
+4. An attached Environment with the same name as a *jobEnvironments* entry is not reachable by name from the Job
+   Template. Implementations should warn when they see one.
+
+After resolution, constraint 7 is checked over the combined Job: every Step whose Sessions enter an attached Environment
+with a parameter that has no `default` must supply it, or the submission is rejected.
+
+#### 3.2.2. Effective Environment parameter values
+
+For each Step and each Environment its Sessions enter, the **effective value** of every parameter of that Environment
+is determined when the Job is created:
+
+1. If an *environment* entry of the Step names the Environment and supplies the parameter, the resolved value of that
+   entry.
+2. Otherwise, the resolved `default` of the parameter.
+
+The effective values are part of the Job. A PATH-typed effective value must be an absolute path, or with the `EXPR`
+extension a URI; a relative path is an error. Path mapping rules are applied to PATH-typed effective values on the
+Worker Host, as they are to PATH Job Parameters. See [How Jobs Are Run](How-Jobs-Are-Run#environment-parameters) for how
+the effective values determine a Session's Environments.
 
 ### 3.3. `<HostRequirements>`
 
@@ -1527,6 +1634,7 @@ An `<Environment>` is the object:
 ```yaml
 name: <EnvironmentName>
 description: <Description> # @optional
+parameterDefinitions: [ <EnvironmentParameterDefinition>, ... ] # @optional @extension ENV_PARAMS
 script: <EnvironmentScript> # @optional
 variables: <EnvironmentVariables> # @optional
 ```
@@ -1537,19 +1645,33 @@ Where:
    Template for a Job Environment, and the Step Template for a Step Environment.
 2. *description* — A description to apply to the environment. It has no functional purpose, but may appear in UI elements.
    See: [&lt;Description&gt;](#72-description).
-3. *script* — The action that is taken by this Environment when it is run on a Worker host.
-4. *variables* — A set of environment variable name/value pairs, with the values being
+3. *parameterDefinitions* — The parameters that a Step whose Sessions enter this Environment may supply values for,
+   through an `environment:` entry in its *dependencies* (see [&lt;StepDependency&gt;](#32-stepdependency)). Their
+   values are available within this Environment as `Env.Param.<name>` and `Env.RawParam.<name>`.
+   See: [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition). Available with the `ENV_PARAMS`
+   extension. Constraints:
+    1. Minimum number of elements: If provided, then this list must contain at least one element.
+    2. Maximum number of elements: 50.
+    3. No two definitions in this list may have the same value for the `name` property. A name may coincide with a Job
+       Parameter name or with a parameter of another Environment; they do not conflict.
+    4. Permitted on a Job Template's *jobEnvironments* entries and on an Environment Template's *environment*. Not
+       permitted on a *stepEnvironments* entry.
+4. *script* — The action that is taken by this Environment when it is run on a Worker host.
+5. *variables* — A set of environment variable name/value pairs, with the values being
    [Format Strings](#73-format-strings) that are resolved when entering the environment. The specified variables must be
    set prior to running either `onEnter` or `onExit` for the environment, and for all actions that are run with the
    environment active.
-5. At least one of "script" or "variables" must be provided.
+6. At least one of "script" or "variables" must be provided.
 
 The format string scopes available to format strings within an Environment are:
 
 1. `Param.*` and `RawParam.*` — Values of Job Parameters.
 2. `Session.*` — Values such as the Session's working directory.
 3. `Env.*` — Scope of the environment entity itself. Values such as the embedded files defined within the Environment
-   entity.
+   entity, and with the `ENV_PARAMS` extension, `Env.Param.*` and `Env.RawParam.*`: the effective values of this
+   Environment's parameters for the Step whose Session is entering it (see
+   [Effective Environment parameter values](#322-effective-environment-parameter-values)). A Step's own script cannot
+   reference `Env.Param.*`, and no Environment can reference another Environment's parameters.
 4. Names bound by `let` in the enclosing `<EnvironmentScript>`. Available with the `EXPR` extension.
 5. `WrappedAction.*` — Available within `onWrapEnvEnter`, `onWrapTaskRun`, and `onWrapEnvExit` only. Carries
    the wrapped `<Action>`'s fields. Available with the `WRAP_ACTIONS` extension.
@@ -1724,6 +1846,43 @@ A string value subject to the following constraints:
 1. Allowable characters: Any
 2. Minimum length: 0 characters
 3. Maximum length: 2048 characters
+
+### 4.5. `<EnvironmentParameterDefinition>` `@extension ENV_PARAMS`
+
+An `<EnvironmentParameterDefinition>` declares one value that a Step may supply to the Environment that contains it.
+It has the shape of a [&lt;JobParameterDefinition&gt;](#2-jobparameterdefinition) of the same `type`, with these
+differences:
+
+1. *type* — Any type available to a `<JobParameterDefinition>` in the same document, except `LIST[PATH]` and
+   `RANGE_EXPR`. As for Job Parameters, the types other than `STRING`, `INT`, `FLOAT`, and `PATH` require the `EXPR`
+   extension.
+2. *userInterface* — Not permitted. Environment parameters are set by templates, not by a person submitting a Job.
+3. *objectType* and *dataFlow* (`PATH`) — Not permitted. Which files a Job reads and writes is declared by its Job
+   Parameters.
+4. *default* — Optional. A [Format String](#73-format-strings) resolved when the Job is created. It may reference
+   `RawParam.<name>` for any Job Parameter, and `Param.<name>` for any Job Parameter not of type PATH or LIST[PATH],
+   defined in the top-level *parameterDefinitions* of the same document, and no other scope. Those Job Parameters have
+   their merged values (see [§1.2.1](#121-merging-environment-template-parameter-definitions)). With the `EXPR`
+   extension, a `default` consisting of a single `{{ }}` expression is evaluated with the parameter's type as its
+   target type; otherwise the resolved string is converted to the parameter's type as a submitted Job Parameter value
+   of that type would be. A literal `default` is written as for a `<JobParameterDefinition>` of the same type.
+5. *allowedValues*, *minLength*, *maxLength*, *minValue*, *maxValue*, and *item* — As for the
+   `<JobParameterDefinition>` of the same type. They constrain every effective value, whether supplied by a Step or
+   taken from the resolved `default`.
+
+A parameter without a `default` is required: every Step whose Sessions enter the Environment must supply it (see
+[&lt;StepDependency&gt;](#32-stepdependency) constraint 7).
+
+The value of an Environment parameter is referenced in format strings, within the Environment that defines it, as both:
+
+1. `Env.Param.<name>` — the effective value; for type PATH, with path mapping rules applied; and
+2. `Env.RawParam.<name>` — the effective value with no path mapping applied.
+
+With the `EXPR` extension, `Env.Param.<name>` has the expression type of the corresponding Job Parameter type, and
+`Env.RawParam.<name>` has the same type except that it is `string` for PATH.
+
+Environment parameters were introduced in
+[RFC NNNN](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/NNNN-environment-parameters.md).
 
 ## 5. `<Action>`
 
@@ -2039,6 +2198,8 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Task.RawParam.<ParamName>`|Values of task parameters are available within the `Task.Param` object.|Available within the Step Script Actions and Embedded Files.|
 |`Task.File.<name>`|The filesystem location to which the Task Embedded File with key `<name>` has been written.| Available within the Step Script Actions and Embedded Files.|
 |`Env.File.<name>`|The filesystem location to which the Environment Attachment with key `<name>` has been written.|Available within the Environment Script Actions and Embedded Files.|
+|`Env.Param.<ParamName>`|The effective value of the Environment parameter `<ParamName>` for the Step whose Session is entering the Environment. The same as `Env.RawParam.<ParamName>` except for type PATH, where path mapping rules are applied. Requires the `ENV_PARAMS` extension.|Available within the Environment that declares the parameter: its `variables`, and its Script's `let`, Actions, and Embedded Files. Not available in any other Environment or in a Step.|
+|`Env.RawParam.<ParamName>`|The effective value of the Environment parameter `<ParamName>`, with no path mapping applied. Requires the `ENV_PARAMS` extension.|As for `Env.Param.<ParamName>`.|
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Job.Name`|The resolved name of the Job. This is a `string` type. Requires the `EXPR` extension.|Available in every Format String in the Job Template, except the `name` field of the Job Template itself.|
 |`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`.|
@@ -2053,9 +2214,9 @@ different sets of values are known, which determines which format strings can be
 
 | Stage | When | Known Values | Unknown Values | What Happens |
 |-------|------|-------------|----------------|--------------|
-| **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. |
-| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. |
-| **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. |
+| **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `ENV_PARAMS` extension: `Env.Param.*` is type-checked against the Environment's *parameterDefinitions*, and literal `environment:` values for Job Environments are checked against their definitions. |
+| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `ENV_PARAMS` extension: external Environments are resolved, and Environment parameter defaults and `environment:` values are resolved into each Step's effective values and checked. |
+| **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Env.Param.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. |
 
 The `@fmtstring` and `@fmtstring[host]` annotations in this specification indicate which stage
 a format string is resolved in. A format string annotated `@fmtstring` (without `[host]`) is

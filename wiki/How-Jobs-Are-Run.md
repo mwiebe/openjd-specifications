@@ -25,7 +25,9 @@ until the **Environment** is exited.
 
 Once the **Environments** have been created and entered for a **Session**, a series of Tasks are run within that
 **Session** and the **Environments**. Tasks from any Step in a Job can run within the same **Session** provided that
-the set of **Environments** that are required to run those Tasks are identical. If the parameter space of a Step
+the set of **Environments** that are required to run those Tasks are identical and, with the ENV_PARAMS extension,
+the effective values of every **Environment**'s parameters are identical for those Steps (see
+[Environment Parameters](#environment-parameters)). If the parameter space of a Step
 includes a task parameter with type `CHUNK[INT]` (part of the TASK_CHUNKING extension), then the **Session**
 runs Chunks for that Step instead of individual Tasks. A Chunk is a set of Tasks with all of the Task parameter
 values identical except for the chunked Task parameter. It takes values from an integer range expression
@@ -78,6 +80,34 @@ within. A failed Task will result in a failed **Session**, which will subsequent
 The following diagram provides an overview of the steps taken to run a Session.
 
 ![Actions Run in a Session](./images/2023-09_how_jobs_are_run.png)
+
+## Environment Parameters
+
+With the ENV_PARAMS extension, introduced in
+[RFC NNNN](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/NNNN-environment-parameters.md),
+an **Environment** may declare parameters, and a Step supplies values for them in an `environment:` entry of its
+`dependencies`. The **Environment** reads the values as `{{Env.Param.<name>}}`.
+
+The values are resolved once, when the Job is created. For each Step and each **Environment** that the Step's
+**Sessions** enter, each parameter takes the value the Step supplies, or else the parameter's default, which may refer
+to a Job Parameter. An `environment:` entry can name one of the Job's own Job Environments, or an **Environment** that
+the render management system attaches from an Environment Template; the latter is matched by name when the Job is
+created. If the entry says `required: false` and nothing of that name is attached, the entry has no effect and the
+Step's **Sessions** run without that **Environment**. If it says `required: true` (the default), the submission is
+rejected.
+
+A **Session** runs Tasks from a single Step, so a **Session**'s **Environment** parameter values are fixed by the Step
+it serves, for the whole **Session**: the **Environment**'s `onEnter`, every Task the **Session** runs, and the
+**Environment**'s `onExit` all see the same values. Path mapping rules are applied to PATH-typed values on the Worker
+Host, as for PATH Job Parameters. A Step's own script cannot read `Env.Param.*`.
+
+Because the values are fixed per Step and known when the Job is created, a render management system can group
+**Sessions** by them. Two Steps whose effective values are identical for every **Environment** may share **Sessions**;
+two Steps whose values differ for any **Environment** never do. A render management system may also use the values to
+prefer a Worker Host that recently entered an **Environment** with the same values, for example one that has a
+matching Conda environment or container image cached. For a pipeline that decodes video with ffmpeg, solves
+structure-from-motion with COLMAP, and renders with Maya, each Step's **Sessions** then install or pull only the
+software that Step needs.
 
 ## Session Environment Variables
 

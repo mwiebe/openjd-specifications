@@ -1,0 +1,92 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# ----
+# Demonstrates
+# ----
+# A queue Conda Environment that each Step of a Job can configure, using the
+# ENV_PARAMS extension (RFC NNNN). The Environment declares its own parameters,
+# Packages and Channels, read as {{Env.Param.*}}. Their defaults are the
+# template-level CondaPackages and CondaChannels Job Parameters, so a Job
+# Template that knows nothing about ENV_PARAMS keeps working: every Session
+# gets the job-wide packages, as before.
+#
+# A Step that lists this Environment in its dependencies supplies its own
+# values instead:
+#
+#   dependencies:
+#     - environment: Conda
+#       required: false
+#       parameters:
+#         Packages: "colmap=3.11"
+#
+# See job_templates/video-sfm-composite.yaml.
+#
+# ----
+# Requirements
+# ----
+# - bash shell
+# - conda (or mamba) on PATH
+#
+# -----
+# Contributors to this template:
+#   Mark Wiebe (https://github.com/mwiebe)
+
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+parameterDefinitions:
+- name: CondaPackages
+  type: STRING
+  description: >
+    Space-separated conda package specs to install in every Session, for Steps
+    that do not supply their own. Empty means use the host's software.
+  default: ""
+- name: CondaChannels
+  type: STRING
+  description: Space-separated conda channels to search.
+  default: "conda-forge"
+environment:
+  name: Conda
+  description: >
+    Creates a conda environment in the Session Working Directory with the
+    packages the Session's Step asked for, and activates it for the rest of
+    the Session.
+  parameterDefinitions:
+  - name: Packages
+    type: STRING
+    default: "{{Param.CondaPackages}}"
+  - name: Channels
+    type: STRING
+    default: "{{Param.CondaChannels}}"
+  script:
+    actions:
+      onEnter:
+        command: bash
+        args: ["{{Env.File.Enter}}"]
+    embeddedFiles:
+    - name: Enter
+      type: TEXT
+      data: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        PACKAGES='{{Env.Param.Packages}}'
+        CHANNELS='{{Env.Param.Channels}}'
+
+        if [ -z "$PACKAGES" ]; then
+          echo "No conda packages requested; using the host's software."
+          exit 0
+        fi
+
+        CHANNEL_ARGS=()
+        for c in $CHANNELS; do
+          CHANNEL_ARGS+=(-c "$c")
+        done
+
+        echo "openjd_status: Creating conda environment with: $PACKAGES"
+        # Word splitting of $PACKAGES is intended: one argument per package spec.
+        conda create --yes --quiet --prefix ./.conda-env "${CHANNEL_ARGS[@]}" $PACKAGES
+
+        PREFIX="$(pwd)/.conda-env"
+        echo "openjd_env: CONDA_PREFIX=$PREFIX"
+        echo "openjd_env: PATH=$PREFIX/bin:$PATH"
