@@ -62,16 +62,21 @@ environment:
     actions:
       onEnter:
         command: bash
-        args: ["{{Env.File.Enter}}"]
+        # The values travel as argv, never as script text, so a quote or other
+        # shell syntax in a value cannot change what the script runs.
+        args: ["{{Env.File.Enter}}", "{{Env.Param.Packages}}", "{{Env.Param.Channels}}"]
     embeddedFiles:
     - name: Enter
       type: TEXT
       data: |
         #!/usr/bin/env bash
         set -euo pipefail
+        # Word splitting of the arguments below is intended, globbing is not.
+        set -f
 
-        PACKAGES='{{Env.Param.Packages}}'
-        CHANNELS='{{Env.Param.Channels}}'
+        # argv: <packages> <channels>
+        PACKAGES="$1"
+        CHANNELS="$2"
 
         if [ -z "$PACKAGES" ]; then
           echo "No conda packages requested; using the host's software."

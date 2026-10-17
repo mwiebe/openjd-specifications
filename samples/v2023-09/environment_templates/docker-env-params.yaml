@@ -3,21 +3,32 @@
 # ----
 # Demonstrates
 # ----
-# A queue Docker Environment whose container image each Step of a Job can
-# choose, combining the ENV_PARAMS extension (RFC NNNN) with WRAP_ACTIONS
-# (RFC 0008). The container starts in onEnter from {{Env.Param.Image}}, and
-# every inner Environment action and Task of the Session runs inside it via
-# the wrap hooks. Image defaults to the template-level DockerImage Job
-# Parameter, so Job Templates that do not use ENV_PARAMS get one image for
-# the whole Job, as before.
+# A queue Docker Environment that each Step of a Job configures, combining
+# the ENV_PARAMS extension (RFC NNNN) with WRAP_ACTIONS (RFC 0008). The
+# container starts in onEnter, and every inner Environment action and Task of
+# the Session runs inside it via the wrap hooks. The Environment declares
+# three parameters:
 #
-# A Step selects its image with:
+#   Image   The container image. Defaults to the template-level DockerImage
+#           Job Parameter, so Job Templates that do not use ENV_PARAMS get one
+#           image for the whole Job, as before.
+#   Mounts  Host paths the Step reads or writes (LIST[PATH]). Each directory,
+#           or the parent directory of each file, is bind-mounted at the same
+#           path inside the container, after path mapping, so the Step's
+#           {{Param.*}} paths work unchanged inside it. The Session Working
+#           Directory is always mounted.
+#   Gpus    The value for `docker run --gpus`, such as "all". Empty means no
+#           GPUs.
+#
+# A Step configures it with, for example:
 #
 #   dependencies:
 #     - environment: Docker
 #       required: false
 #       parameters:
 #         Image: "docker.io/colmap/colmap:latest"
+#         Mounts: "{{ [RawParam.WorkDir] }}"
+#         Gpus: "all"
 #
 # See job_templates/video-sfm-composite.yaml.
 #
@@ -26,7 +37,10 @@
 # ----
 # - bash shell
 # - docker, with permission for the job user to run containers
+# - for Gpus, the NVIDIA Container Toolkit on GPU hosts
 # - linux
+# - Mounted paths must not contain commas, which docker's --mount syntax
+#   uses as a separator.
 #
 # -----
 # Contributors to this template:
@@ -52,11 +66,23 @@ environment:
     type: STRING
     minLength: 1
     default: "{{Param.DockerImage}}"
+  - name: Mounts
+    type: LIST[PATH]
+    default: []
+  - name: Gpus
+    type: STRING
+    default: ""
   script:
     actions:
       onEnter:
         command: bash
-        args: ["{{Env.File.Enter}}", "{{Env.Param.Image}}"]
+        # Values travel as argv, never as script text. Mounts expands to one
+        # argument per path, with path mapping applied.
+        args:
+        - "{{Env.File.Enter}}"
+        - "{{Env.Param.Image}}"
+        - "{{Env.Param.Gpus}}"
+        - "{{Env.Param.Mounts}}"
       # The wrapped action arrives as argv after "--", so it needs no quoting.
       onWrapEnvEnter:
         command: bash
@@ -91,14 +117,34 @@ environment:
       data: |
         #!/usr/bin/env bash
         set -euo pipefail
-        # argv: <image>
+        # argv: <image> <gpus> [<path> ...]
         IMAGE="$1"
+        GPUS="$2"
+        shift 2
+
+        SESSION_DIR={{ repr_sh(Session.WorkingDirectory) }}
+        RUN_ARGS=(--rm --detach --workdir "$SESSION_DIR" --entrypoint sleep)
+        if [ -n "$GPUS" ]; then
+            RUN_ARGS+=(--gpus "$GPUS")
+        fi
+
+        # Mount each directory, or each file's parent directory, at the same
+        # path. A path that does not exist yet (an output) gets its parent
+        # created and mounted. Skip duplicates, which docker rejects.
+        declare -A MOUNTED=()
+        for dir in "$SESSION_DIR" "$@"; do
+            if [ ! -d "$dir" ]; then
+                dir="$(dirname -- "$dir")"
+                mkdir -p -- "$dir"
+            fi
+            if [ -z "${MOUNTED[$dir]+x}" ]; then
+                MOUNTED[$dir]=1
+                RUN_ARGS+=(--mount "type=bind,src=$dir,dst=$dir")
+            fi
+        done
+
         echo "openjd_status: Starting container from $IMAGE"
-        DOCKER_CONTAINER_ID=$(docker container run --rm --detach \
-            --mount {{ repr_sh("type=bind,src=" + Session.WorkingDirectory + ",dst=" + Session.WorkingDirectory) }} \
-            --workdir {{ repr_sh(Session.WorkingDirectory) }} \
-            --entrypoint sleep \
-            "$IMAGE" infinity)
+        DOCKER_CONTAINER_ID=$(docker container run "${RUN_ARGS[@]}" "$IMAGE" infinity)
         echo "openjd_env: DOCKER_CONTAINER_ID=$DOCKER_CONTAINER_ID"
     - name: Wrap
       type: TEXT
