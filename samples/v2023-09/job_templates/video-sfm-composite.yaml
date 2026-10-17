@@ -145,8 +145,9 @@ steps:
         colmap sequential_matcher --database_path "$SFM/db.db"
         colmap mapper --database_path "$SFM/db.db" \
           --image_path '{{Param.WorkDir}}/frames' --output_path "$SFM/sparse"
+        mkdir -p "$SFM/text"
         colmap model_converter --input_path "$SFM/sparse/0" \
-          --output_path "$SFM/cameras.txt" --output_type TXT
+          --output_path "$SFM/text" --output_type TXT
 
 - name: Composite
   dependencies:
@@ -180,14 +181,77 @@ steps:
         END=$(( START + {{Param.FramesPerTask}} - 1 ))
         if [ "$END" -gt {{Param.FrameCount}} ]; then END={{Param.FrameCount}}; fi
         mkdir -p '{{Param.WorkDir}}/render'
-        # composite.py (not shown) imports the COLMAP cameras, sets the
-        # plate as the camera background, and renders the frame range.
-        mayapy '{{Param.WorkDir}}/composite.py' \
+        mayapy '{{Task.File.Composite}}' \
           --scene '{{Param.MayaScene}}' \
-          --cameras '{{Param.WorkDir}}/sfm/cameras.txt' \
+          --model '{{Param.WorkDir}}/sfm/text' \
           --plates '{{Param.WorkDir}}/frames' \
           --out '{{Param.WorkDir}}/render' \
           --start "$START" --end "$END"
+    - name: Composite
+      type: TEXT
+      filename: composite.py
+      data: |
+        # Animates a camera from the COLMAP solve, puts the plate behind it,
+        # and renders the 3D objects over it with Arnold.
+        import argparse, math, os, re
+        import maya.standalone
+        maya.standalone.initialize()
+        import maya.cmds as cmds
+        import maya.api.OpenMaya as om
+
+        ap = argparse.ArgumentParser()
+        for a in ("--scene", "--model", "--plates", "--out"):
+            ap.add_argument(a, required=True)
+        ap.add_argument("--start", type=int, required=True)
+        ap.add_argument("--end", type=int, required=True)
+        args = ap.parse_args()
+
+        cmds.file(args.scene, open=True, force=True)
+        cmds.loadPlugin("mtoa", quiet=True)
+
+        # cameras.txt: CAMERA_ID MODEL WIDTH HEIGHT f ... (single camera)
+        with open(os.path.join(args.model, "cameras.txt")) as f:
+            cam_line = next(l for l in f if l.strip() and not l.startswith("#")).split()
+        width, height, focal_px = int(cam_line[2]), int(cam_line[3]), float(cam_line[4])
+
+        # images.txt: IMAGE_ID QW QX QY QZ TX TY TZ CAMERA_ID NAME, then a points line.
+        poses = {}
+        with open(os.path.join(args.model, "images.txt")) as f:
+            lines = [l for l in f if not l.startswith("#")]
+        for line in lines[0::2]:
+            v = line.split()
+            frame = int(re.search(r"(\d+)", v[9]).group(1))
+            poses[frame] = [float(x) for x in v[1:8]]
+
+        cam, cam_shape = cmds.camera(name="solvedCam")
+        aperture_in = 1.417
+        cmds.setAttr(cam_shape + ".horizontalFilmAperture", aperture_in)
+        cmds.setAttr(cam_shape + ".verticalFilmAperture", aperture_in * height / width)
+        cmds.setAttr(cam_shape + ".focalLength", focal_px / width * aperture_in * 25.4)
+
+        for frame, (qw, qx, qy, qz, tx, ty, tz) in sorted(poses.items()):
+            # COLMAP stores world-to-camera; invert, then flip Y and Z for Maya's camera.
+            r = om.MQuaternion(qx, qy, qz, qw).asMatrix().transpose()
+            c = -om.MVector(tx, ty, tz) * r
+            m = om.MTransformationMatrix(om.MMatrix([1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1]) * r)
+            rot = [math.degrees(a) for a in m.rotation()]
+            cmds.setAttr(cam + ".translate", c.x, c.y, c.z)
+            cmds.setAttr(cam + ".rotate", *rot)
+            cmds.setKeyframe(cam, attribute=["translate", "rotate"], time=frame)
+
+        plate = cmds.imagePlane(camera=cam_shape,
+                                fileName=os.path.join(args.plates, "frame_0001.png"))[1]
+        cmds.setAttr(plate + ".useFrameExtension", 1)
+
+        cmds.setAttr("defaultRenderGlobals.currentRenderer", "arnold", type="string")
+        cmds.setAttr("defaultResolution.width", width)
+        cmds.setAttr("defaultResolution.height", height)
+        cmds.setAttr("defaultArnoldDriver.ai_translator", "png", type="string")
+        for frame in range(args.start, args.end + 1):
+            cmds.currentTime(frame)
+            cmds.setAttr("defaultArnoldDriver.prefix",
+                         os.path.join(args.out, "frame_%04d" % frame), type="string")
+            cmds.arnoldRender(camera=cam, width=width, height=height)
 
 - name: EncodeVideo
   dependencies:
