@@ -14,13 +14,23 @@
 #   - Docker, matching environment_templates/docker-env-params.yaml
 # On a Conda queue the Conda entries apply, on a Docker queue the Docker
 # entries apply, and on a queue whose hosts have the software preinstalled
-# neither applies. The Job Template is the same in all three cases.
+# neither applies. The Job Template is the same in all three cases. The
+# entries are independent: a queue should attach one of the two, since with
+# both attached the Conda Environment's onEnter would run inside the Docker
+# container, whose images have no conda.
 #
-# Because each Step supplies different values, the scheduler never puts two
-# of these Steps in the same Session, and each Session installs (or pulls)
-# only one application.
+# The Docker entries also tell the container which host paths to mount (the
+# Job's PATH parameters, path-mapped on the host) and, for SolveSfM, to pass
+# the host's GPUs. The Mounts value is the same for every Step, so it is
+# written once with a YAML anchor (&mounts) and reused (*mounts).
 #
-# To see the Steps and their dependencies:
+# Steps whose values differ never share a Session, so each Session installs
+# (or pulls) only one application. DecodeFrames and EncodeVideo supply equal
+# values for both Environments, so a scheduler may run them in the same
+# Session or reuse a host that already prepared that software.
+#
+# Once ENV_PARAMS is implemented in the openjd tools, see the Steps and their
+# dependencies with:
 #
 #   openjd summary video-sfm-composite.yaml
 #
@@ -41,6 +51,7 @@
 specificationVersion: 'jobtemplate-2023-09'
 extensions:
 - ENV_PARAMS
+- EXPR
 name: "{{Param.JobName}}"
 description: >
   Decode a video to frames, solve camera motion with COLMAP, composite 3D
@@ -97,6 +108,7 @@ steps:
     required: false
     parameters:
       Image: "docker.io/linuxserver/ffmpeg:latest"
+      Mounts: &mounts "{{ [RawParam.InputVideo, RawParam.MayaScene, RawParam.WorkDir, RawParam.OutputVideo] }}"
   script:
     actions:
       onRun:
@@ -123,6 +135,8 @@ steps:
     required: false
     parameters:
       Image: "docker.io/colmap/colmap:latest"
+      Mounts: *mounts
+      Gpus: "all"
   hostRequirements:
     amounts:
     - name: amount.worker.gpu
@@ -161,6 +175,7 @@ steps:
     required: false
     parameters:
       Image: "registry.example.com/studio/maya:2025"
+      Mounts: *mounts
   parameterSpace:
     taskParameterDefinitions:
     - name: StartFrame
@@ -256,9 +271,9 @@ steps:
 - name: EncodeVideo
   dependencies:
   - dependsOn: Composite
-  # Same values as DecodeFrames, so a scheduler may reuse a host whose
-  # Session for DecodeFrames already created this conda environment or
-  # pulled this image.
+  # Same values as DecodeFrames, so a scheduler may run this Step in the
+  # Session that ran DecodeFrames, or reuse a host that already created this
+  # conda environment or pulled this image.
   - environment: Conda
     required: false
     parameters:
@@ -267,6 +282,7 @@ steps:
     required: false
     parameters:
       Image: "docker.io/linuxserver/ffmpeg:latest"
+      Mounts: *mounts
   script:
     actions:
       onRun:
