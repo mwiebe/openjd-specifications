@@ -995,10 +995,22 @@ An `<EnvironmentParameterValue>` is one of:
   of the same type is written: a string, an integer or `<intstring>`, a float or `<floatstring>`, and with the `EXPR`
   extension a boolean or a list.
 * A [Format String](#73-format-strings) resolved when the Job is created. Its available scopes are `RawParam.*` for
-  every Job Parameter, `Param.*` for every Job Parameter not of type PATH or LIST[PATH], and, with the `EXPR` extension,
-  `Job.Name`, `Step.Name`, and the names bound by the Step's `let`. `Task.*`, `Session.*`, and `Env.*` are not
-  available: a value is fixed for the whole Step. With the `EXPR` extension, a value consisting of a single `{{ }}`
-  expression is evaluated with the parameter's type as its target type.
+  every Job Parameter and `Param.*` for every Job Parameter not of type PATH or LIST[PATH], in both cases those defined
+  in the top-level *parameterDefinitions* of the document that contains the entry, with their merged values (see
+  [§1.2.1](#121-merging-environment-template-parameter-definitions)); and, with the `EXPR` extension, `Job.Name`,
+  `Step.Name`, and the names bound by the Step's `let`. `Task.*`, `Session.*`, and `Env.*` are not available: a value
+  is fixed for the whole Step. With the `EXPR` extension, a value consisting of a single `{{ }}` expression is
+  evaluated with the parameter's type as its target type. Any other format string resolves to a string, which is
+  converted to the parameter's type as a submitted Job Parameter value of that type would be, except that a relative
+  path is not joined with any directory (see
+  [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition-extension-env_params)). A list-typed
+  parameter has no string form, so its value must be a list literal or a single `{{ }}` expression.
+
+An entry is part of the document that contains it, and that document's extensions, not the Environment's, decide which
+forms a value may take. Without the `EXPR` extension in the supplying document, a value is a string, integer, or float
+literal or a format string of value references, and the entry cannot supply a parameter whose type requires `EXPR`
+(constraint 6); every Step of that document takes such a parameter's `default`. For example, a Job Template that does
+not list `EXPR` can supply a STRING `Image` to a Docker Environment but not a LIST[PATH] `Mounts`.
 
 A value for a parameter of type PATH or LIST[PATH] is a path in the Job's submission path format; see
 [&lt;EnvironmentParameterDefinition&gt;](#45-environmentparameterdefinition-extension-env_params).
@@ -1014,7 +1026,8 @@ Constraints:
    Environment that declares none, including one from a document that does not list `ENV_PARAMS`, accepts an entry with
    no *parameters* and rejects one with any.
 6. Every value must be valid for the parameter it supplies: of its type, and within its `allowedValues`, `minLength`,
-   `maxLength`, `minValue`, `maxValue`, and `item` constraints.
+   `maxLength`, `minValue`, `maxValue`, and `item` constraints. An entry in a document that does not list `EXPR` must
+   not supply a parameter whose type requires `EXPR` (BOOL or a LIST type).
 7. For every Environment that a Step's Sessions enter, the Step must supply every parameter of that Environment that has
    no `default`. Every Session enters every *jobEnvironments* entry and every attached Environment, so such a parameter
    must be supplied by every Step of the Job.
@@ -1035,7 +1048,10 @@ When a Job is created from a Job Template and one or more Environment Templates,
 *jobEnvironments* entry of the Job Template is resolved against the attached Environment Templates:
 
 1. If exactly one attached Environment Template's `environment` has the entry's name, the entry refers to it, and
-   constraints 5 and 6 are checked against that Environment's *parameterDefinitions*.
+   constraints 5 and 6 are checked against that Environment's *parameterDefinitions*. This applies whatever *required*
+   says: `required: false` tolerates a missing Environment, not one that lacks a parameter the entry supplies. An entry
+   that supplies parameters to an attached Environment that declares none, such as one from an Environment Template
+   written before `ENV_PARAMS`, causes the submission to be rejected, naming the entry and the parameter.
 2. If none does, then with `required: true` the submission must be rejected, naming the entry and the missing
    Environment; with `required: false` the entry is ignored.
 3. If two or more do, the submission must be rejected, naming the entry and the ambiguous name.
@@ -1894,7 +1910,9 @@ differences:
    their merged values (see [§1.2.1](#121-merging-environment-template-parameter-definitions)). With the `EXPR`
    extension, a `default` consisting of a single `{{ }}` expression is evaluated with the parameter's type as its
    target type; otherwise the resolved string is converted to the parameter's type as a submitted Job Parameter value
-   of that type would be. A literal `default` is written as for a `<JobParameterDefinition>` of the same type.
+   of that type would be, except that a relative path is not joined with any directory (see below). A list-typed
+   parameter has no string form, so a list `default` that is not a literal must be a single `{{ }}` expression. A
+   literal `default` is written as for a `<JobParameterDefinition>` of the same type.
 5. *allowedValues*, *minLength*, *maxLength*, *minValue*, *maxValue*, and *item* — As for the
    `<JobParameterDefinition>` of the same type. They constrain every effective value, whether supplied by a Step or
    taken from the resolved `default`.
@@ -2250,7 +2268,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Task.RawParam.<ParamName>`|Values of task parameters are available within the `Task.Param` object.|Available within the Step Script Actions and Embedded Files.|
 |`Task.File.<name>`|The filesystem location to which the Task Embedded File with key `<name>` has been written.| Available within the Step Script Actions and Embedded Files.|
 |`Env.File.<name>`|The filesystem location to which the Environment Attachment with key `<name>` has been written.|Available within the Environment Script Actions and Embedded Files.|
-|`Env.Param.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment: the effective value for every Step whose Tasks the Session runs, which are equal (see [§3.2.2](#322-effective-environment-parameter-values)). The same as `Env.RawParam.<ParamName>` except for type PATH, where path mapping rules are applied. Requires the `ENV_PARAMS` extension.|Available within the Environment that declares the parameter: its `variables`, and its Script's `let`, Actions, and Embedded Files. Not available in any other Environment or in a Step.|
+|`Env.Param.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment: the effective value for every Step whose Tasks the Session runs, which are equal (see [§3.2.2](#322-effective-environment-parameter-values)). The same as `Env.RawParam.<ParamName>` except for types PATH and LIST[PATH], where path mapping rules are applied. Requires the `ENV_PARAMS` extension.|Available within the Environment that declares the parameter: its `variables`, and its Script's `let`, Actions, and Embedded Files. Not available in any other Environment or in a Step.|
 |`Env.RawParam.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment, with no path mapping applied. Requires the `ENV_PARAMS` extension.|As for `Env.Param.<ParamName>`.|
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Job.Name`|The resolved name of the Job. This is a `string` type. Requires the `EXPR` extension.|Available in every Format String in the Job Template, except the `name` field of the Job Template itself.|

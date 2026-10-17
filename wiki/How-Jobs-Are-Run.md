@@ -94,9 +94,11 @@ to a Job Parameter. An `environment:` entry can name one of the Job's own Job En
 the render management system attaches from an Environment Template; the latter is matched by name when the Job is
 created. If the entry says `required: false` and nothing of that name is attached, the entry has no effect and the
 Step's **Sessions** run without that **Environment**. If it says `required: true` (the default), the submission is
-rejected. The entries are independent of one another: if the render management system attaches several of the
-**Environments** a Step names, the Step's **Sessions** enter each of them with the values its own entry supplies. The
-entries do not change which **Environments** a **Session** enters, or their order.
+rejected. If something of that name is attached but does not declare a parameter the entry supplies, for example an
+**Environment** written before the extension, the submission is rejected whatever `required` says. The entries are
+independent of one another: if the render management system attaches several of the **Environments** a Step names,
+the Step's **Sessions** enter each of them with the values its own entry supplies. The entries do not change which
+**Environments** a **Session** enters, or their order.
 
 A **Session** enters each **Environment** once, with one set of parameter values, and keeps those values until it
 exits the **Environment**: the **Environment**'s `onEnter`, every Task the **Session** runs, and the **Environment**'s

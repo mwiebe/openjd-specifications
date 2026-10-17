@@ -22,8 +22,9 @@ the Step requires it (`required`, default `true`), and gives the values (`parame
 Environment may be one of the Job Template's own `jobEnvironments` or one attached by the scheduler
 from an Environment Template. Each Step's values are fixed when the Job is created. A Session enters
 each Environment once, with one set of values, and runs Tasks of any Step whose values match them,
-so a scheduler can group Sessions by those values. A multi-application Job can then install, or pull a container image for, only the software
-each Step needs, and the same Job Template still runs on a queue that attaches no such Environment.
+so a scheduler can group Sessions by those values. A multi-application Job can then install, or
+pull a container image for, only the software each Step needs, and the same Job Template still runs
+on a queue that attaches no such Environment.
 
 ## Basic Examples
 
@@ -116,6 +117,13 @@ runs unchanged. The complete pipeline, with both Environment Templates, is in
 [`samples/v2023-09`](../samples/v2023-09); there the Docker entries also name the host paths to
 mount in the container and, for `SolveSfM`, request the host's GPUs.
 
+`required: false` covers a queue that attaches no Environment of the name. It does not cover a
+queue whose `Conda` Environment declares no `Packages` parameter, such as an Environment Template
+written before this extension: there the entry resolves, it supplies a parameter the Environment
+does not have, and the submission is rejected, naming the entry. See
+[Backward compatibility](#backward-compatibility) for how a queue administrator migrates such an
+Environment.
+
 ### One parameterized Job Environment serving several Steps
 
 An `environment:` entry can name a Job Environment of the same template, so one Environment
@@ -203,9 +211,11 @@ in every Session of the Job. The Job's author has three options, none good:
 
 A Step Environment cannot help, because it has no way to ask an Environment the queue attached to do
 anything differently. The Job Template could stop relying on the queue and install software in its own
-Step Environments, but then it hard-codes one provisioning mechanism, and the
-[Design Tenets](https://github.com/OpenJobDescription/openjd-specifications/wiki/Design-Tenets) ask that
-a Job Template run unmodified with a Conda, Rez, Docker, or Apptainer Environment supplying its software.
+Step Environments, but then it hard-codes one provisioning mechanism. That works against the Portable
+[Design Tenet](https://github.com/OpenJobDescription/openjd-specifications/wiki/Design-Tenets), which asks
+that jobs be portable to many different systems and usable with the technology stack of their choice:
+applied here, the same Job Template should run whether a Conda, Rez, Docker, or Apptainer Environment
+supplies its software.
 
 With this RFC, each Step states what it needs from each kind of provisioning Environment it may meet,
 and the queue's Environment does exactly that for each Step's Sessions.
@@ -259,6 +269,17 @@ This RFC is additive and gated by the `ENV_PARAMS` extension name declared under
   `ENV_PARAMS` runs with a Job Template that does: the Job Template's `environment:` entries that name
   it find no parameters to set, which is an error only if they supply any (see
   [`<StepDependency>`](#32-stepdependency) constraint 5).
+- A queue Environment written before this extension under a [recommended name](#recommended-names-non-normative)
+  rejects Job Templates that supply its recommended parameters, even with `required: false`, because
+  the entry resolves to an Environment that lacks them ([§3.2.1](#321-resolving-external-environments)
+  item 1). Deadline Cloud's console Conda queue environment is such a case today: it is named `Conda`
+  and takes `CondaPackages` and `CondaChannels` as Job Parameters only, so it rejects the pipeline
+  sample. The remedy is for the queue administrator to add `ENV_PARAMS` and the recommended
+  `parameterDefinitions`, with defaults that read the existing Job Parameters, as
+  `conda-env-params.yaml` does. That change is itself backward compatible: Job Templates that do not
+  supply the parameters see the same job-wide values as before. The rejection names the entry and the
+  parameter, so a submitter can see which queue Environment needs updating. The rationale is in
+  [An Environment without the supplied parameter is an error](#an-environment-without-the-supplied-parameter-is-an-error).
 - No existing field changes meaning. A Job with no `environment:` entries and no Environment
   `parameterDefinitions` behaves exactly as today, including how Sessions are shared between Steps.
   A Job Template that lists `ENV_PARAMS` but no `environment:` entries, run with an Environment
@@ -380,7 +401,9 @@ differences:
    their merged values (see [§1.2.1](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#121-merging-environment-template-parameter-definitions)). With the `EXPR`
    extension, a `default` consisting of a single `{{ }}` expression is evaluated with the parameter's type as its
    target type; otherwise the resolved string is converted to the parameter's type as a submitted Job Parameter value
-   of that type would be. A literal `default` is written as for a `<JobParameterDefinition>` of the same type.
+   of that type would be, except that a relative path is not joined with any directory (see below). A list-typed
+   parameter has no string form, so a list `default` that is not a literal must be a single `{{ }}` expression. A
+   literal `default` is written as for a `<JobParameterDefinition>` of the same type.
 5. *allowedValues*, *minLength*, *maxLength*, *minValue*, *maxValue*, and *item* — As for the
    `<JobParameterDefinition>` of the same type. They constrain every effective value, whether supplied by a Step or
    taken from the resolved `default`.
@@ -539,10 +562,22 @@ An `<EnvironmentParameterValue>` is one of:
   of the same type is written: a string, an integer or `<intstring>`, a float or `<floatstring>`, and with the `EXPR`
   extension a boolean or a list.
 * A [Format String](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#73-format-strings) resolved when the Job is created. Its available scopes are `RawParam.*` for
-  every Job Parameter, `Param.*` for every Job Parameter not of type PATH or LIST[PATH], and, with the `EXPR` extension,
-  `Job.Name`, `Step.Name`, and the names bound by the Step's `let`. `Task.*`, `Session.*`, and `Env.*` are not
-  available: a value is fixed for the whole Step. With the `EXPR` extension, a value consisting of a single `{{ }}`
-  expression is evaluated with the parameter's type as its target type.
+  every Job Parameter and `Param.*` for every Job Parameter not of type PATH or LIST[PATH], in both cases those defined
+  in the top-level *parameterDefinitions* of the document that contains the entry, with their merged values (see
+  [§1.2.1](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#121-merging-environment-template-parameter-definitions)); and, with the `EXPR` extension, `Job.Name`,
+  `Step.Name`, and the names bound by the Step's `let`. `Task.*`, `Session.*`, and `Env.*` are not available: a value
+  is fixed for the whole Step. With the `EXPR` extension, a value consisting of a single `{{ }}` expression is
+  evaluated with the parameter's type as its target type. Any other format string resolves to a string, which is
+  converted to the parameter's type as a submitted Job Parameter value of that type would be, except that a relative
+  path is not joined with any directory (see
+  [&lt;EnvironmentParameterDefinition&gt;](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#45-environmentparameterdefinition-extension-env_params)). A list-typed
+  parameter has no string form, so its value must be a list literal or a single `{{ }}` expression.
+
+An entry is part of the document that contains it, and that document's extensions, not the Environment's, decide which
+forms a value may take. Without the `EXPR` extension in the supplying document, a value is a string, integer, or float
+literal or a format string of value references, and the entry cannot supply a parameter whose type requires `EXPR`
+(constraint 6); every Step of that document takes such a parameter's `default`. For example, a Job Template that does
+not list `EXPR` can supply a STRING `Image` to a Docker Environment but not a LIST[PATH] `Mounts`.
 
 A value for a parameter of type PATH or LIST[PATH] is a path in the Job's submission path format; see
 [&lt;EnvironmentParameterDefinition&gt;](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#45-environmentparameterdefinition-extension-env_params).
@@ -558,7 +593,8 @@ Constraints:
    Environment that declares none, including one from a document that does not list `ENV_PARAMS`, accepts an entry with
    no *parameters* and rejects one with any.
 6. Every value must be valid for the parameter it supplies: of its type, and within its `allowedValues`, `minLength`,
-   `maxLength`, `minValue`, `maxValue`, and `item` constraints.
+   `maxLength`, `minValue`, `maxValue`, and `item` constraints. An entry in a document that does not list `EXPR` must
+   not supply a parameter whose type requires `EXPR` (BOOL or a LIST type).
 7. For every Environment that a Step's Sessions enter, the Step must supply every parameter of that Environment that has
    no `default`. Every Session enters every *jobEnvironments* entry and every attached Environment, so such a parameter
    must be supplied by every Step of the Job.
@@ -579,7 +615,10 @@ When a Job is created from a Job Template and one or more Environment Templates,
 *jobEnvironments* entry of the Job Template is resolved against the attached Environment Templates:
 
 1. If exactly one attached Environment Template's `environment` has the entry's name, the entry refers to it, and
-   constraints 5 and 6 are checked against that Environment's *parameterDefinitions*.
+   constraints 5 and 6 are checked against that Environment's *parameterDefinitions*. This applies whatever *required*
+   says: `required: false` tolerates a missing Environment, not one that lacks a parameter the entry supplies. An entry
+   that supplies parameters to an attached Environment that declares none, such as one from an Environment Template
+   written before `ENV_PARAMS`, causes the submission to be rejected, naming the entry and the parameter.
 2. If none does, then with `required: true` the submission must be rejected, naming the entry and the missing
    Environment; with `required: false` the entry is ignored.
 3. If two or more do, the submission must be rejected, naming the entry and the ambiguous name.
@@ -652,17 +691,27 @@ RFC 0009 adds `service:` entries to `<StepDependency>`, `dependencies` to `<Serv
 6. **Supplying entities.** Wherever ENV_PARAMS says "Step" for the entity that supplies values (constraints 5–7, §3.2.1,
    §3.2.2), read "Step or Service". A Service's *parameters* values may use `RawParam.*`, `Param.*` (not PATH or
    LIST[PATH]), `Job.Name`, and the Service's own `let` bindings; `Step.Name` is not available. A Service Session's
-   Environment parameter values are the Service's effective values.
+   Environment parameter values are the Service's effective values. SERVICE's §3.6.2 row for `<Service>.let` gains
+   "and with `ENV_PARAMS` the *parameters* values of *dependencies* entries" in its Bound Names Available In column,
+   as the `<StepTemplate>.let` row does.
 7. **Which Sessions enter which Environments.** A Service Session enters exactly the *jobEnvironments* whose `runScope`
    includes `SERVICE`, and the combined Job's *jobEnvironments* include the attached Environments. An attached
    Environment in a document that does not declare `SERVICE` has the default `runScope` of every kind of Session, so
    every Service Session enters it. Constraint 7 then applies to every Service of the Job for each such Environment's
-   parameters that have no `default`.
+   parameters that have no `default`. On the Step side, the second sentence of constraint 7 reads: "Every Task
+   Session enters each *jobEnvironments* entry and each attached Environment whose `runScope` includes `TASK`, so such
+   a parameter of such an Environment must be supplied by every Step of the Job." The last paragraph of §3.2.1 is
+   qualified the same way.
 8. **`runScope` checks.** An *environment* entry on a Service that names an Environment whose `runScope` excludes
    `SERVICE` is an error, because the Service's Sessions never enter it. For an entry that names a *jobEnvironments*
    entry this is checked at template validation; for an entry that resolves to an external Environment it is checked
    when the Job is created, after resolution. The same rule, with `TASK`, applies to a Step's entry naming an
    Environment whose `runScope` excludes `TASK`.
+9. **Checks over the combined Job.** SERVICE §1.2.2 ends "Items 2 and 4 are the only checks that require the combined
+   Job". With `ENV_PARAMS` that sentence reads "Items 2 and 4, and the `ENV_PARAMS` checks of
+   [§3.2.1](#321-resolving-external-environments) (resolving *environment* entries, and constraints 5–7 and the
+   `runScope` check of item 8 for entries that resolve to attached Environments), are the only checks that require the
+   combined Job".
 
 A Job Environment entered by Service Sessions that has a parameter without a `default` must be supplied by every
 Service as well as every Step. When only Steps are meant to supply the parameter, give the Environment
@@ -674,7 +723,7 @@ Service as well as every Step. When only Steps are meant to supply the parameter
 
 ```diff
   |`Env.File.<name>`|...|Available within the Environment Script Actions and Embedded Files.|
-+ |`Env.Param.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment: the effective value for every Step whose Tasks the Session runs, which are equal (see [§3.2.2](#322-effective-environment-parameter-values)). The same as `Env.RawParam.<ParamName>` except for type PATH, where path mapping rules are applied. Requires the `ENV_PARAMS` extension.|Available within the Environment that declares the parameter: its `variables`, and its Script's `let`, Actions, and Embedded Files. Not available in any other Environment or in a Step.|
++ |`Env.Param.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment: the effective value for every Step whose Tasks the Session runs, which are equal (see [§3.2.2](#322-effective-environment-parameter-values)). The same as `Env.RawParam.<ParamName>` except for types PATH and LIST[PATH], where path mapping rules are applied. Requires the `ENV_PARAMS` extension.|Available within the Environment that declares the parameter: its `variables`, and its Script's `let`, Actions, and Embedded Files. Not available in any other Environment or in a Step.|
 + |`Env.RawParam.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment, with no path mapping applied. Requires the `ENV_PARAMS` extension.|As for `Env.Param.<ParamName>`.|
 ```
 
@@ -694,6 +743,24 @@ parameters through `Env.Param.*`; an inner Environment's parameters are not visi
   into each Step's effective values and checked.
 * **Task execution** — `Env.Param.*` is available in the Environment's host-evaluated format strings, with path mapping
   applied to PATH and LIST[PATH] values.
+
+### Modifications to the Expression Language
+
+> A modification to [`1.2.2. Built-in Symbol Types`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2026-02-Expression-Language#122-built-in-symbol-types)
+> of the Expression Language, after *Embedded File Symbols*.
+
+```diff
++ ##### Environment Parameter Symbols
++
++ With the `ENV_PARAMS` extension, an Environment that declares *parameterDefinitions* (see
++ [Template Schemas](2023-09-Template-Schemas#45-environmentparameterdefinition-extension-env_params)) can read their
++ values within that Environment only:
++
++ | Symbol | Type | Description |
++ |--------|------|-------------|
++ | `Env.Param.<name>` | The `Param.<name>` type of the parameter's type in the Job Parameter table above | The value with which the Session entered the Environment, with path mapping applied to PATH and LIST[PATH] |
++ | `Env.RawParam.<name>` | The `RawParam.<name>` type of the parameter's type in the Job Parameter table above | The same value with no path mapping applied |
+```
 
 ### Modifications to How Jobs Are Run
 
@@ -722,9 +789,11 @@ And a new section, *Environment Parameters*, after *Running a Session*:
 > the render management system attaches from an Environment Template; the latter is matched by name when the Job is
 > created. If the entry says `required: false` and nothing of that name is attached, the entry has no effect and the
 > Step's **Sessions** run without that **Environment**. If it says `required: true` (the default), the submission is
-> rejected. The entries are independent of one another: if the render management system attaches several of the
-> **Environments** a Step names, the Step's **Sessions** enter each of them with the values its own entry supplies. The
-> entries do not change which **Environments** a **Session** enters, or their order.
+> rejected. If something of that name is attached but does not declare a parameter the entry supplies, for example an
+> **Environment** written before the extension, the submission is rejected whatever `required` says. The entries are
+> independent of one another: if the render management system attaches several of the **Environments** a Step names,
+> the Step's **Sessions** enter each of them with the values its own entry supplies. The entries do not change which
+> **Environments** a **Session** enters, or their order.
 >
 > A **Session** enters each **Environment** once, with one set of parameter values, and keeps those values until it
 > exits the **Environment**: the **Environment**'s `onEnter`, every Task the **Session** runs, and the **Environment**'s
@@ -762,6 +831,11 @@ that Deadline Cloud's sample queue environments already use, so existing Job Tem
 
 When this RFC is accepted, the table can become a wiki conventions page that queues and Job Template authors refer to.
 
+An Environment Template that adopts a recommended Environment name should declare that name's recommended parameters,
+because Job Templates that follow the table supply them, and an Environment that lacks a supplied parameter rejects the
+submission (see [Backward compatibility](#backward-compatibility)). This matters most for `Conda`, the name Deadline
+Cloud's existing Conda queue environments already use without parameters.
+
 ### Validation
 
 Every rule this extension adds, by the stage that checks it. Constraint numbers refer to
@@ -780,7 +854,9 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 | Keys and literal values of *parameters* for a *jobEnvironments* entry (constraints 5, 6) | Template validation |
 | Every *jobEnvironments* parameter without a `default` supplied by every Step (constraint 7) | Template validation |
 | External name resolution: missing with `required: true`, or ambiguous (§3.2.1) | Job creation |
-| Keys and values for an external Environment; resolved format-string values (constraints 5, 6) | Job creation |
+| Keys and values for an external Environment; resolved format-string values (constraints 5, 6). A key the resolved Environment does not declare is an error even with `required: false` (§3.2.1 item 1) | Job creation |
+| A document that does not list `EXPR` supplies no parameter of type BOOL or a LIST type (constraint 6) | Template validation for *jobEnvironments*; job creation for external Environments |
+| A format-string value or `default` for a list-typed parameter is a single `{{ }}` expression (§3.2, §4.5) | Template validation for `default`s and *jobEnvironments* entries; job creation for external Environments |
 | A resolved, non-literal `default` satisfies its parameter's type and constraints, for each Step that takes it (§4.5) | Job creation |
 | PATH and LIST[PATH] values absolute in the submission path format, or URIs; their string constraints, against the unmapped value (§4.5) | Job creation |
 | Required parameters of attached Environments supplied by every Step of the combined Job (constraint 7, §3.2.1) | Job creation |
@@ -834,6 +910,23 @@ undeclared choice is that the Step needs what it named. A Job Template that targ
 queue writes `required: false` on each alternative, which states in the template that the Job runs
 without them. The opposite default would let a typo in an Environment name silently do nothing.
 
+### An Environment without the supplied parameter is an error
+
+`required: false` makes an absent Environment acceptable. It does not make an entry that supplies
+a parameter the resolved Environment lacks acceptable, and this RFC rejects the submission in that
+case. The case arises in practice during migration: a queue's `Conda` Environment written before
+this extension has the recommended name but no `Packages` parameter.
+
+The alternative is to ignore such an entry, perhaps with a warning. On that queue the Job would
+then run every Step's Sessions with the job-wide `CondaPackages`, which a Job Template written for
+per-Step values usually leaves empty, and each Step would fail inside its Tasks for want of its
+software, after Worker Hosts had been provisioned and Sessions started. Rejecting the submission
+fails before anything runs, with an error naming the entry and the parameter, and the fix belongs
+to the queue administrator, who adds the parameters with defaults that keep existing Job Templates
+working. An Environment of the same name that does not understand the request is also not the
+Environment the Job Template asked for; treating it as present but ignoring what the Step asked of
+it would make the name mean two things.
+
 ### Names resolve to the Job Template first
 
 An `environment:` entry is checkable at template validation whenever it names one of the template's
@@ -858,8 +951,13 @@ The difference is acceptable here for three reasons:
 2. The motivating use is `required: false` entries for Environments that a given queue may not attach
    at all. A declaration would be a second place to write the same name, add no information, and
    still could not be checked without the queue.
-3. Every mistake an implicit name allows is caught at job creation, with an error that names the entry:
-   a misspelled name with `required: true`, an unknown key, or a value of the wrong type.
+3. Every mistake an implicit name allows in a `required: true` entry is caught at job creation, with
+   an error that names the entry: a misspelled name, an unknown key, or a value of the wrong type. A
+   `required: false` entry is different: a misspelled name resolves to nothing on every queue and the
+   entry is silently ignored, which is the cost of letting the same Job Template run where the
+   Environment is absent. A validator given the queue's Environment Templates should warn when a
+   `required: false` entry resolves to no Environment, so that the mistake is visible before
+   submission.
 
 What a template validator does with an external entry is specified in
 [`<StepDependency>`](#32-stepdependency): it checks constraints 1–4 and 8 and the form of literal values.
@@ -907,6 +1005,24 @@ the Job, which is what lets a scheduler compare them to group Sessions and cache
 that depended on `Session.*` or host state would be different on every host, and the grouping would
 be meaningless. Path mapping is the one host-side step, and it applies to `PATH` values as it does to
 `PATH` Job Parameters.
+
+The same reason excludes `Param.<name>` of a PATH or LIST[PATH] Job Parameter from values and
+defaults, although §7.3.1 allows it elsewhere in an Environment. `Param.<name>` of a path is the
+host-mapped value, which does not exist until a Worker Host applies its path mapping rules. A value
+or default reads the unmapped `RawParam.<name>`, and the Environment's own `Env.Param.<name>`
+applies the mapping on the host.
+
+### Values follow the supplying document's extensions
+
+An `environment:` entry is written in the supplying document, so that document's `EXPR`
+extension, not the Environment's, decides whether the entry may use list and boolean literals or
+expressions. Reading the Environment's extensions instead would make the syntax a Job Template may
+use depend on which queue it is submitted to, and a template validator could not check it. The
+consequence is that a Job Template without `EXPR` cannot supply a parameter whose type requires
+`EXPR`, such as the Docker sample's LIST[PATH] `Mounts`; its Steps take that parameter's `default`.
+A format string that is not a single expression is converted as a submitted Job Parameter value of
+the parameter's type would be, which is the rule a `default` already follows, so an INT supplied
+as `"{{Param.SeatCount}}"` is the same INT as one supplied as a literal.
 
 ### Path values use the submission path format
 

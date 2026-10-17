@@ -855,6 +855,17 @@ representation of frame ranges. Use `list(Task.Param.Frame)` to convert to a lis
 | `Task.File.<name>` | `path` | Location of the embedded file within a Step Script |
 | `Env.File.<name>` | `path` | Location of the embedded file within an Environment |
 
+##### Environment Parameter Symbols
+
+With the `ENV_PARAMS` extension, an Environment that declares *parameterDefinitions* (see
+[Template Schemas](2023-09-Template-Schemas#45-environmentparameterdefinition-extension-env_params)) can read their
+values within that Environment only:
+
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `Env.Param.<name>` | The `Param.<name>` type of the parameter's type in the Job Parameter table above | The value with which the Session entered the Environment, with path mapping applied to PATH and LIST[PATH] |
+| `Env.RawParam.<name>` | The `RawParam.<name>` type of the parameter's type in the Job Parameter table above | The same value with no path mapping applied |
+
 #### 1.2.3. Implicit Type Coercion
 
 As a glue expression language intended for convenience, implicit non-destructive type
