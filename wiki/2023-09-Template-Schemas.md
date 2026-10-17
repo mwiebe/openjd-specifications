@@ -54,7 +54,8 @@ Where:
          [REDACTED_ENV_VARS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0003-redacted-env-vars.md),
          [FEATURE_BUNDLE_1](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0004-enhanced-limits-and-capabilities.md),
          [EXPR](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0005-expression-language.md),
-         [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md)
+         [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md),
+         [ENV_PARAMS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/NNNN-environment-parameters.md)
 4. *name* — The name to give to a Job that is created from the template. See: [&lt;JobName&gt;](#111-jobname).
 5. *description* — A description to apply to all Jobs that are created from the template. It has no functional purpose,
    but may appear in UI elements. See: [&lt;Description&gt;](#72-description).
@@ -91,12 +92,18 @@ A literal string matching the following character regex: `[A-Z_0-9]{3,128}`.
 
 ```yaml
 specificationVersion: environment-2023-09
+$schema: <string> # @optional
+extensions: [ <ExtensionName>, ... ] # @optional
 parameterDefinitions: [ <JobParameterDefinition>, ... ] # @optional
 environment: <Environment>
 ```
 
 1. *specificationVersion* — A literal that identifies the document as adhering to this schema.
-2. *parameterDefinitions* — A list of the Job Parameters that are available within the Environment Template. Values
+2. *$schema* — Ignored. This property is allowed for compatibility with JSON-editing IDEs.
+3. *extensions* — If provided, is a non-empty list of extensions that this document uses, with the same available
+   names as the Job Template. An extension listed here applies to the content of this document only; a Job Template
+   does not need to list the extensions used by the Environment Templates a scheduler applies to it, and vice versa.
+4. *parameterDefinitions* — A list of the Job Parameters that are available within the Environment Template. Values
    for Job Parameters are defined when submitting a Job Template to create a Job to a render management system.
    Both the Job Template and Environment Template(s) for a submission are allowed to contain definitions for the same
    job parameter name, but the submission must be rejected if any of the definitions of the same job parameter name
@@ -106,7 +113,7 @@ environment: <Environment>
    See: [&lt;JobParameterDefinition&gt;](#2-jobparameterdefinition).
       * Minimum number of elements: If provided, then this list must contain at least one element.
       * Maximum number of elements: The list must not contain more than 50 elements.
-3. *environment* — The definition of the Environment that the Environment Template defines.
+5. *environment* — The definition of the Environment that the Environment Template defines.
    See [&lt;Environment&gt;](#4-environment).
 
 #### 1.2.1. Merging Environment Template Parameter Definitions
@@ -129,6 +136,13 @@ or submission, and the Job Template is always processed last. The exception to t
 Job Parameter Definition; the default value for a job parameter is always the last `default` value defined in the template
 processing order. The merged job parameter definition that results from this process must be internally consistent to be considered
 valid -- for example, the value of the `default` property must adhere to the constraints in the definition.
+
+This merge applies to the top-level `parameterDefinitions` of each template only. The `parameterDefinitions` of an
+[&lt;Environment&gt;](#4-environment) (`@extension ENV_PARAMS`) are never merged: each Environment's parameters are a
+namespace of their own, even when two Environments, or an Environment and a Job Parameter, use the same name. An
+Environment parameter's `default` that references `Param.<name>` or `RawParam.<name>` reads the merged Job Parameter's
+value, so a Job Template that redefines a Job Parameter's `default` changes the default of every Environment parameter
+that refers to it.
 
 ## 2. `<JobParameterDefinition>`
 
