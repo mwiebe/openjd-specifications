@@ -592,3 +592,165 @@ And a new subsection, *Environment Parameters*:
 > An `environment:` entry with `required: false` names an Environment the Job can run without. If
 > the scheduler attaches no Environment of that name, the entry has no effect, and the Step's
 > Sessions run without it.
+
+### Validation
+
+Every rule this extension adds, by the stage that checks it.
+
+| Rule | Checked at |
+|------|-----------|
+| `ENV_PARAMS` listed by any document that uses Environment `parameterDefinitions` or `environment:` entries | Template validation |
+| Environment `parameterDefinitions`: 1–50 entries, unique names, not on `stepEnvironments`, permitted types and fields | Template validation |
+| `default` references only `Param.*` / `RawParam.*` of the same document's Job Parameters | Template validation |
+| `Env.Param.*` / `Env.RawParam.*` name a parameter of the enclosing Environment, and appear only inside it | Template validation |
+| `<StepDependency>` has exactly one of `dependsOn` / `service` / `environment`; `required` and `parameters` only with `environment` | Template validation |
+| `environment:` not on an Environment's `dependencies`; does not name the Step's own `stepEnvironments` entry; no duplicates per list | Template validation |
+| Keys and literal values of `parameters` for a `jobEnvironments` entry (constraints 6, 7) | Template validation |
+| Every `jobEnvironments` parameter without a `default` supplied by every Step (and Service entering it) | Template validation |
+| External name resolution: missing with `required: true`, or ambiguous | Job creation |
+| Keys and values for an external Environment; resolved format-string values; resolved defaults; relative `PATH` values | Job creation |
+| Required parameters of attached Environments supplied over the combined Job | Job creation |
+
+## Design Choice Rationale
+
+### Parameters declared on the Environment
+
+The Environment is the only entity that knows what it can be told. Declaring the parameters there
+gives each one a type, constraints, and a default in the place they are used, and lets a template
+validator check every `Env.Param.*` reference and every supplied value against a definition, exactly
+as it checks `Param.*` against Job Parameters. Reusing the `<JobParameterDefinition>` shapes means
+there is nothing new to learn: an Environment parameter is a Job Parameter with a narrower audience.
+The fields that do not apply (`userInterface`, `objectType`, `dataFlow`) are the ones that describe a
+submitter or a Job's data flow, neither of which an Environment parameter has.
+
+### A `default` that refers to a Job Parameter
+
+Queue Environments already take their configuration from Job Parameters, and existing Job Templates
+set those parameters. Letting `default: "{{Param.CondaPackages}}"` read the Job Parameter keeps every
+such Job Template working with no change: a Step that says nothing gets the job-wide value, which is
+today's behavior. It also gives the submitter a way to override the job-wide value at submission,
+through the Job Parameter, while Steps that know better override it per Step. Allowing only
+`Param.*` and `RawParam.*` of the same document keeps a default resolvable at job creation and
+checkable without knowledge of other documents; §1.2.1 merging then decides the Job Parameter's
+value, so the Job Template's own `default` for `CondaPackages` flows into the queue Environment as it
+does today.
+
+### The `environment:` form of `<StepDependency>`
+
+A Step that needs an Environment configured a certain way depends on it, and `dependencies` is where a
+Step says what it depends on. RFC 0009 adds `service:` there for the same reason, and the two forms
+read alike: one list, one key per kind of thing depended on. Putting the values beside the name
+(`environment: Conda`, `parameters: {...}`) groups everything a Step says about one Environment in one
+entry, and the Environment's name is the key that makes the values unambiguous when a Step meets
+several Environments that use the same parameter name (see
+[Rejected Ideas](#a-flat-per-step-map-of-values)).
+
+An `environment:` entry does not delay scheduling the way `dependsOn:` and `service:` do. It is still
+a dependency: with `required: true` the Step cannot run without the Environment, and the scheduler
+rejects the submission rather than run it on a queue that lacks it.
+
+### `required` defaults to `true`
+
+Listing something in `dependencies` declares a dependency on it, and the safe reading of an
+undeclared choice is that the Step needs what it named. A Job Template that targets several kinds of
+queue writes `required: false` on each alternative, which states in the template that the Job runs
+without them. The opposite default would let a typo in an Environment name silently do nothing.
+
+### Names resolve to the Job Template first
+
+An `environment:` entry is checkable at template validation whenever it names one of the template's
+own `jobEnvironments`, which is the case a template author controls completely. Resolving the
+template's own names first means an attached Environment can never change what such an entry refers
+to. An external name cannot be checked until job creation, since the template cannot know what a queue
+attaches; resolving it then, and rejecting ambiguity rather than guessing, matches how RFC 0009 matches
+`externalServices`.
+
+### Values fixed per Step
+
+An Environment is entered once per Session and serves every Task of that Session, and a Session runs
+Tasks of one Step. Values that varied per Task would force one Session per Task, which defeats the
+Environment's purpose. Values fixed per Step are known at job creation, so tooling can display them, a
+scheduler can group Sessions by them, and two Steps with equal values can still share Sessions as
+today.
+
+### Values resolved at job creation
+
+`parameters` values and defaults see only the Job Parameters (and, with `EXPR`, the Step's `let`
+bindings and names), all known at job creation. That makes the effective values a static property of
+the Job, which is what lets a scheduler compare them to group Sessions and cache environments. Values
+that depended on `Session.*` or host state would be different on every host, and the grouping would
+be meaningless. Path mapping is the one host-side step, and it applies to `PATH` values as it does to
+`PATH` Job Parameters.
+
+### Environment parameters are not merged with Job Parameters
+
+§1.2.1 merges same-named Job Parameters because a Job has one value per Job Parameter name. An
+Environment's parameters are a per-Environment namespace with one value per Step; merging a queue
+Conda Environment's `Packages` with a Job Environment's `Packages` would make two independent
+Environments share an input they never agreed to share. The names are therefore scoped to the
+Environment, and the only link to Job Parameters is the explicit one a `default` writes.
+
+### Not on Step Environments
+
+A Step Environment is entered only by its own Step's Sessions, and its Step writes its actions. The
+Step can write any value directly in the Environment, or use a Step `let` binding, so a parameter
+block there would add a second way to say the same thing.
+
+### `LIST[PATH]` and `RANGE_EXPR` excluded
+
+`LIST[PATH]` defaults are relative paths joined with the template directory (§2.12), which has no
+meaning for an Environment parameter, and a list of paths whose mapping happens per element is a large
+surface for a narrow need; a `LIST[STRING]` of `RawParam` values covers it. `RANGE_EXPR` describes a
+parameter space, which belongs to a Step. Either can be added later without changing anything here.
+
+### Required parameters are allowed
+
+A parameter without a `default` makes the Environment useless unless each Step configures it, which is
+the right contract for a Job Environment like `RenderLicense` whose author wants every Step to say
+which product it uses. For an Environment Template the same rule would break every Job Template that
+does not know the parameter, so this RFC states the consequence and leaves the choice to the queue
+administrator, who normally gives every parameter a default.
+
+### No extension dependency on `EXPR`
+
+The core of the feature, string and numeric values passed to a provisioning script, needs nothing from
+the expression language. Requiring `EXPR` would keep this feature from schedulers and templates that
+have not adopted it. With `EXPR`, list and boolean parameters and typed expression defaults become
+available, as they do for Job Parameters.
+
+## Prior Art
+
+* **Nextflow** — Every `process` can carry its own `conda`, `container`, `module`, and `spack`
+  directives, and a pipeline's configuration selects which of them is honored with
+  `conda.enabled = true` or `docker.enabled = true`. The same pipeline thus runs with Conda,
+  Docker, Singularity, or preinstalled software, and each process gets only its own tools. This is the
+  closest precedent: per-unit software requirements, written once per kind of provisioning, with the
+  execution platform choosing which kind applies. This RFC's `required: false` entries are the same
+  pattern, with the queue's attached Environments playing the role of the enabled directive. Nextflow
+  builds the provisioning mechanisms into the engine; OpenJD keeps them in Environment Templates the
+  queue owns.
+* **Snakemake** — Each `rule` can declare `conda:` (an environment file), `container:`, and
+  `envmodules:`, and the command line's `--use-conda`, `--use-singularity`, or `--use-envmodules`
+  selects which is used. Snakemake caches each distinct Conda environment by the hash of its
+  definition, which is the reuse a scheduler can achieve by grouping Sessions by effective values.
+* **Argo Workflows** — Every `template` in a workflow specifies its own `container` (image, command,
+  resources), and `inputs.parameters` let a step pass values into a template. A parameterized template
+  invoked from several steps with different `arguments` is the shape of this RFC's parameterized Job
+  Environment. Argo has no notion of a queue-supplied environment around a template, since every step
+  is its own container.
+* **Slurm and Environment Modules** — A batch script runs `module load colmap/3.11` per job step, or
+  `srun --container-image=...` (with Pyxis/Enroot) per step. The selection lives in the script text, so
+  no tool can see which software a step needs without parsing shell, which is what the
+  [Tooling parseable](https://github.com/OpenJobDescription/openjd-specifications/wiki/Design-Tenets)
+  tenet asks OpenJD to avoid.
+* **GitHub Actions** — `jobs.<id>.container` and `runs-on` select the execution environment per job,
+  and reusable workflows take typed `inputs` with defaults. A job's choice is written where the job is
+  defined, as an `environment:` entry is written on the Step.
+* **CWL** — `requirements` and `hints` on each `CommandLineTool` (`DockerRequirement`,
+  `SoftwareRequirement` with package names and versions) state what a tool needs, and a hint is
+  optional while a requirement is not. That distinction is `required: false` versus `required: true`.
+
+Across these systems the unit of work names its own software, and the platform decides how it is
+provided. What none of them has is a provisioning layer owned by someone other than the workflow
+author, which OpenJD has in Environment Templates; this RFC is what lets a Job Template speak to that
+layer per Step.
