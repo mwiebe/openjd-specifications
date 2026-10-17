@@ -274,11 +274,12 @@ This RFC is additive and gated by the `ENV_PARAMS` extension name declared under
   the entry resolves to an Environment that lacks them ([§3.2.1](#321-resolving-external-environments)
   item 1). Deadline Cloud's console Conda queue environment is such a case today: it is named `Conda`
   and takes `CondaPackages` and `CondaChannels` as Job Parameters only, so it rejects the pipeline
-  sample. The remedy is for the queue administrator to add `ENV_PARAMS` and the recommended
-  `parameterDefinitions`, with defaults that read the existing Job Parameters, as
-  `conda-env-params.yaml` does. That change is itself backward compatible: Job Templates that do not
-  supply the parameters see the same job-wide values as before. The rejection names the entry and the
-  parameter, so a submitter can see which queue Environment needs updating. The rationale is in
+  sample. So is its sample Rez queue environment (`rez_queue_env.yaml`), named `Rez`, which takes
+  `RezPackages` as a Job Parameter only. The remedy is for the queue administrator to add
+  `ENV_PARAMS` and the recommended `parameterDefinitions`, with defaults that read the existing Job
+  Parameters, as `conda-env-params.yaml` does. That change is itself backward compatible: Job
+  Templates that do not supply the parameters see the same job-wide values as before. The rejection
+  names the entry and the parameter, so a submitter can see which queue Environment needs updating. The rationale is in
   [An Environment without the supplied parameter is an error](#an-environment-without-the-supplied-parameter-is-an-error).
 - No existing field changes meaning. A Job with no `environment:` entries and no Environment
   `parameterDefinitions` behaves exactly as today, including how Sessions are shared between Steps.
@@ -412,7 +413,9 @@ A `default` is checked against the definition at two points:
 
 1. A literal `default`, one that contains no `{{ }}`, is checked at template validation against the parameter's type
    and constraints, as a Job Parameter's literal `default` is. A literal that violates them is an error even when every
-   Step supplies the parameter.
+   Step supplies the parameter. For PATH and LIST[PATH], the checks that depend on the submission path format,
+   including absoluteness, are made when the Job is created, as below; a relative literal `default` is then an error
+   even when every Step supplies the parameter.
 2. Any other `default` is resolved when the Job is created and is checked only where it becomes an effective value,
    that is, for each Step that enters the Environment without supplying the parameter. A resolved `default` that would
    violate the constraints is not an error when every such Step supplies its own value, since a `default` that reads a
@@ -611,7 +614,7 @@ Templates a scheduler will attach, as `openjd run` accepts them, can resolve the
 
 ###### 3.2.1. Resolving external Environments
 
-When a Job is created from a Job Template and one or more Environment Templates, each *environment* entry that names no
+When a Job is created from a Job Template and zero or more Environment Templates, each *environment* entry that names no
 *jobEnvironments* entry of the Job Template is resolved against the attached Environment Templates:
 
 1. If exactly one attached Environment Template's `environment` has the entry's name, the entry refers to it, and
@@ -740,7 +743,8 @@ parameters through `Env.Param.*`; an inner Environment's parameters are not visi
   *parameters* values for *jobEnvironments* entries, are checked against their definitions.
 * **Job creation** — Each Step's Environment parameter effective values are added to the Known Values at the end of the
   stage. External Environments are resolved, and Environment parameter `default`s and *parameters* values are resolved
-  into each Step's effective values and checked.
+  into each Step's effective values and checked. Environment parameter PATH and LIST[PATH] values are not joined with
+  any directory and must be absolute (see [§4.5](#45-environmentparameterdefinition-extension-env_params)).
 * **Task execution** — `Env.Param.*` is available in the Environment's host-evaluated format strings, with path mapping
   applied to PATH and LIST[PATH] values.
 
@@ -834,7 +838,8 @@ When this RFC is accepted, the table can become a wiki conventions page that que
 An Environment Template that adopts a recommended Environment name should declare that name's recommended parameters,
 because Job Templates that follow the table supply them, and an Environment that lacks a supplied parameter rejects the
 submission (see [Backward compatibility](#backward-compatibility)). This matters most for `Conda`, the name Deadline
-Cloud's existing Conda queue environments already use without parameters.
+Cloud's existing Conda queue environments already use without parameters, and for `Rez`, the name of its sample Rez
+queue environment (`rez_queue_env.yaml`), which also declares no parameters.
 
 ### Validation
 
@@ -855,10 +860,10 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 | Every *jobEnvironments* parameter without a `default` supplied by every Step (constraint 7) | Template validation |
 | External name resolution: missing with `required: true`, or ambiguous (§3.2.1) | Job creation |
 | Keys and values for an external Environment; resolved format-string values (constraints 5, 6). A key the resolved Environment does not declare is an error even with `required: false` (§3.2.1 item 1) | Job creation |
-| A document that does not list `EXPR` supplies no parameter of type BOOL or a LIST type (constraint 6) | Template validation for *jobEnvironments*; job creation for external Environments |
+| A document that does not list `EXPR` supplies no parameter of type BOOL or a LIST type (constraint 6) | Job creation (entries naming external Environments; for *jobEnvironments* entries the rule holds by construction) |
 | A format-string value or `default` for a list-typed parameter is a single `{{ }}` expression (§3.2, §4.5) | Template validation for `default`s and *jobEnvironments* entries; job creation for external Environments |
 | A resolved, non-literal `default` satisfies its parameter's type and constraints, for each Step that takes it (§4.5) | Job creation |
-| PATH and LIST[PATH] values absolute in the submission path format, or URIs; their string constraints, against the unmapped value (§4.5) | Job creation |
+| PATH and LIST[PATH] values absolute in the submission path format, or URIs; their string constraints, against the unmapped value. This includes a literal `default` that no Step uses (§4.5) | Job creation |
 | Required parameters of attached Environments supplied by every Step of the combined Job (constraint 7, §3.2.1) | Job creation |
 | With `SERVICE`: an *environment* entry on a Service names an Environment whose `runScope` includes `SERVICE` | Template validation for *jobEnvironments*; job creation for external Environments |
 
@@ -1156,8 +1161,9 @@ cannot change between the two.
 * **Snakemake** — Each `rule` can declare `conda:` (an environment file), `container:`, and
   `envmodules:`, and the command line selects which is used: since Snakemake 8 with
   `--software-deployment-method` (`--sdm conda`, `--sdm apptainer`, `--sdm env-modules`), and before
-  it with `--use-conda`, `--use-singularity`, or `--use-envmodules`. Snakemake caches each distinct Conda environment by the hash of its
-  definition, which is the reuse a scheduler can achieve by grouping Sessions by effective values.
+  it with `--use-conda`, `--use-singularity`, or `--use-envmodules`. Snakemake caches each distinct
+  Conda environment by the hash of its definition, which is the reuse a scheduler can achieve by
+  grouping Sessions by effective values.
 * **Deadline Cloud sample queue environments** — The in-ecosystem baseline. Deadline Cloud's
   sample Conda queue environments take `CondaPackages` and `CondaChannels` Job Parameters, and its
   Rez sample takes `RezPackages`, each applied to every Session of a Job. This RFC generalizes them: the
