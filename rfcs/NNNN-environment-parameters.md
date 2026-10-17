@@ -353,7 +353,7 @@ The format string scopes available within an Environment gain one entry:
 Available when using the `ENV_PARAMS` extension.
 
 An `<EnvironmentParameterDefinition>` declares one value that a Step may supply to the Environment
-that contains it. It has the shape of a [`<JobParameterDefinition>`](#2-jobparameterdefinition) of the
+that contains it. It has the shape of a [`<JobParameterDefinition>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#2-jobparameterdefinition) of the
 same `type`, with these differences:
 
 1. *type* — Any type available to a `<JobParameterDefinition>` in the same document, except
