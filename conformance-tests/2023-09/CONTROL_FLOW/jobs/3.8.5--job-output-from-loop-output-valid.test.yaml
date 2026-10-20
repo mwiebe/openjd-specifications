@@ -1,6 +1,7 @@
 # RFC 0013 §Steps.* in and around a loop item 4 / RFC 0011 §Job outputs: a job output that
 # reads a loop output is evaluated when the loop succeeds; a valid one does not affect the run.
-# 3.8.5--job-output-from-loop-output-fails is the same template with a guard that holds.
+# Its `fail` condition (`Final == 7`) is false. 3.8.5--job-output-from-loop-output-fails is the
+# same template with a `fail` condition (`Final == 2`) that is true.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

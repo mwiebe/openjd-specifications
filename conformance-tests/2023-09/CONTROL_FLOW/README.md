@@ -196,7 +196,8 @@ and its section.
 ## Not covered
 
 - Re-runs and retries, including the recovery of a loop whose failed body Step instance
-  succeeds on a retry or requeue of its Tasks, committed-value display, forwarding, and
+  of the iteration in progress succeeds on a retry or requeue of its Tasks, and the rule
+  that no recovery follows a final loop failure, committed-value display, forwarding, and
   `PENDING_INPUTS`/`SKIPPED` state reporting, including whether a pending Step's Tasks and
   host requirements are known: scheduler behavior that `openjd run` can't show portably.
 - *When* a Step fails at step input binding after Job creation. Evaluating a group as soon as
@@ -216,7 +217,8 @@ and its section.
   (a runtime that blocks would hang the runner).
 - A scheduler's Task-count limit, and `TASK_DEPENDENCIES` composition.
 - For loops: Session reuse across iterations, a scheduler's display of iterations, re-runs
-  of a completed iteration's Tasks, a scheduler's limits on total Tasks or body Step
+  of an earlier iteration's Tasks or of Tasks after the loop has ended (which never change
+  the loop's state, variables, or outputs), a scheduler's limits on total Tasks or body Step
   instances, the 1 MiB floor for loop values, and chunked body Steps.
 - `Steps.*` in `parameterDefinitions`: no field there is a format string.
 - A directive in a Job Environment's `onExit`, because whether a failed `onExit` fails a
