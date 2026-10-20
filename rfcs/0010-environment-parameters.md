@@ -956,17 +956,37 @@ extensions:
    to make the Environment `ONLY_REQUESTED`, so that the Service's Sessions do not enter it. A Service may otherwise use
    an Environment that configures clients of another Service, and starts after that Service is READY, exactly as a Step
    would.
-9. **Wrap hooks.** SERVICE's rule "the required hooks follow from `runScope`" is restated in terms of the Sessions a
-   wrapping Environment is entered in. A wrapping Environment (RFC 0008) defines `onWrapEnvEnter` and `onWrapEnvExit`;
-   it defines `onWrapTaskRun` if any Task Session enters it, and all four `onWrapService*` hooks if any Service
-   Session enters it. For an `ONLY_REQUESTED` Environment, which kinds of Session enter it is known from which
-   entities request it; for an `ALL` Environment, every kind of Session in the combined Job enters it. A Session of a
-   kind whose hooks the wrapper does not define is an error, at template validation when the wrapper and the
-   requesting entities are in one Job Template and every request's *enableIf* is absent or a literal, and at job
-   creation otherwise, naming the Environment and the entity.
-   This generalizes SERVICE's Environment Template item 4, which stated the `ALL` case for wrappers from documents that
-   do not declare `SERVICE`. The remedy is the same: define the hooks, or make the wrapper `ONLY_REQUESTED` so that
-   only entities of the kinds it supports request it.
+9. **Wrap hooks.** SERVICE's rule "the required hooks follow from `runScope`" and RFC 0008's rule that a wrapper
+   defines all three of its hooks are replaced by one invariant: **every action that runs inside a wrapping
+   Environment is wrapped by it.** An action runs inside a wrapping Environment when it runs in a Session that has
+   entered the Environment and not yet exited it. Each kind of action has one wrap hook:
+
+   | Action | Wrap hook |
+   |--------|-----------|
+   | An inner Environment's `onEnter` | `onWrapEnvEnter` |
+   | A Task's `onRun` | `onWrapTaskRun` |
+   | An inner Environment's `onExit` | `onWrapEnvExit` |
+   | A Service's `onEnter` | `onWrapServiceEnter` |
+   | A Service's `onRun` | `onWrapServiceRun` |
+   | A Service's `onHealthCheck` | `onWrapServiceHealthCheck` |
+   | A Service's `onExit` | `onWrapServiceExit` |
+
+   A wrapping Environment that a Session of some kind enters MUST define the hook for every kind of action that kind of
+   Session may run inside it: the three Task-Session hooks if any Task Session enters it, the two inner-Environment
+   hooks and the four Service hooks if any Service Session enters it. The check is over the actions a kind of Session
+   may run, not the actions a particular template defines, so one wrapper is checked once per kind of Session that
+   enters it. A hook for a kind of action that never runs inside the wrapper is permitted and wraps nothing, so a
+   wrapper may define all seven hooks and be attached to any queue. Which kinds of Session enter the wrapper is known
+   from `runScope` and, for `ONLY_REQUESTED`, from the entities that request it; the check is made at template
+   validation when the wrapper and every requesting entity are in one Job Template and every request's *enableIf* is
+   absent or a literal, and at job creation otherwise, naming the Environment and the kind of Session. A validator
+   should warn at template validation when an `ALL` wrapper in a Job Template lacks `onWrapTaskRun`, since every Job
+   has Task Sessions and the error is certain. The remedy is to define the hooks, or to make the wrapper
+   `ONLY_REQUESTED` and have only entities of the kinds it supports request it.
+
+   RFC 0008's "all three" rule is the Task-Session case of this invariant. SERVICE's Environment Template item 4 (a
+   wrapper from a document without `SERVICE`, in a Job with Services) is the Service-Session case, and needs no
+   separate text. A future RFC that adds a kind of action adds its hook to the table; the invariant does not change.
 10. **Checks over the combined Job.** SERVICE §1.2.2 ends "Items 2 and 4 are the only checks that require the combined
     Job". With `ENV_PARAMS` that sentence reads "Items 2 and 4, and the `ENV_PARAMS` checks that need the attached
     Environments: resolving *environment* entries ([§3.2.1](#321-resolving-external-environments)), constraints 5–7 for
@@ -1244,7 +1264,7 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 | PATH and LIST[PATH] values absolute in the submission path format, or URIs; their string constraints, against the unmapped value. This includes a literal `default` that no Step uses (§4.5) | Job creation |
 | Required parameters of attached `ALL` Environments supplied by every Step of the combined Job, and of attached `ONLY_REQUESTED` Environments by every Step whose entry resolves to one (constraint 7, §3.2.1) | Job creation; with `CONTROL_FLOW`, not for a `SKIPPED` Step, and at step input binding when the Step's *enableIf* is dynamic |
 | With `SERVICE`: the SERVICE dependency graph, with an edge from each Service to every Service listed by an Environment its Sessions enter (including a self-edge from a Service's own entry for such an Environment), is acyclic ([Composition with SERVICE](#composition-with-service) item 8) | Template validation for *jobEnvironments* and entries without an *enableIf* expression; job creation otherwise |
-| With `SERVICE` and `WRAP_ACTIONS`: a wrapping Environment defines the hooks for every kind of Session that enters it ([Composition with SERVICE](#composition-with-service) item 9) | Template validation within one Job Template; job creation for attached Environments |
+| With `SERVICE` and `WRAP_ACTIONS`: every action that runs inside a wrapping Environment has a wrap hook, checked per kind of Session that enters it ([Composition with SERVICE](#composition-with-service) item 9) | Template validation when the wrapper and its requesters are in one Job Template with literal *enableIf*s; job creation otherwise |
 | With `CONTROL_FLOW`: an Environment's `enableIf` references `Env.*` only of the enclosing Environment, and `Env.Param.*` only of non-PATH types; in an Environment Template it references `Env.*` only ([Composition with CONTROL_FLOW](#composition-with-control_flow)) | Template validation |
 
 A Session runs Tasks of a Step only when it has entered the Environments the Step's Sessions enter and the Step's

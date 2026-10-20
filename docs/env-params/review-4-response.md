@@ -78,4 +78,8 @@ pass; none blocks the edits below.
   Environments, §3.3.3 conflicts), because the condition that skips a Step is often the one under which its
   configuration would be invalid. Template-validation checks still apply to every Step as written. New CONTROL_FLOW
   composition item 8; Validation rows qualified.
-* **Q4** — Open; to be examined with the wrap hook rule as a whole.
+* **Q4** — "Only if" is dropped deliberately, and the rule is restated as an invariant that generalizes to future
+  action kinds: every action that runs inside a wrapping Environment is wrapped by it. A wrapper MUST define the hook
+  for every kind of action that a kind of Session entering it may run; a hook for an action that never runs inside it
+  is permitted. RFC 0008's "all three" rule and SERVICE's Environment Template item 4 become instances. Item 9
+  rewritten with the action-to-hook table.
