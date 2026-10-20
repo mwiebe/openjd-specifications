@@ -2038,17 +2038,20 @@ size of the loop's variable and output values is checked after the *initial* val
 creation if they are evaluated then), and after each iteration once the outputs and once the *next* values are
 evaluated; a scheduler must accept at least 1 MiB. A failed Step in the iteration in progress, or an error in any of
 these expressions, fails the loop at once. Only a failure of the Tasks of a Step instance of the iteration in progress
-can be recovered, as any failed Step can: if a retry or requeue of its Tasks makes it succeed, the iteration continues
-and the loop resumes at that iteration's boundary, and until then the loop is failed and the Steps that depend on it
-are blocked. Every other failure of a loop is final, and once one occurs the loop cannot resume: an error in a
+can be recovered, as any failed Step can: a loop whose failure is recoverable is `FAILED` until every failed body Step
+instance of the iteration in progress has succeeded after a retry or requeue of its Tasks; it then returns to
+`RUNNING`, and the iteration continues to its boundary. Until then the Steps that depend on it are blocked. Every
+other failure of a loop is final, and once one occurs the loop cannot return to `RUNNING`: an error in a
 materialization expression of a Step instance or of the loop (its *enableIf*, *maxIterations*, an *initial*, or the
 first *while*), exceeding a limit, an error in *while*, *until*, *next*, or an output *value*, a violated constraint,
 including `minLength` when the loop ends, and reaching *maxIterations*. Any `Steps.*` output that a loop's *while*,
 *until*, *next*, *initial*, or output *value* references counts as consumed, for re-runs of its Task, once that
-expression has been evaluated. A re-run of a Task of an earlier iteration, or after the loop has ended, follows the
-re-run rules for any Task's outputs (a successful re-run replaces an output that has not been consumed, keeps one that
-it reports unchanged, and is reported as failed if it changes a consumed one) and never changes the loop's state,
-variables, or outputs; a failed re-run commits nothing, and the Step instance keeps its committed values. The loop's
+expression has been evaluated. Any re-run of a body Task that has already succeeded, in any iteration, including the
+iteration in progress, or after the loop is `SUCCEEDED` or finally `FAILED`, follows the re-run rules for any Task's
+outputs (a successful re-run replaces an output that has not been consumed, keeps one that it reports unchanged, and
+is reported as failed if it changes a consumed one); a failed or rejected re-run commits nothing, leaves the Task and
+its Step instance `SUCCEEDED`, and never fails the loop or changes its state, variables, or outputs. Only a failed
+attempt of a Task that has not yet succeeded counts as a failure of a Step instance. The loop's
 outputs are available to the Steps that depend on it when it succeeds. See
 [How Jobs Are Run](How-Jobs-Are-Run#step-loops).
 
