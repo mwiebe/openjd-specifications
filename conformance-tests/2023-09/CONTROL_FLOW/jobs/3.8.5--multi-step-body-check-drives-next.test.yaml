@@ -26,7 +26,7 @@ template:
               args:
               - -c
               - |-
-                print('R_' + str({{Loop.Value}}))
+                print('R_' + str({{Loop.Value}}) + '_')
       - name: Check
         dependencies:
         - dependsOn: Render
@@ -64,11 +64,11 @@ template:
             import json; print('GOT:final=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.FinalScore))}})))
 expected:
   output:
-  - R_1
-  - R_2
-  - R_4
-  - R_8
+  - R_1_
+  - R_2_
+  - R_4_
+  - R_8_
   - GOT:values=[1, 2, 4, 8]
   - GOT:final=16
   forbidden:
-  - R_16
+  - R_16_
