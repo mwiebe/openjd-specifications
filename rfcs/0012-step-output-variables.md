@@ -748,6 +748,12 @@ Output values are stored, logged, and may be displayed, so they are not redacted
 
 #### Retries and re-runs
 
+A re-run of a Task that has already succeeded, whether or not its Step declares outputs, leaves the Task `SUCCEEDED`
+for every purpose while the re-run is pending or running, and after it fails or is rejected: for `dependsOn`, for
+completeness ([RFC 0011 §Reductions](0011-control-flow.md#reductions) item 3), for Step and Job success, and for loop
+iteration completion ([RFC 0013 §Iterations](0013-step-loops.md#iterations)). A scheduler MAY show the re-run
+attempt's own status separately. Only a re-run that succeeds and commits changes anything, under the rules below.
+
 * **Retry of a failed attempt.** A failed attempt committed nothing, so a retry starts with no values.
 * **Re-run of a succeeded Task.** An output of a producer is **consumed** once a consumer that references it (as found
   by symbol collection) has evaluated a materialization group whose inputs include it, or has started a Task.
@@ -764,8 +770,9 @@ Output values are stored, logged, and may be displayed, so they are not redacted
        Task keeps its earlier succeeded state and all of its committed values, as in rule 3.
 
   The check is all or nothing: if any output falls under rule 3, nothing from the re-run is committed, and in a
-  chunked Step the check covers every Task of the re-run chunk. Values are the
-  same if their converted, typed values are equal.
+  chunked Step the check covers every Task of the re-run chunk. If rule 3 rejects a re-run chunk that mixes Tasks
+  that have already succeeded with Tasks that have not, nothing is committed for any of them, and the attempt of the
+  Tasks that have not yet succeeded fails. Values are the same if their converted, typed values are equal.
 
   So a metric that no Step reads never blocks a re-run, but a consumed value that varies from run to run, such as a
   measured frame rate that a later Step reduces, makes every differing re-run of its Task fail once it is consumed.

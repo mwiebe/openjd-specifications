@@ -1667,6 +1667,8 @@ RFC adds to the model are:
 A Step that has been bound is `READY` and is gated by its dependencies exactly as today. A Step one of whose
 materialization groups fails to evaluate is `FAILED` at once, which, like any failed Step, does not satisfy
 `dependsOn`.
+A re-run of a Task does not move a `SUCCEEDED` Step out of `SUCCEEDED` (see
+[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs)).
 
 #### Job output evaluation
 
