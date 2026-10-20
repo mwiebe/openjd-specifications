@@ -229,7 +229,7 @@ requests it:
 
 ```yaml
 specificationVersion: "environment-2023-09"
-extensions: [ENV_PARAMS, EXPR]
+extensions: [ENV_PARAMS, EXPR, FEATURE_BUNDLE_1]   # FEATURE_BUNDLE_1 for a format-string `min`
 environment:
   name: Docker
   runScope: ONLY_REQUESTED

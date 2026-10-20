@@ -14,10 +14,15 @@
 #   - Docker, matching environment_templates/docker-env-params.yaml
 # On a Conda queue the Conda entries apply, on a Docker queue the Docker
 # entries apply, and on a queue whose hosts have the software preinstalled
-# neither applies. The Job Template is the same in all three cases. The
-# entries are independent: a queue should attach one of the two, since with
-# both attached the Conda Environment's onEnter would run inside the Docker
-# container, whose images have no conda.
+# neither applies. The Job Template is the same in all three cases.
+#
+# A queue may attach both. The Conda entries carry
+#   enableIf: "{{ 'Docker' not in Job.EnvironmentNames }}"
+# which disables them when a Docker Environment is present, so a Step is
+# never told to install conda packages inside a container that has no conda.
+# Job.EnvironmentNames lists the names of every Environment the Job has once
+# the queue's are attached. The Docker Environment is ONLY_REQUESTED, so the
+# Steps' requests are what bring it into their Sessions.
 #
 # `required: false` covers a queue that attaches no Environment of that name.
 # A queue whose Conda (or Docker) Environment declares no ENV_PARAMS
@@ -113,6 +118,7 @@ steps:
   dependencies:
   - environment: Conda
     required: false
+    enableIf: &prefer_docker "{{ 'Docker' not in Job.EnvironmentNames }}"
     parameters:
       Packages: "ffmpeg=7"
   - environment: Docker
@@ -141,6 +147,7 @@ steps:
   - dependsOn: DecodeFrames
   - environment: Conda
     required: false
+    enableIf: *prefer_docker
     parameters:
       Packages: "colmap=3.11"
   - environment: Docker
@@ -182,6 +189,7 @@ steps:
   - dependsOn: SolveSfM
   - environment: Conda
     required: false
+    enableIf: *prefer_docker
     parameters:
       Packages: "maya=2025 mtoa"
       Channels: "studio-internal conda-forge"
@@ -298,6 +306,7 @@ steps:
   # conda environment or pulled this image.
   - environment: Conda
     required: false
+    enableIf: *prefer_docker
     parameters:
       Packages: "ffmpeg=7"
   - environment: Docker

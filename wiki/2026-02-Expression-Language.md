@@ -866,6 +866,12 @@ values within that Environment only:
 | `Env.Param.<name>` | The `Param.<name>` type of the parameter's type in the Job Parameter table above | The value with which the Session entered the Environment, with path mapping applied to PATH and LIST[PATH] |
 | `Env.RawParam.<name>` | The `RawParam.<name>` type of the parameter's type in the Job Parameter table above | The same value with no path mapping applied |
 
+With the `ENV_PARAMS` extension, every template can also read:
+
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `Job.EnvironmentNames` | `list[string]` | The names of the Job's Job Environments, including those attached from Environment Templates, in entry order. `unresolved[list[string]]` at template validation; concrete at Job creation. |
+
 #### 1.2.3. Implicit Type Coercion
 
 As a glue expression language intended for convenience, implicit non-destructive type
