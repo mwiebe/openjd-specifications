@@ -1095,8 +1095,9 @@ When a loop starts iteration `N`:
    Step's groups whose inputs are concrete at Job creation are. An error in one fails the instance, and so the loop,
    finally (see [Failure](#failure)).
 4. Iteration `N` is complete when every instance of it is `SUCCEEDED` or `SKIPPED`. The loop then evaluates the
-   iteration boundary. A re-run of a Task that has already succeeded does not change whether its instance counts as
-   `SUCCEEDED` here, so the boundary does not wait for the re-run (see [Retries and re-runs](#retries-and-re-runs)).
+   iteration boundary. A re-run of a Task that has already succeeded leaves its instance `SUCCEEDED` here, so the
+   boundary does not wait for it (see
+   [RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs)).
 
 No instance of iteration `N + 1` is created, and no Task of it runs, before the boundary of iteration `N` has decided
 to continue. Iterations never overlap.
@@ -1171,14 +1172,11 @@ then returns to `RUNNING`, and the iteration continues to its boundary. Until th
 are blocked, exactly as for a failed Step, and a job output that reads it is not evaluated (see
 [RFC 0011 §Job outputs](0011-control-flow.md#job-outputs) item 4).
 
-Any re-run of a body Task that has already succeeded, in any iteration, including the iteration in progress, or after
-the loop is `SUCCEEDED` or finally `FAILED`, follows [RFC 0012 §Retries and
-re-runs](0012-step-output-variables.md#retries-and-re-runs) rules 1 to 4. A failed re-run, or one that rule 3 rejects,
-commits nothing, and the Task keeps its earlier succeeded state and all of its committed values, as it does in any Step,
-so its instance stays `SUCCEEDED` and the re-run never fails the loop or changes its state, its loop variables, or its
-loop outputs. A re-run does not change whether the instance counts as `SUCCEEDED` for the completion of its iteration,
-so the boundary does not wait for it. Only a failed attempt of a Task that has not yet succeeded counts as a failure of
-a body Step instance.
+A re-run of a body Task that has already succeeded, in any iteration or after the loop has ended, leaves the Task, and
+so its instance, `SUCCEEDED` (see
+[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs)), so it never fails the loop or
+changes its state, its loop variables, or its loop outputs. Only a failed attempt of a Task that has not yet
+succeeded counts as a failure of a body Step instance.
 
 Every other failure of a loop is final: the loop is `FAILED` and cannot return to `RUNNING`. These are a group of a body
 Step instance that fails to evaluate; a group of the loop itself that fails to evaluate; exceeding a limit of
@@ -1208,12 +1206,8 @@ re-evaluated, and an iteration is never run again. A failed attempt of a Task of
 not yet succeeded may be retried as any Task's may. A loop whose failure is recoverable is `FAILED` until every failed
 body Step instance of the iteration in progress has succeeded after a retry or requeue of its Tasks; it then returns
 to `RUNNING`, and the iteration continues to its boundary, unless a final failure has occurred (see
-[Failure](#failure)). Any re-run of a body Task that has already succeeded, in any iteration, including the iteration
-in progress, or after the loop is `SUCCEEDED` or finally `FAILED`, follows rules 1 to 4; a failed re-run, or one that
-rule 3 rejects, commits nothing, and the Task keeps its earlier succeeded state and all of its committed values, as
-it does in any Step, so its instance stays `SUCCEEDED` and the re-run never fails the loop or changes its state,
-variables, or outputs (see [Failure](#failure)). The re-run does not change whether the instance counts as
-`SUCCEEDED` for iteration completion, so the boundary of the iteration in progress does not wait for it.
+[Failure](#failure)). A re-run of a body Task that has already succeeded leaves its instance `SUCCEEDED`, as RFC 0012
+says, so it never fails the loop and the boundary does not wait for it (see [Failure](#failure)).
 
 #### Limits
 
@@ -1255,14 +1249,12 @@ loop's outputs and decides, from `until` or `while`, whether another iteration r
 `maxIterations` fails; and a failure of a body Step instance of the iteration in progress fails the loop. Only a failure
 of the Tasks of a body Step instance of the iteration in progress is recoverable: a loop whose failure is recoverable is
 `FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry or requeue of
-its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. Any re-run of a body Task that has
-already succeeded, in any iteration, including the iteration in progress, or after the loop is `SUCCEEDED` or finally
-`FAILED`, follows the re-run rules of Step outputs; a failed or rejected re-run commits nothing, and the Task keeps its
-earlier succeeded state and all of its committed values, as in any Step, so its instance stays `SUCCEEDED` and the
-re-run never fails the loop or changes its state, variables, or outputs; the iteration boundary does not wait for a
-re-run. Only a failed attempt of a Task that has not yet succeeded counts as a body Step instance failure. Every other
-loop failure, including an expression or constraint error in the loop or at an iteration boundary, a binding error of a
-body Step instance, exceeding a limit, a violated `minLength` when the loop ends, and reaching `maxIterations`, is
+its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. A re-run of a body Task that has
+already succeeded leaves the Task `SUCCEEDED`, under the re-run rules of Step outputs, so it never fails the loop or
+changes its state, variables, or outputs, and the iteration boundary does not wait for it. Only a failed attempt of a
+Task that has not yet succeeded counts as a body Step instance failure. Every other loop failure, including an
+expression or constraint error in the loop or at an iteration boundary, a binding error of a body Step instance,
+exceeding a limit, a violated `minLength` when the loop ends, and reaching `maxIterations`, is
 final, and once one occurs the loop cannot return to `RUNNING`. See [Running a loop](#running-a-loop).
 
 ### Validation
@@ -1364,10 +1356,12 @@ What this RFC does differently:
   rejected with an error whenever the selected Step is a loop, whether named by `--step` or selected as the Job's
   only top-level Step. Only the rejection of an explicitly given `--maximum-tasks` is limited to an explicit `--step`
   naming a loop; this needs the CLI to tell a given `--maximum-tasks` from its default. In every other run that
-  includes a loop, which covers a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`,
+  includes a loop, which covers a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`
+  for a `--step` that is not a loop,
   `--maximum-tasks` applies to each body Step instance as it does to any Step. A body Step instance that did not run
   all its Tasks is incomplete. The other instances of its iteration follow the CLI's usual rule for an incomplete
-  producer: only the Steps that read the incomplete instance's outputs are blocked. The iteration never completes, so
+  producer: only the Steps that read the incomplete instance's outputs are blocked. A failure of another instance of
+  the iteration fails the loop as usual. The iteration never completes, so
   the boundary is not evaluated, the loop is reported as blocked by an incomplete body Step instance, and every Step
   that depends on the loop is blocked behind it, as for a blocked dependency. With `--step L` for a loop `L`,
   `--step-inputs` supplies the values of the outputs of `L`'s dependencies that the loop and its body read. For a

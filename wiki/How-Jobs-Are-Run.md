@@ -200,13 +200,10 @@ is the list of every iteration's value, in order. A failed Step instance in the 
 any of the loop's expressions, fails the loop at once, and the Steps that depend on it do not run while it is failed.
 Only a failure of the Tasks of a Step instance of the iteration in progress can be recovered: a loop whose failure is
 recoverable is `FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry
-or requeue of its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. Any re-run of a body
-Task that has already succeeded, in any iteration, including the iteration in progress, or after the loop is `SUCCEEDED`
-or finally `FAILED`, follows the re-run rules for any Task's outputs; a failed or rejected re-run commits nothing,
-and the Task keeps its earlier succeeded state and all of its committed values, as in any Step, so its Step instance
-stays `SUCCEEDED` and the re-run never fails the loop or changes its state, variables, or outputs. A re-run does not
-change whether the instance counts as succeeded for the completion of its iteration, so the boundary does not wait for
-it.
+or requeue of its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. A re-run of a body
+Task that has already succeeded leaves the Task and its Step instance succeeded (see
+[RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)), so it never fails the
+loop or changes its state, variables, or outputs, and the iteration boundary does not wait for it.
 Only a failed attempt of a Task that has not yet succeeded counts as a failure of a Step instance. Every other failure
 of a loop is final, the loop cannot return to `RUNNING` once one occurs, and the Steps that depend on it never run: an
 error in a Step instance's or the loop's own materialization expressions, exceeding a limit, an error in any of the

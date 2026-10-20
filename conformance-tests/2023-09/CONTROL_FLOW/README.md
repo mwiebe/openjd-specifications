@@ -218,11 +218,9 @@ and its section.
   (a runtime that blocks would hang the runner).
 - A scheduler's Task-count limit, and `TASK_DEPENDENCIES` composition.
 - For loops: Session reuse across iterations, a scheduler's display of iterations, re-runs
-  of body Tasks that have already succeeded, in any iteration, including the iteration in
-  progress, or after the loop is `SUCCEEDED` or finally `FAILED` (a failed or rejected
-  re-run commits nothing, the Task keeps its earlier succeeded state and all of its
-  committed values, as in any Step, and the re-run never fails the loop or changes its
-  state, variables, or outputs; the iteration boundary does not wait for a re-run), a
+  of body Tasks that have already succeeded (the Task stays `SUCCEEDED` under RFC 0012
+  §Retries and re-runs, so a re-run never fails the loop and the iteration boundary does
+  not wait for it), a
   scheduler's limits on total Tasks or body Step instances, the 1 MiB floor for loop
   values, and chunked body Steps.
 - The loop rules of `openjd run`, which are CLI-specific: `--tasks` and `--task-param` are
