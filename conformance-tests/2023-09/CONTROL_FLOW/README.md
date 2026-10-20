@@ -121,17 +121,20 @@ and its section.
   any body Step; outside Steps and job outputs read loop outputs, never body Steps, and
   need a dependency on the loop; `Loop.*` only in the loop and its body, and only the
   loop's own variables; no `TaskParam` or undeclared outputs of a loop.
-- **Running loops** (`jobs/3.8.5--*`): `until` after each iteration, with `APPEND` history,
-  `LAST` final value, and `Loop.Iteration` from 0; `while` before each iteration, including
-  zero iterations (`LAST` is `null`, `APPEND` is `[]`); a two-Step body whose check drives
-  `next`; every `next` reading the old values (a swap); `until` true skips `next`; the bound
-  fails a loop that would continue, from a literal or a parameter, but not one whose
-  condition ends it in the last allowed iteration; a failed body Step, a `fail(...)` in
-  `next` or in a loop output `value`, and a loop variable constraint violation each fail the
-  loop and stop its iterations and its dependents; a body fan-out from a loop variable with
-  its own Tasks per iteration; a fan-out after the loop over an `APPEND` output; a skipped
-  loop's `null` outputs; a body Step skipped in some iterations; body Steps reading the
-  loop's dependency; and a job output from a loop output, valid and failing.
+- **Running loops** (`jobs/3.8.5--*`): `until` after each iteration, with `APPEND`
+  history, `LAST` final value, and `Loop.Iteration` from 0; `while` before each iteration,
+  including zero iterations (`LAST` is `null`, `APPEND` is `[]`), and an `APPEND` output's
+  `minLength` checked against `[]` after zero iterations, failing the loop; a two-Step
+  body whose check drives `next`; every `next` reading the old values (a swap); `until`
+  true skips `next`; the bound fails a loop that would continue, from a literal or a
+  parameter, but not one whose condition ends it in the last allowed iteration; a failed
+  body Step, a `fail(...)` in `next` or in a loop output `value`, and a loop variable
+  constraint violation, including one from `next` at the final boundary of a `while` loop
+  that `while` would have ended, each fail the loop and stop its iterations and its
+  dependents; a body fan-out from a loop variable with its own Tasks per iteration; a
+  fan-out after the loop over an `APPEND` output; a skipped loop's `null` outputs; a body
+  Step skipped in some iterations; body Steps reading the loop's dependency; and a job
+  output from a loop output, valid and failing.
 
 ## Conventions in this directory
 
@@ -172,7 +175,9 @@ and its section.
   failure tests are, with `3.8.5--job-output-from-loop-output-valid` as its companion.
 - **Markers are built at run time** (`print('C_' + 'RAN')`) so that a forbidden or
   expected marker never appears literally in the template, in case a runner logs the
-  command line. Directive lines that are asserted in the log are built the same way.
+  command line. Directive lines that are asserted in the log are built the same way. No
+  expected or forbidden marker is a substring of another line the same template prints
+  (`X_0`, not `T_0`, beside `IT_0`).
 - **Timing.** `3.7.1--invalid-directive-cancels-at-once` sleeps 30 s after an invalid
   directive and forbids the line printed after the sleep, so a runtime that waits for the
   Action to exit instead of canceling it fails the test by printing that line. A runner
@@ -190,9 +195,10 @@ and its section.
 
 ## Not covered
 
-- Re-runs and retries, committed-value display, forwarding, and `PENDING_INPUTS`/`SKIPPED`
-  state reporting, including whether a pending Step's Tasks and host requirements are known:
-  scheduler behavior that `openjd run` can't show portably.
+- Re-runs and retries, including the recovery of a loop whose failed body Step instance
+  succeeds on a retry or requeue of its Tasks, committed-value display, forwarding, and
+  `PENDING_INPUTS`/`SKIPPED` state reporting, including whether a pending Step's Tasks and
+  host requirements are known: scheduler behavior that `openjd run` can't show portably.
 - *When* a Step fails at step input binding after Job creation. Evaluating a group as soon as
   its inputs are concrete is a SHOULD, an early and a late failure end the same way (the Step
   never runs and the run fails), and the RFC doesn't say whether Steps independent of a failed

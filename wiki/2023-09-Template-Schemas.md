@@ -1944,7 +1944,8 @@ Where:
     * Maximum number of elements: 32.
     * No two elements in this list may have the same value for the `name` property.
 2. *while* — Checked before each iteration, including the first: the iteration runs only if it is `true`. If it is
-   `false` before the first iteration, the loop runs zero iterations and succeeds. Its target type is `bool`, and a
+   `false` before the first iteration, the loop runs zero iterations and, if every `APPEND` output's `minLength`
+   holds for `[]`, succeeds. Its target type is `bool`, and a
    `null` result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`,
    `Job.Name`, `Loop.*` and `RawLoop.*`, and the `Steps.*` values of the loop's *dependencies*, but not the Steps of
    the loop's body.
@@ -2017,8 +2018,8 @@ Where:
    or under `APPEND` of its element type, and a `null` result is an error. It may reference everything *until* may.
 5. *description*, *unit* — For display only, as on `<OutputVariableDefinition>`.
 6. Constraint properties — Under `LAST`, checked against each iteration's value; under `APPEND`, `item` constraints
-   and `maxLength` as each element is added, and `minLength` when the loop succeeds, including after zero
-   iterations, but not when the loop is skipped. A violation fails the loop.
+   and `maxLength` as each element is added, and `minLength` when *until* or *while* ends the loop, before it
+   succeeds, including after zero iterations, but not when the loop is skipped. A violation fails the loop.
 
 The type of `Steps.<LoopName>.Output.<name>`, where `T` is the expression type of *type*:
 
@@ -2046,21 +2047,24 @@ parameters.
 #### 3.8.5. Running a loop
 
 The loop's *enableIf* is decided first, as a Step's is. Then its *maxIterations*, each variable's *initial*, and, with
-*while*, the first *while* are evaluated, as materialization expressions of the loop. When the loop's dependencies
-are satisfied it runs its iterations in order, starting with iteration 0. Each iteration creates a new instance of
-every Step of the body, with its own Tasks, states, and output values, and the body's Steps run as the Steps of a
-Job do, in the order of their *dependencies*. `Loop.*` values are fixed for the whole iteration. The next iteration
-starts only when every Step of the current one has completed successfully or been skipped. After each iteration, in
-this order: every loop output's *value* is evaluated; *until*, if present, is checked, and if it is `true` the loop
-succeeds; every variable's *next* is evaluated; *while*, if present, is checked with the new values, and if it is
-`false` the loop succeeds; and if the loop has run *maxIterations* iterations, it fails. A failed Step in an
-iteration, or an error in any of these expressions, fails the loop at once. A failed Step instance can be recovered
-as any failed Step can: if a retry or requeue of its Tasks makes it succeed, the iteration continues and the loop
-resumes at that iteration's boundary, and until then the loop is failed and the Steps that depend on it are blocked.
-An error in *while*, *until*, *next*, or an output *value*, a violated constraint, and reaching *maxIterations* are
-final. Any `Steps.*` output that a loop's *while*, *until*, *next*, *initial*, or output *value* references counts as
-consumed, for re-runs of its Task, once that expression has been evaluated. The loop's outputs are available to the
-Steps that depend on it when it succeeds. See
+*while*, the first *while* are evaluated, as materialization expressions of the loop. When the loop's dependencies are
+satisfied it runs its iterations in order, starting with iteration 0. Each iteration creates a new instance of every
+Step of the body, with its own Tasks, states, and output values, and the body's Steps run as the Steps of a Job do, in
+the order of their *dependencies*. `Loop.*` values are fixed for the whole iteration. The next iteration starts only
+when every Step of the current one has completed successfully or been skipped. After each iteration, in this order:
+every loop output's *value* is evaluated; *until*, if present, is checked, and if it is `true` the loop ends; every
+variable's *next* is evaluated; *while*, if present, is checked with the new values, and if it is `false` the loop ends;
+and if the loop has run *maxIterations* iterations, it fails. A loop whose first *while* is `false` ends with zero
+iterations. When a loop ends, each `APPEND` output's `minLength` is checked, and then the loop succeeds. A failed Step
+in an iteration, or an error in any of these expressions, fails the loop at once. Only a failure of a Step instance's
+Tasks can be recovered, as any failed Step can: if a retry or requeue of its Tasks makes it succeed, the iteration
+continues and the loop resumes at that iteration's boundary, and until then the loop is failed and the Steps that depend
+on it are blocked. Every other failure of a loop is final: an error in a materialization expression of a Step instance
+or of the loop (its *enableIf*, *maxIterations*, an *initial*, or the first *while*), exceeding a limit, an error in
+*while*, *until*, *next*, or an output *value*, a violated constraint, and reaching *maxIterations*. Any `Steps.*`
+output that a loop's *while*, *until*, *next*, *initial*, or output *value* references counts as consumed, for re-runs
+of its Task, once that expression has been evaluated. The loop's outputs are available to the Steps that depend on it
+when it succeeds. See
 [How Jobs Are Run](How-Jobs-Are-Run#step-loops).
 
 ## 4. `<Environment>`
@@ -2606,7 +2610,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`, and with the `CONTROL_FLOW` extension `enableIf`.|
 |`Session.HasPathMappingRules`|This value can be used to determine whether path mapping rules are available to the Session. Without the `EXPR` extension, it is string valued, with values "true" or "false". With the `EXPR` extension enabled, it is a `bool` type. "true"/`True` means that the path mapping JSON contains path mapping rules. "false"/`False` means that the contents of the path mapping JSON are the empty object.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Session.PathMappingRulesFile`|This is a string whose value is the location of a JSON file on the worker node's local disk that contains the path mapping rule substitutions for the Session.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
-|`Steps.<StepName>.Output.<VarName>`|The value of output variable `<VarName>` of Step `<StepName>`. If the Step has no *parameterSpace* its type is the declared type `T`; otherwise it is `list[T]`, one element per Task in parameter-space iteration order. If the Step has an *enableIf*, the type is optional (`T?` or `list[T]?`) and the value is `null` when the Step was skipped. A `PATH` value has the consuming Session's path mapping rules applied. `<StepName>` must be an `<Identifier>`. Requires the `CONTROL_FLOW` extension.|Available in the Step Template scope (*enableIf*, *let*, *hostRequirements*, *parameterSpace* ranges and its other format strings, *stepEnvironments*, *script*) of a Step that lists `<StepName>` directly in its *dependencies*, and in the *value* of a `<JobOutputDefinition>` for any Step. A value whose type is or contains `path` only in format strings annotated `@fmtstring[host]`. Not available in *combination*, other job-level fields, or Environment Templates. Inside and around a loop, see [3.8.4](#384-scopes-in-and-around-a-loop): a Step of a loop's body reads its body dependencies and the loop's dependencies, a loop's *until*, *next*, and output *value*s read any Step of its body, and a Step of a loop's body is not available outside the loop.|
+|`Steps.<StepName>.Output.<VarName>`|The value of output variable `<VarName>` of Step `<StepName>`. If the Step has no *parameterSpace* its type is the declared type `T`; otherwise it is `list[T]`, one element per Task in parameter-space iteration order. If the Step has an *enableIf*, the type is optional (`T?` or `list[T]?`) and the value is `null` when the Step was skipped. If `<StepName>` is a loop, `<VarName>` is one of its loop outputs, and its type is given by the table in [3.8.3](#383-loopoutputvariabledefinition). A `PATH` value has the consuming Session's path mapping rules applied. `<StepName>` must be an `<Identifier>`. Requires the `CONTROL_FLOW` extension.|Available in the Step Template scope (*enableIf*, *let*, *hostRequirements*, *parameterSpace* ranges and its other format strings, *stepEnvironments*, *script*) of a Step that lists `<StepName>` directly in its *dependencies*, and in the *value* of a `<JobOutputDefinition>` for any Step. A value whose type is or contains `path` only in format strings annotated `@fmtstring[host]`. Not available in *combination*, other job-level fields, or Environment Templates. Inside and around a loop, see [3.8.4](#384-scopes-in-and-around-a-loop): a Step of a loop's body reads its body dependencies and the loop's dependencies, a loop's *until*, *next*, and output *value*s read any Step of its body, and a Step of a loop's body is not available outside the loop.|
 |`Steps.<StepName>.RawOutput.<VarName>`|The same value as `Steps.<StepName>.Output.<VarName>` with no path mapping applied: a `PATH` value is in the submission path context. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.Output.*`, including TEMPLATE-scope fields for `PATH` values.|
 |`Steps.<StepName>.TaskParam.<ParamName>`|A `list` of the values of Task parameter `<ParamName>` for every Task of Step `<StepName>`, in parameter-space iteration order, aligned element-for-element with the Step's `Output` lists. The element type is the Task parameter's type (`int` for `CHUNK[INT]`). Optional, and `null` when skipped, if the Step has an *enableIf*. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.Output.*`. For a `PATH` Task parameter, only in format strings annotated `@fmtstring[host]`, with path mapping rules applied.|
 |`Steps.<StepName>.TaskRawParam.<ParamName>`|The same values as `Steps.<StepName>.TaskParam.<ParamName>` with no path mapping applied. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.RawOutput.*`.|

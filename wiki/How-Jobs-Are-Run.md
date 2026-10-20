@@ -191,11 +191,17 @@ its **iterations** one after another, numbered from 0:
 3. If the loop has not ended and has already run `maxIterations` iterations, it fails. Otherwise the next iteration
    starts. Iterations never overlap.
 
-A loop with `while` whose first `while` is `false` runs zero iterations and succeeds, as a Step with zero Tasks does.
-When a loop succeeds, its outputs are available to the Steps that depend on it: a `collect: LAST` output is the value
-of the last iteration (`null` after zero iterations), and a `collect: APPEND` output is the list of every iteration's
-value, in order. A failed Step instance in any iteration, or an error in any of the loop's expressions, fails the loop
-at once, and the Steps that depend on it never run.
+A loop with `while` whose first `while` is `false` runs zero iterations, as a Step can have zero Tasks. When a loop
+ends, by `until`, by `while`, or with zero iterations, the `minLength` of every `collect: APPEND` output is checked,
+and then the loop succeeds. When a loop succeeds, its outputs are available to the Steps that depend on it: a
+`collect: LAST` output is the value of the last iteration (`null` after zero iterations), and a `collect: APPEND`
+output is the list of every iteration's value, in order. A failed Step instance in any iteration, or an error in any
+of the loop's expressions, fails the loop at once, and the Steps that depend on it do not run while it is failed. Only
+a failure of a Step instance's Tasks can be recovered: if a retry or requeue of those Tasks makes the instance
+succeed, the iteration continues and the loop resumes. Every other failure of a loop is final, and the Steps that
+depend on it never run: an error in a Step instance's or the loop's own materialization expressions, exceeding a
+limit, an error in any of the loop's expressions at an iteration boundary or a violated constraint, and reaching
+`maxIterations`.
 
 A scheduler should show each iteration with its index, the loop variable values it ran with, and its Step instances
 and their Tasks. A loop's total number of Tasks is not known until it ends. A Session holds the Step Environments of

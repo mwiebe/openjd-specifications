@@ -1,0 +1,65 @@
+# RFC 0013 §<LoopOutputVariableDefinition> item 6 and §Loop binding: a while loop that runs
+# zero iterations checks each APPEND output's minLength against [] before it succeeds, so
+# minLength: 1 fails the loop and its dependent never runs. A runs first to show the template
+# was accepted. 3.8.5--while-zero-iterations, with no minLength, is the companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: A
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('A_' + 'RAN')
+  - name: L
+    dependencies:
+    - dependsOn: A
+    loop:
+      variables:
+      - name: N
+        type: INT
+        initial: '{{0}}'
+        next: '{{Loop.N - 1}}'
+      while: '{{Loop.N > 0}}'
+      maxIterations: 5
+      steps:
+      - name: B
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('B_' + 'RAN')
+    outputVariables:
+    - name: Hist
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Loop.N}}'
+      minLength: 1
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - A_RAN
+  forbidden:
+  - B_RAN
+  - C_RAN
