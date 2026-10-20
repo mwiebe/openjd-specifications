@@ -237,7 +237,8 @@ proposed as a separate extension with its own directive, `openjd_metric: <name>=
 output variable that no Step reads. It is declared with a type and constraints, has an optional `unit` and
 `description` for display, and is reported with `openjd_output_var:`. A scheduler stores and can show every Task's
 committed outputs whether or not a Step reads them (see [Committing values](#committing-values)), so the same
-declaration gives a UI its columns and, if a later Step needs it, gives that Step its input (see the sweep examples).
+declaration gives a UI its columns and, if a later Step needs it, gives that Step its input (see
+[RFC 0011 §Parameter sweep, then run the winner](0011-control-flow.md#parameter-sweep-then-run-the-winner)).
 
 One mechanism instead of two means one directive, one set of validation rules, and one way of storing values per Task.
 A metric that later feeds a Step needs no change to the producer. The costs:

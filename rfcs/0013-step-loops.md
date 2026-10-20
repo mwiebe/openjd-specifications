@@ -58,6 +58,9 @@ iterations is late-bound, as a Task count is under RFC 0011.
 ### A loop at a glance
 
 ```yaml
+parameterDefinitions:
+  - name: Target
+    type: FLOAT
 steps:
   - name: Setup
     outputVariables:
@@ -159,6 +162,12 @@ A loop has the Step states of [RFC 0011 §Step states](0011-control-flow.md#step
                        ├──a group fails ──► FAILED, at once
                        └──a dependency FAILED ──► (blocked; never runs)
 ```
+
+A loop is `FAILED` when a body Step instance fails, when an evaluation at an iteration boundary fails, or when it
+reaches *maxIterations* while continuing (see [Failure](#failure)). A failure of a body Step instance is recoverable
+in the way a Step's failure is: if the scheduler lets the instance's failed Tasks be retried or requeued and the
+instance then succeeds, the loop leaves `FAILED` and resumes. A failure at an iteration boundary, and reaching the
+bound, are final.
 
 ## Basic Examples
 
@@ -898,8 +907,10 @@ Where:
    `null` result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`,
    `Job.Name`, and the `Steps.*` symbols of the loop's dependencies. It may not reference `Loop.*`, `RawLoop.*`, the
    body's Steps, `Step.Name`, `Task.*`, `Session.*`, or names bound by `let`.
-4. *next* — The value for the following iteration, evaluated at each iteration boundary at which the loop continues.
-   Its target type and `null` rule are those of *initial*. It may reference everything *until* may.
+4. *next* — The value for the following iteration, evaluated at each iteration boundary at which *until*, if
+   present, did not end the loop, before *while* and the bound. So a `while` loop evaluates *next* at its final
+   boundary too, and an error or constraint violation there fails the loop. Its target type and `null` rule are those
+   of *initial*. It may reference everything *until* may.
 5. *description* — For display only.
 6. Constraint properties — Checked against every value the variable takes, from *initial* and from each *next*. A
    violation fails the loop.
@@ -942,8 +953,8 @@ Where:
    everything *until* may.
 5. *description* and *unit* — For display, as on `<OutputVariableDefinition>`.
 6. Constraint properties — Under `LAST`, checked against each iteration's value. Under `APPEND`, `item` constraints
-   and `maxLength` are checked as each element is added, and `minLength` when the loop ends. A violation fails the
-   loop.
+   and `maxLength` are checked as each element is added, and `minLength` when the loop succeeds, including after zero
+   iterations; `minLength` is not checked when the loop is skipped. A violation fails the loop.
 
 A `PATH` value, read through the `Raw` forms, is in the submission path context, as for a loop variable.
 
@@ -964,7 +975,8 @@ CONTROL_FLOW adds three value references for loops:
 **Where available.** For loop `L`:
 
 1. In every format string of a body Step of `L`: its *enableIf*, *let*, *hostRequirements*, *parameterSpace*
-   (except *combination*), *stepEnvironments*, and *script*. There, the values are those of the iteration that the
+   (except *combination*), *stepEnvironments*, *script*, and, with `TASK_DEPENDENCIES`, the subspace ranges of its
+   *dependencies*. There, the values are those of the iteration that the
    body Step instance belongs to.
 2. In `L`'s *while*, where the values are those of the iteration about to start; and in `L`'s *until*, *next*, and
    loop output *value*s, where the values are those of the iteration that just finished. See
@@ -1030,7 +1042,7 @@ says for any Step, within its iteration.
 | **Job creation** | as today | as today | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated. |
 | **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011, and for a body Step instance, `Loop.*` | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
 | **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Loop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' values | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
-| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for `N`, the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
+| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
 | **Job output evaluation** | as RFC 0011 | as RFC 0011 | as RFC 0011 | A job output may read a loop's `Steps.*` symbols, and not a body Step's. |
 | **Task execution** | as today | as today, and `Loop.*` for a body Step instance | *(none)* | As RFC 0011. |
 
@@ -1128,6 +1140,15 @@ for loop variables.
 * Reaching the bound fails the loop (step 5 of the boundary).
 * A loop whose dependency fails, or can never run, never runs, as a Step behind a failed dependency never does.
 
+**Recovery.** A body Step instance's failure is recoverable in the same way as any Step's failure under RFC 0011 and
+RFC 0012: a scheduler that lets a failed Task be retried or requeued may do so for the Tasks of a failed instance. If
+the instance then succeeds, its iteration continues, and when the iteration is complete the loop leaves `FAILED` and
+resumes at that iteration's boundary. Until then the loop is `FAILED` and the Steps that depend on it are blocked,
+exactly as for a failed Step, and a job output that reads it is not evaluated (see
+[RFC 0011 §Job outputs](0011-control-flow.md#job-outputs) item 4). A failure at the iteration boundary (an error in
+*while*, *until*, *next*, or a loop output *value*, or a violated loop variable or loop output constraint) and
+reaching the bound are final: the loop is `FAILED` and cannot resume.
+
 #### Sessions
 
 A body Step instance is a Step for the rules of Sessions: a Session holds the Step Environments of one Step, so a
@@ -1138,12 +1159,15 @@ one Session under those rules, keeping its Job Environments entered, but need no
 #### Retries and re-runs
 
 [RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs) applies to every Task of a body Step
-instance, with one addition to when an output is **consumed**: an output of a body Step instance is consumed when the
-iteration boundary has evaluated a loop output *value*, an *until*, or a *next* that references it, as found by
-symbol collection. So a re-run of a Task of a completed iteration, after the loop has gone past its boundary, that
-succeeds with different values fails, as for any consumed output, because the next iteration was built from them.
-Loop variables and loop outputs are never re-evaluated, and an iteration is never run again. A failed attempt of a
-body Task may be retried as any Task's may; if the instance still fails, the loop fails.
+instance, with one addition to when an output is **consumed**: any `Steps.*` output, of a body Step instance or of
+one of the loop's dependencies, that a loop's *while*, *until*, *next*, *initial*, or loop output *value* references,
+as found by symbol collection, is consumed once that expression has been evaluated, consistent with
+[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs). So a re-run of a Task of a
+completed iteration, after the loop has gone past its boundary, that succeeds with different values fails, as for any
+consumed output, because the next iteration was built from them. Loop variables and loop outputs are never
+re-evaluated, and an iteration is never run again. A failed attempt of a body Task may be retried as any Task's may;
+if the instance still fails, the loop stays `FAILED`, and if it later succeeds the loop resumes (see
+[Failure](#failure)).
 
 #### Limits
 
@@ -1164,7 +1188,10 @@ body Task may be retried as any Task's may; if the instance still fails, the loo
 
 * **`TASK_CHUNKING`.** A body Step may be chunked. RFC 0012's rules for chunked Steps apply to each instance.
 * **`TASK_DEPENDENCIES`.** A body Step's subspace dependencies may name only body Steps of the same loop, and select
-  Tasks of their instances in the same iteration. Dependencies between iterations are Future Work.
+  Tasks of their instances in the same iteration; their subspace ranges may reference `Loop.*` and `RawLoop.*` (see
+  [The `Loop.*` scope](#the-loop-scope)). A top-level Step may not have a subspace dependency on a loop, which has no
+  Tasks, and a loop's own `dependencies` must be whole-Step dependencies. Dependencies between iterations are Future
+  Work.
 * **`WRAP_ACTIONS`** and other extensions that change how a Step's Actions run apply to body Step instances as to any
   Step.
 
@@ -1175,7 +1202,8 @@ body Task may be retried as any Task's may; if the instance still fails, the loo
 Add a section, *Step Loops*: a loop runs its body Steps once per iteration, one iteration after another; each
 iteration has its own instance of every body Step, with its own Tasks; at the end of each iteration the scheduler
 evaluates the loop's outputs and decides, from `until` or `while`, whether another iteration runs; a loop that would
-exceed `maxIterations` fails; and a failure in any body Step fails the loop. See [Running a loop](#running-a-loop).
+exceed `maxIterations` fails; and a failure in any body Step fails the loop, which resumes if a retry or requeue makes
+that body Step succeed. See [Running a loop](#running-a-loop).
 
 ### Validation
 
@@ -1262,8 +1290,10 @@ What this RFC does differently:
 - **Sessions (openjd-sessions, Python and Rust)**: Nothing new. A body Step instance runs as a Step, with `Loop.*`
   values supplied with its other symbols, and with `PATH` values marked as paths so that the Session maps them.
 - **CLI (`openjd run`)**: Runs a loop's iterations in order, each iteration's body Steps in dependency order, prints
-  each iteration's index, loop variable values, and loop outputs, and fails the run as the loop fails. `openjd
-  summary` reports a loop's bound and body.
+  each iteration's index, loop variable values, and loop outputs, and fails the run as the loop fails. `openjd run
+  --step` and `--tasks` accept a loop's name, which runs the whole loop, and reject a body Step's name with an error
+  that names its loop, because a body Step runs only within its loop's iterations. `openjd summary` reports a loop's
+  bound and body.
 - **Schedulers**: Creating body Step instances as iterations start, running iterations in order, evaluating the
   boundary, storing the loop variables and outputs, and showing iterations. A scheduler whose Jobs have a fixed set
   of Steps from submission must add the ability to create Steps while a Job runs, or represent each iteration's

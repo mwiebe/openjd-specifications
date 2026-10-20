@@ -240,31 +240,34 @@ Items 9 and later concern loops (RFC 0013).
    example. The RFC could state it more directly, for example by saying that a value under
    no rule's `destination_path` has no submission-context form. The stored forms asserted
    in the other path tests are those of the reference inverse.
-2. **Type of `RawOutput` for `PATH`.** The RFC says `RawOutput` has the same type as
-   `Output` (`path`), while EXPR types `RawParam` of a `PATH` parameter as `string`
-   because a submission path may not parse on the local OS.
-3. **Float formatting of output values.** EXPR §1.3.4 preserves a float's original text
-   when it is copied; the RFC doesn't say whether that applies to a reported `3` or `3.50`.
-4. **Iteration order of a chunked list range** such as `[5, 1, 3, 2]`: list order or the
-   sorted order chunks are formed in. `3.7.1--chunk-list-range-alignment` checks alignment only.
-5. **Job output failure timing.** Whether Tasks that depend on the producer may be
-   dispatched before the job output is evaluated. `2.17--job-output-fails-after-step` only
-   asserts that the run fails.
-6. **Directive coercion vs. parameter parsing.** BOOL job parameters accept `1`; EXPR
-   coercion has no `int` to `bool`. The tests follow the RFC's EXPR coercion rule (`B=1`
-   is invalid; `N="12"` is the INT 12).
-7. **The 64 KiB line floor**: whether it includes the line terminator. The test uses a
-   65,023-byte line.
-8. **`@` file read time**: no bound on how soon a runtime must process a flushed line.
-9. **Other body Steps after a failure.** RFC 0013 §Failure lets instances of the same
-   iteration that don't depend on a failed one keep running. Tests forbid only markers of
-   dependents of the failed instance and of later iterations.
-10. **Iteration order is not observed directly.** That iteration `N + 1` starts only after
-    iteration `N` ends is implied by the values the tests check (each iteration reads `next`
-    from the one before), not by timing.
-11. **A loop's own failure is not a Task failure.** A boundary error or the bound fails the
-    loop, not a Task, but `openjd run` reports it as a failed run, which `taskFailure`
-    accepts; its exit-code check is not used.
+2. **Type of `RawOutput` for `PATH` (RFC 0011 §The `Steps.*` scope).** RFC 0011 says
+   `RawOutput` has the same type as `Output` (`path`), while EXPR types `RawParam` of a
+   `PATH` parameter as `string` because a submission path may not parse on the local OS.
+3. **Float formatting of output values (RFC 0012 §Processing a directive).** EXPR §1.3.4
+   preserves a float's original text when it is copied; RFC 0012 doesn't say whether that
+   applies to a reported `3` or `3.50`.
+4. **Iteration order of a chunked list range (RFC 0012 §Chunked Steps)** such as
+   `[5, 1, 3, 2]`: list order or the sorted order chunks are formed in.
+   `3.7.1--chunk-list-range-alignment` checks alignment only.
+5. **Job output failure timing (RFC 0011 §Job outputs).** Whether Tasks that depend on the
+   producer may be dispatched before the job output is evaluated.
+   `2.17--job-output-fails-after-step` only asserts that the run fails.
+6. **Directive coercion vs. parameter parsing (RFC 0012 §Processing a directive).** BOOL
+   job parameters accept `1`; EXPR coercion has no `int` to `bool`. The tests follow
+   RFC 0012's EXPR coercion rule (`B=1` is invalid; `N="12"` is the INT 12).
+7. **The 64 KiB line floor (RFC 0012 §Limits)**: whether it includes the line terminator.
+   The test uses a 65,023-byte line.
+8. **`@` file read time (RFC 0012 §File values)**: no bound on how soon a runtime must
+   process a flushed line.
+9. **Other body Steps after a failure (RFC 0013 §Failure).** RFC 0013 lets instances of
+   the same iteration that don't depend on a failed one keep running. Tests forbid only
+   markers of dependents of the failed instance and of later iterations.
+10. **Iteration order is not observed directly (RFC 0013 §Iterations).** That iteration
+    `N + 1` starts only after iteration `N` ends is implied by the values the tests check
+    (each iteration reads `next` from the one before), not by timing.
+11. **A loop's own failure is not a Task failure (RFC 0013 §Failure).** A boundary error or
+    the bound fails the loop, not a Task, but `openjd run` reports it as a failed run,
+    which `taskFailure` accepts; its exit-code check is not used.
 
 ## Running the tests
 
