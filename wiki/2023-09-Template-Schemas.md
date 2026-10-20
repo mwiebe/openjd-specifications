@@ -2045,8 +2045,8 @@ other failure of a loop is final, and once one occurs the loop cannot return to 
 materialization expression of a Step instance or of the loop (its *enableIf*, *maxIterations*, an *initial*, or the
 first *while*), exceeding a limit, an error in *while*, *until*, *next*, or an output *value*, a violated constraint,
 including `minLength` when the loop ends, and reaching *maxIterations*. Any `Steps.*` output that a loop's *while*,
-*until*, *next*, *initial*, or output *value* references counts as consumed, for re-runs of its Task, once that
-expression has been evaluated. A re-run of a body Task that has already succeeded leaves the Task and its Step
+*until*, *next*, *initial*, or output *value* references counts as consumed (a value a later expression has read, so
+a re-run that changes it fails), for re-runs of its Task, once that expression has been evaluated. A re-run of a body Task that has already succeeded leaves the Task and its Step
 instance `SUCCEEDED` (see [RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)),
 so it never fails the loop or changes its state, variables, or outputs, and the iteration boundary does not wait for
 it. Only a failed attempt of a Task that has not yet succeeded counts as a failure of a Step instance. The loop's
