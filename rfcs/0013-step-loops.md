@@ -1357,11 +1357,10 @@ What this RFC does differently:
   only top-level Step. Only the rejection of an explicitly given `--maximum-tasks` is limited to an explicit `--step`
   naming a loop; this needs the CLI to tell a given `--maximum-tasks` from its default. In every other run that
   includes a loop, including a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`
-  for a `--step` that is not a loop,
-  `--maximum-tasks` applies to each body Step instance as it does to any Step. A body Step instance that did not run
-  all its Tasks is incomplete. The other instances of its iteration follow the CLI's usual rule for an incomplete
-  producer: only the Steps that read the incomplete instance's outputs are blocked. A failure of another instance of
-  the iteration fails the loop as usual. The iteration never completes, so
+  for a `--step` that is not a loop, `--maximum-tasks` applies to each body Step instance as it does to any Step. A
+  body Step instance that did not run all its Tasks is incomplete. The other instances of its iteration follow the
+  CLI's usual rule for an incomplete producer: only the Steps that read the incomplete instance's outputs are
+  blocked. A failure of another instance of the iteration fails the loop as usual. The iteration never completes, so
   the boundary is not evaluated, the loop is reported as blocked by an incomplete body Step instance, and every Step
   that depends on the loop is blocked behind it, as for a blocked dependency. With `--step L` for a loop `L`,
   `--step-inputs` supplies the values of the outputs of `L`'s dependencies that the loop and its body read. For a
