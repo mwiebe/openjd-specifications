@@ -152,8 +152,9 @@ once its own dependencies are satisfied, so skipping a Step never lets later wor
 of it. A failed Step does not satisfy dependencies, and a pending Step whose producer fails never runs, as with any
 dependency on a failed Step today.
 
-A re-run of a Task that has already succeeded leaves the Task and its Step succeeded, for dependencies and for Step
-and Job success, unless the re-run succeeds and commits new values (see
+A re-run of a Task that has already succeeded never moves the Task or its Step out of succeeded, for dependencies or
+for Step success. Only a re-run that succeeds and commits new values changes anything: the Step's outputs change, the
+Job outputs that read them are evaluated again, and the Job fails if one of those fails (see
 [RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)).
 
 A scheduler may create a pending Step's Tasks only when it is bound, when its Tasks are known, or create the Step at
