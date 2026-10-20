@@ -1944,12 +1944,13 @@ Where:
     * Maximum number of elements: 32.
     * No two elements in this list may have the same value for the `name` property.
 2. *while* — Checked before each iteration, including the first: the iteration runs only if it is `true`. If it is
-   `false` before the first iteration, the loop runs zero iterations and, if every `APPEND` output's `minLength`
-   holds for `[]`, succeeds. Its target type is `bool`, and a
-   `null` result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`,
+   `false` before the first iteration, the loop runs zero iterations and, once its dependencies are satisfied,
+   succeeds if every `APPEND` output's `minLength` holds for `[]`. Its target type is `bool`, and a `null` result is
+   an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`,
    `Job.Name`, `Loop.*` and `RawLoop.*`, and the `Steps.*` values of the loop's *dependencies*, but not the Steps of
    the loop's body.
-3. *until* — Checked after each iteration: if it is `true`, the loop stops and succeeds. A loop with *until* runs at
+3. *until* — Checked after each iteration: if it is `true`, it ends the loop, which succeeds if every `APPEND`
+   output's `minLength` holds. A loop with *until* runs at
    least once. Its target type is `bool`, and a `null` result is an error. It may reference everything *while* may,
    and the `Steps.*` values of every Step of the loop's body, for the iteration that just finished.
 4. *maxIterations* — The most iterations the loop may run, an integer from 1 to 1,000. A format string here may
@@ -2055,16 +2056,24 @@ when every Step of the current one has completed successfully or been skipped. A
 every loop output's *value* is evaluated; *until*, if present, is checked, and if it is `true` the loop ends; every
 variable's *next* is evaluated; *while*, if present, is checked with the new values, and if it is `false` the loop ends;
 and if the loop has run *maxIterations* iterations, it fails. A loop whose first *while* is `false` ends with zero
-iterations. When a loop ends, each `APPEND` output's `minLength` is checked, and then the loop succeeds. A failed Step
-in an iteration, or an error in any of these expressions, fails the loop at once. Only a failure of a Step instance's
-Tasks can be recovered, as any failed Step can: if a retry or requeue of its Tasks makes it succeed, the iteration
-continues and the loop resumes at that iteration's boundary, and until then the loop is failed and the Steps that depend
-on it are blocked. Every other failure of a loop is final: an error in a materialization expression of a Step instance
-or of the loop (its *enableIf*, *maxIterations*, an *initial*, or the first *while*), exceeding a limit, an error in
-*while*, *until*, *next*, or an output *value*, a violated constraint, and reaching *maxIterations*. Any `Steps.*`
-output that a loop's *while*, *until*, *next*, *initial*, or output *value* references counts as consumed, for re-runs
-of its Task, once that expression has been evaluated. The loop's outputs are available to the Steps that depend on it
-when it succeeds. See
+iterations once its dependencies are satisfied. When a loop ends, each `APPEND` output's `minLength` is checked, and
+then the loop succeeds; this check is not a materialization expression and is never part of Job creation. The total
+size of the loop's variable and output values is checked after the *initial* values are evaluated (failing Job
+creation if they are evaluated then), and after each iteration once the outputs and once the *next* values are
+evaluated; a scheduler must accept at least 1 MiB. A failed Step in the iteration in progress, or an error in any of
+these expressions, fails the loop at once. Only a failure of the Tasks of a Step instance of the iteration in progress
+can be recovered, as any failed Step can: if a retry or requeue of its Tasks makes it succeed, the iteration continues
+and the loop resumes at that iteration's boundary, and until then the loop is failed and the Steps that depend on it
+are blocked. Every other failure of a loop is final, and once one occurs the loop cannot resume: an error in a
+materialization expression of a Step instance or of the loop (its *enableIf*, *maxIterations*, an *initial*, or the
+first *while*), exceeding a limit, an error in *while*, *until*, *next*, or an output *value*, a violated constraint,
+including `minLength` when the loop ends, and reaching *maxIterations*. Any `Steps.*` output that a loop's *while*,
+*until*, *next*, *initial*, or output *value* references counts as consumed, for re-runs of its Task, once that
+expression has been evaluated. A re-run of a Task of an earlier iteration, or after the loop has ended, follows the
+re-run rules for any Task's outputs (a successful re-run replaces an output that has not been consumed, keeps one that
+it reports unchanged, and is reported as failed if it changes a consumed one) and never changes the loop's state,
+variables, or outputs; a failed re-run commits nothing, and the Step instance keeps its committed values. The loop's
+outputs are available to the Steps that depend on it when it succeeds. See
 [How Jobs Are Run](How-Jobs-Are-Run#step-loops).
 
 ## 4. `<Environment>`
@@ -2627,7 +2636,7 @@ different sets of values are known, which determines which format strings can be
 | Stage | When | Known Values | Unknown Values | What Happens |
 |-------|------|-------------|----------------|--------------|
 | **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Steps.*`, `Loop.*`, and `RawLoop.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `CONTROL_FLOW` extension: `Steps.*` values are available as `unresolved` values of the types derived from the producing Steps' *outputVariables* and Task parameters, and references to them are checked against the referencing Step's *dependencies*; `Loop.*` and `RawLoop.*` values are available as `unresolved` values of the loop variables' types (see [3.8.4](#384-scopes-in-and-around-a-loop)). |
-| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated and expressions in TEMPLATE scope are fully evaluated (with the `CONTROL_FLOW` extension, only those of the materialization groups evaluated then, and the `let` bindings those groups use); `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose values are all concrete is evaluated; for each Step whose *enableIf* is then `true` or absent, every materialization group whose `Steps.*` values are all concrete is evaluated, and an error fails Job creation; the other groups wait for step input binding. A loop is treated as a Step here; nothing of a Step of a loop's body is evaluated at Job creation (see [3.8.5](#385-running-a-loop)). |
+| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated and expressions in TEMPLATE scope are fully evaluated (with the `CONTROL_FLOW` extension, only those of the materialization groups evaluated then, and the `let` bindings those groups use); `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose values are all concrete is evaluated; for each Step whose *enableIf* is then `true` or absent, every materialization group whose `Steps.*` values are all concrete is evaluated, and an error fails Job creation; the other groups wait for step input binding. A loop is treated as a Step here; nothing of a Step of a loop's body is evaluated at Job creation, and the `minLength` check of a loop's `APPEND` outputs is never part of it (see [3.8.5](#385-running-a-loop)). |
 | **Step input binding** (`CONTROL_FLOW` only) | Per materialization group of a Step (see [3](#3-steptemplate)), as soon as every `Steps.*` value it reads is concrete, with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The group's format strings are evaluated. If *enableIf* is `false` the Step is skipped, its parameter space is the empty set (its `Steps.*` values are `null`, not `[]`), and no other group is evaluated. When *parameterSpace* is evaluated the Step's Tasks are known, and when *hostRequirements* is, its host requirements are known, in either order. If any evaluation fails, or the Task count exceeds the implementation's limit, the Step fails at once, before any of its Tasks runs. Until every group has been evaluated the Step is pending inputs, and none of its Tasks is dispatched. |
 | **Loop iteration start** (`CONTROL_FLOW` only) | When a loop starts an iteration (see [3.8.5](#385-running-a-loop)) | `Param.*`, `RawParam.*`, `Loop.*` for the iteration, the `Steps.*` values of the loop's dependencies | The values of the Steps of the iteration | A new instance of every Step of the loop's body is created. Each is bound as a Step is at step input binding; a group whose values are all concrete is evaluated now. |
 | **Loop iteration boundary** (`CONTROL_FLOW` only) | When every Step instance of an iteration has completed successfully or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for the iteration (for *while*, for the next iteration), the `Steps.*` values of the loop's dependencies and of the iteration's Steps | `Task.*`, `Session.*` | The loop outputs' *value*s, then *until*, then every *next*, then *while* with the new values, then the *maxIterations* bound. Any failure fails the loop. |
