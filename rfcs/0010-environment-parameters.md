@@ -241,16 +241,16 @@ environment:
       default: ""
   hostRequirements:
     attributes:
-      - name: attr.worker.docker
-        anyOf: ["true"]
+      - name: attr.worker.os.family
+        anyOf: [linux]
     amounts:
       - name: amount.worker.gpu
         min: "{{ 1 if Env.Param.Gpus != '' else 0 }}"
   script: ...
 ```
 
-A Step that requests `Docker` with `Gpus: "all"` is placed only on a host with `attr.worker.docker` and
-at least one GPU; one that requests it without `Gpus` needs only the first. A Step that does not request
+A Step that requests `Docker` with `Gpus: "all"` is placed only on a Linux host with at least one GPU; one
+that requests it without `Gpus` needs only Linux. A Step that does not request
 `Docker` is unaffected. On a fleet where only some hosts run containers, this is what keeps the Steps
 that asked for a container off the others.
 
@@ -416,7 +416,11 @@ This RFC is additive and gated by the `ENV_PARAMS` extension name declared under
 > A modification to [`1.1. Job Template`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#11-job-template)
 
 The Job Template schema is unchanged. Extension list addition to item 3 (*extensions*): `ENV_PARAMS`
-(this RFC).
+(this RFC). Item 7 (*jobEnvironments*) says the Environments "are entered in the order provided at the start of every
+Session for Tasks in the Job"; add after that sentence: "With the `ENV_PARAMS` extension, an Environment whose
+`runScope` is `ONLY_REQUESTED` is entered only in the Sessions of the Steps that request it (see
+[`<Environment>`](#4-environment))."
+
 
 #### Environment Template
 
@@ -494,9 +498,11 @@ New properties:
   addition to those of the Step (or, with `SERVICE`, the Service) whose Sessions they are. Available with the
   `ENV_PARAMS` extension. The object is a [`<HostRequirements>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#33-hostrequirements)
   with the same shape and constraints as on a `<StepTemplate>`, with these differences:
-    1. Its format strings may reference, besides the scopes available to a Step's *hostRequirements*, this Environment's
-       `Env.Param.*` and `Env.RawParam.*` of types other than PATH and LIST[PATH]. They are resolved when the Job is
-       created, once for each Step whose Sessions enter the Environment, with that Step's effective values (see
+    1. Its format strings may reference `RawParam.*` and `Param.*` (not PATH or LIST[PATH]) of the Job Parameters of
+       the document that contains the Environment, with the `EXPR` extension `Job.Name` and `Job.EnvironmentNames`, and
+       this Environment's `Env.Param.*` and `Env.RawParam.*` of types other than PATH and LIST[PATH]. No other scope is
+       available: in particular not `Step.Name`, a Step's `let` bindings, or `Session.*`. They are resolved when the Job
+       is created, once for each Step whose Sessions enter the Environment, with that Step's effective values (see
        [Effective Environment parameter values](#322-effective-environment-parameter-values)), so one Environment may
        impose different requirements on different Steps.
     2. Permitted on a Job Template's *jobEnvironments* entries and on an Environment Template's *environment*. Not
@@ -794,10 +800,10 @@ Constraints:
    `maxLength`, `minValue`, `maxValue`, and `item` constraints. An entry in a document that does not list `EXPR` must
    not supply a parameter whose type requires `EXPR` (BOOL or a LIST type).
 7. For every Environment that a Step's Sessions enter, the Step must supply every parameter of that Environment that has
-   no `default`. A Step's Sessions enter every *jobEnvironments* entry and every attached Environment whose `runScope` is
-   `ALL`, so such a parameter of such an Environment must be supplied by every Step of the Job; and they enter every
-   Environment with `runScope: ONLY_REQUESTED` that the Step requests, so such a parameter of such an Environment must be
-   supplied by every Step that requests it.
+   no `default`. A Step's Sessions enter every Environment of the Job, whether a *jobEnvironments* entry or an attached
+   Environment, whose `runScope` is `ALL`, so such a parameter of such an Environment must be supplied by every Step of
+   the Job; and they enter every Environment with `runScope: ONLY_REQUESTED` that the Step requests, so such a parameter
+   of such an Environment must be supplied by every Step that requests it.
 8. *required* must not be `false` on an entry that names a *jobEnvironments* entry.
 9. *enableIf* is permitted only in a document that lists `EXPR`, and must be a boolean literal or a single `{{ }}`
    expression of type `bool`.
@@ -805,8 +811,11 @@ Constraints:
 Constraints 1–4, 8, and 9 are checked at template validation. Constraints 5–7 are checked at template validation for
 entries that name a *jobEnvironments* entry (for constraint 6, against literal values only), and when the Job is
 created for every entry whose *enableIf* is absent or `true`, once format strings are resolved and external
-Environments are known. Constraint 3 applies to entries as written, enabled or not, so two entries for one Environment
-with complementary *enableIf* conditions are an error; write one entry whose values are conditional instead.
+Environments are known. A check that depends on whether an entry is enabled, which includes constraint 7 and any check
+of which Steps request an Environment, is made at template validation only for entries whose *enableIf* is absent or a
+boolean literal; for an entry whose *enableIf* is an expression, it is made when the Job is created. Constraint 3
+applies to entries as written, enabled or not, so two entries for one Environment with complementary *enableIf*
+conditions are an error; write one entry whose values are conditional instead.
 
 For an entry that names no *jobEnvironments* entry, template validation can check only constraints 1–4, 8, and 9, and the
 type of a literal value where its form fixes one (a list is not a STRING). A validator that is given the Environment
@@ -888,8 +897,8 @@ extensions:
 
 1. **§3.2 schema.** `<StepDependency>` is one of three objects, `dependsOn:`, `service:`, and `environment:`. ENV_PARAMS
    constraint 1 and SERVICE constraint 4 merge into one: "Exactly one of *dependsOn*, *service*, or *environment* must be
-   present; an entry that gives more than one, or none, is a validation error. *required* and *parameters* are permitted
-   only with *environment*."
+   present; an entry that gives more than one, or none, is a validation error. *required*, *enableIf*, and *parameters*
+   are permitted only with *environment*."
 2. **Duplicates.** SERVICE constraint 2 ("No two entries of one *dependencies* list may name the same Step or the same
    Service") and ENV_PARAMS constraint 3 (no two *environment* entries naming the same Environment) stay separate rules
    about separate keys. A Step, a Service, and an Environment may share a name; an entry's key says which it means.
@@ -908,11 +917,12 @@ extensions:
 6. **Requesting entities.** Wherever ENV_PARAMS says "Step" for the entity that requests an Environment or supplies
    values (`<Environment>` *runScope* and *hostRequirements*, §3.3.3, constraints 5–7, §3.2.1, §3.2.2), read "Step or
    Service". A Service's combined host requirements are its own *hostRequirements*, which RFC 0009 gives it, together
-   with those of the Environments its Sessions enter, by the rules of §3.3.3. A Service's
-   *parameters* values may use `RawParam.*`, `Param.*` (not PATH or LIST[PATH]), `Job.Name`, `Job.EnvironmentNames`,
-   and the Service's own `let` bindings; `Step.Name` is not available. A Service Session's Environment parameter values are the Service's
-   effective values. SERVICE's §3.6.2 row for `<Service>.let` gains "and with `ENV_PARAMS` the *parameters* values of
-   *dependencies* entries" in its Bound Names Available In column, as the `<StepTemplate>.let` row does.
+   with those of the Environments its Sessions enter, by the rules of §3.3.3. A Service's *parameters* values and
+   *enableIf* may use `RawParam.*`, `Param.*` (not PATH or LIST[PATH]), `Job.Name`, `Job.EnvironmentNames`, and the
+   Service's own `let` bindings; `Step.Name` is not available. A Service Session's Environment parameter values are the
+   Service's effective values. SERVICE's §3.6.2 row for `<Service>.let` gains "and with `ENV_PARAMS` the *parameters*
+   values and *enableIf* of *dependencies* entries" in its Bound Names Available In column, as the `<StepTemplate>.let`
+   row does.
 7. **Which Sessions enter which Environments.** A Service Session enters the combined Job's *jobEnvironments*
    (including attached Environments) by the same rule as a Task Session: every one with `runScope: ALL`, and every one
    with `runScope: ONLY_REQUESTED` that the Service requests. Constraint 7 therefore applies to a Service for each
@@ -922,36 +932,44 @@ extensions:
    every Service Session enters it, as every Task Session does.
 8. **Environments that configure Service clients.** Earlier drafts of SERVICE kept an Environment that lists a
    Service in its *dependencies* out of every Service Session, because such an Environment reads the Service's
-   endpoint, which does not exist until the Service is READY. That rule is replaced by two that follow from the
-   dependency graph:
-    * A Service's Sessions never enter an Environment that lists that Service. For an `ALL` Environment the Service's
-      Sessions skip it, and for an `ONLY_REQUESTED` Environment a request by that Service is a template validation
-      error naming both. Entering it would make the Service wait for its own endpoint.
-    * Every other entity whose Sessions enter an Environment that lists Service `X` depends on `X`: a Step is in
-      `X`'s scope (SERVICE *Service scope* rule 3, which with `ONLY_REQUESTED` reads "every Step that requests it"
-      rather than "every Step"), and a Service `Y` gains the edge `Y` → `X` in the graph of SERVICE constraint 3.
-      That graph must still be acyclic, so a Job in which `X` depends on `Y` while `Y`'s Sessions enter an
-      Environment that lists `X` is rejected, naming the cycle. The remedy is to make the Environment
-      `ONLY_REQUESTED` so that `Y` does not enter it.
+   endpoint, which does not exist until the Service is READY. That rule is replaced by one that follows from the
+   dependency graph, plus one exception:
+    * Every entity whose Sessions enter an Environment that lists Service `X` depends on `X`. A Step is in `X`'s scope
+      (SERVICE *Service scope* rule 3, which with `ONLY_REQUESTED` reads "every Step that requests it" rather than
+      "every Step"), and a Service `Y` gains the edge `Y` → `X` in the graph of SERVICE constraint 3 (or, within an
+      Environment Template, of SERVICE §1.2 item 6 constraint 4). Those graphs must still be acyclic. In particular, an
+      `environment:` entry by `X` itself for an Environment that lists `X` is the edge `X` → `X`, a cycle, and is
+      rejected naming it, whatever the Environment's `runScope`: the entry says that `X`'s Sessions enter an
+      Environment that waits for `X` to be READY. An explicit entry is never silently ignored.
+    * The exception: a Service's Sessions do not enter an `ALL` Environment that lists that Service. Without it, every
+      Environment that configures clients of a Service would put that Service in a cycle by default, and the common
+      case, a Job Environment that sets a cache's address for every Step, could not keep the default `runScope`. The
+      exception applies only where no entry is written; it is a default, not an override.
 
-   So a Service may use an Environment that configures clients of another Service, and starts after that Service is
-   READY, exactly as a Step would. The common case, a Job Environment that sets a cache's address for every Step,
-   keeps the default `runScope: ALL` and is skipped by the cache's own Session.
+   A cycle whose edges all come from one Job Template is rejected at template validation, except where an edge depends
+   on an entry whose *enableIf* is an expression, in which case it is checked when the Job is created (§3.2). A cycle
+   through an attached Environment is checked when the Job is created. The remedy for a cycle that is not a mistake is
+   to make the Environment `ONLY_REQUESTED`, so that the Service's Sessions do not enter it. A Service may otherwise use
+   an Environment that configures clients of another Service, and starts after that Service is READY, exactly as a Step
+   would.
 9. **Wrap hooks.** SERVICE's rule "the required hooks follow from `runScope`" is restated in terms of the Sessions a
    wrapping Environment is entered in. A wrapping Environment (RFC 0008) defines `onWrapEnvEnter` and `onWrapEnvExit`;
    it defines `onWrapTaskRun` if any Task Session enters it, and all four `onWrapService*` hooks if any Service
    Session enters it. For an `ONLY_REQUESTED` Environment, which kinds of Session enter it is known from which
    entities request it; for an `ALL` Environment, every kind of Session in the combined Job enters it. A Session of a
    kind whose hooks the wrapper does not define is an error, at template validation when the wrapper and the
-   requesting entities are in one Job Template, and at job creation otherwise, naming the Environment and the entity.
+   requesting entities are in one Job Template and every request's *enableIf* is absent or a literal, and at job
+   creation otherwise, naming the Environment and the entity.
    This generalizes SERVICE's Environment Template item 4, which stated the `ALL` case for wrappers from documents that
    do not declare `SERVICE`. The remedy is the same: define the hooks, or make the wrapper `ONLY_REQUESTED` so that
    only entities of the kinds it supports request it.
 10. **Checks over the combined Job.** SERVICE §1.2.2 ends "Items 2 and 4 are the only checks that require the combined
-    Job". With `ENV_PARAMS` that sentence reads "Items 2 and 4, and the `ENV_PARAMS` checks of
-    [§3.2.1](#321-resolving-external-environments) (resolving *environment* entries, constraints 5–7 for entries that
-    resolve to attached Environments, and the wrap hook check of item 9 for attached wrapping Environments), are the
-    only checks that require the combined Job".
+    Job". With `ENV_PARAMS` that sentence reads "Items 2 and 4, and the `ENV_PARAMS` checks that need the attached
+    Environments: resolving *environment* entries ([§3.2.1](#321-resolving-external-environments)), constraints 5–7 for
+    entries that resolve to attached Environments, every check that depends on an *enableIf* or *parameters* value
+    that reads `Job.EnvironmentNames`, the §3.3.3 conflicts and the item 8 cycles that involve an attached
+    Environment, and the wrap hook check of item 9 for attached wrapping Environments, are the only checks that require
+    the combined Job".
 
 #### Composition with CONTROL_FLOW
 
@@ -984,12 +1002,15 @@ Job. With both extensions:
 5. **The two `enableIf`s.** CONTROL_FLOW's *enableIf* on an `<Environment>` and this RFC's *enableIf* on an
    `environment:` entry are the same idea from the two sides: the Environment's author says when it applies, the Step's
    author says when it is wanted. A Step's Sessions enter an Environment only when both agree (and `runScope` admits
-   the Step). An entry's *enableIf* and *parameters* values may not reference `Steps.*`: a Step's Environment set and
-   effective values are fixed at Job creation, not at step input binding. Late-binding them is listed under
-   [Future Work](#future-work).
-6. **Host selection.** An Environment's *hostRequirements*, resolved for a Step, join that Step's host selection
-   materialization group, so the Step's combined host requirements are known when CONTROL_FLOW says its host
-   requirements are known. They may not reference `Steps.*`, for the reason given in item 5.
+   the Step). An entry's *enableIf* and *parameters* values may not reference `Steps.*`, directly or through a `let`
+   binding that does: a Step's Environment set and effective values are fixed at Job creation, not at step input
+   binding. Late-binding them is listed under [Future Work](#future-work).
+6. **Host selection.** An Environment's *hostRequirements* read no Step scope (`<Environment>` *hostRequirements* item
+   1), so they are resolved for every Step at Job creation. They join the Step's host selection materialization group
+   as already-concrete requirements, and the Step's combined host requirements are known when CONTROL_FLOW says its
+   host requirements are known. When the Step's own *hostRequirements* read `Steps.*`, that is at step input binding,
+   after submission; a §3.3.3 conflict found then cannot reject the submission, and instead fails the Step, naming the
+   sources, as a binding error does.
 7. **Constraint 7.** A Step whose Sessions do not enter an Environment, because its *enableIf* is `false` for that Step,
    need not supply the Environment's required parameters. Since *enableIf* reads effective values, and a required
    parameter has no `default`, an *enableIf* that reads a required parameter can be evaluated for a Step only when the
@@ -1043,14 +1064,15 @@ parameters through `Env.Param.*`; an inner Environment's parameters are not visi
   declared types of the Environment's *parameterDefinitions*. Literal Environment parameter `default`s, and literal
   *parameters* values for *jobEnvironments* entries, are checked against their definitions.
 * **Job creation** — Each Step's Environment parameter effective values are added to the Known Values at the end of the
-  stage. External Environments are resolved and `Job.EnvironmentNames` becomes concrete; each `environment:` entry's
-  *enableIf* is evaluated; the set of Environments each Step's Sessions enter is fixed from each Environment's
-  `runScope` and the Step's enabled entries; Environment parameter `default`s and *parameters* values are resolved into
-  each Step's effective values and checked; and each Environment's *hostRequirements* are resolved with each entering
-  Step's effective values and combined with the Step's own (§3.3.3).
-  Because `Job.EnvironmentNames` may appear in *enableIf* and *parameters* values, the attached Environments are
-  known before those are evaluated, and *enableIf* is evaluated before the entry's own name is resolved. Environment parameter PATH and LIST[PATH] values are not joined with
-  any directory and must be absolute (see [§4.5](#45-environmentparameterdefinition-extension-env_params)).
+  stage. The Environment Templates attached to the Job are determined first, and `Job.EnvironmentNames` is concrete
+  before any TEMPLATE-scope expression of the Job, including a Step's `let` bindings, is evaluated. Then each
+  `environment:` entry's *enableIf* is evaluated; each enabled entry that names no *jobEnvironments* entry is resolved
+  against the attached Environments (§3.2.1); the set of Environments each Step's Sessions enter is fixed from each
+  Environment's `runScope` and the Step's enabled entries; Environment parameter `default`s and *parameters* values are
+  resolved into each Step's effective values and checked; and each Environment's *hostRequirements* are resolved with
+  each entering Step's effective values and combined with the Step's own (§3.3.3). Environment parameter PATH and
+  LIST[PATH] values are not joined with any directory and must be absolute (see
+  [§4.5](#45-environmentparameterdefinition-extension-env_params)).
 * **Task execution** — `Env.Param.*` is available in the Environment's host-evaluated format strings, with path mapping
   applied to PATH and LIST[PATH] values.
 
@@ -1175,14 +1197,18 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 
 | Rule | Checked at |
 |------|-----------|
-| `ENV_PARAMS` listed by any document that uses Environment *parameterDefinitions*, `runScope`, or `environment:` entries | Template validation |
+| `ENV_PARAMS` listed by any document that uses Environment *parameterDefinitions*, `runScope`, or `hostRequirements`, or `environment:` entries | Template validation |
 | Environment *parameterDefinitions*: 1–50 entries, unique names, not on *stepEnvironments*, permitted types and fields | Template validation |
 | `runScope` is `ALL` or `ONLY_REQUESTED`, and not on *stepEnvironments* | Template validation |
 | Environment *hostRequirements*: §3.3 shape and constraints, not on *stepEnvironments*, `Env.*` references only to the enclosing Environment's non-PATH parameters | Template validation |
-| Combined host requirements have no empty intersection: `min` ≤ `max` for each amount, non-empty `anyOf` for each attribute (§3.3.3 items 1, 2) | Job creation |
+| An Environment's *hostRequirements*, resolved for a Step, satisfy §3.3.1 and §3.3.2 (a `min` that is a non-negative number, no two names in one source equal after resolution, and so on) | Job creation, per Step |
+| Combined host requirements have no empty intersection: `min` ≤ `max` for each amount, non-empty `anyOf` for each attribute (§3.3.3 items 1, 2) | Job creation; with `CONTROL_FLOW`, step input binding when the Step's own requirements read `Steps.*` |
+| With `CONTROL_FLOW`: an entry's *enableIf* and *parameters* values, and an Environment's *hostRequirements*, do not reference `Steps.*` directly or through a `let` binding ([Composition with CONTROL_FLOW](#composition-with-control_flow) items 5, 6) | Template validation |
 | `default` references only `Param.*` / `RawParam.*` of the same document's Job Parameters | Template validation |
 | A literal `default` satisfies its parameter's type and constraints, whether or not any Step uses it | Template validation |
 | `Env.Param.*` / `Env.RawParam.*` name a parameter of the enclosing Environment, and appear only inside it | Template validation |
+| A *parameters* value or *enableIf* references only `RawParam.*`, non-PATH `Param.*`, and with `EXPR` `Job.Name`, `Job.EnvironmentNames`, `Step.Name`, and the Step's `let`; never `Task.*`, `Session.*`, or `Env.*` (§3.2) | Template validation |
+| An Environment's *hostRequirements* reference only its document's `RawParam.*` and non-PATH `Param.*`, with `EXPR` `Job.Name` and `Job.EnvironmentNames`, and its own non-PATH `Env.Param.*` / `Env.RawParam.*` (§4 *hostRequirements* item 1) | Template validation |
 | `Job.EnvironmentNames` appears only in a document that lists `EXPR`, inside a `{{ }}` expression, and not in an Environment parameter `default` | Template validation |
 | `<StepDependency>` has exactly one of *dependsOn* / *environment*; *required*, *enableIf*, and *parameters* only with *environment* (constraint 1) | Template validation |
 | *enableIf* only in a document that lists `EXPR`; a boolean literal or a single `bool` expression (constraint 9) | Template validation |
@@ -1190,7 +1216,7 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 | *environment* does not name the Step's own *stepEnvironments* entry; no duplicates per list; 1–50 *parameters* (constraints 2–4) | Template validation |
 | `required: false` not used on an entry naming a *jobEnvironments* entry (constraint 8) | Template validation |
 | Keys and literal values of *parameters* for a *jobEnvironments* entry (constraints 5, 6) | Template validation |
-| Every parameter without a `default` of an `ALL` *jobEnvironments* entry supplied by every Step, and of an `ONLY_REQUESTED` one by every Step that requests it (constraint 7) | Template validation |
+| Every parameter without a `default` of an `ALL` *jobEnvironments* entry supplied by every Step, and of an `ONLY_REQUESTED` one by every Step that requests it (constraint 7) | Template validation, for Steps whose entries for it have no *enableIf* or a literal one; job creation for Steps with an *enableIf* expression |
 | External name resolution: missing with `required: true`, or ambiguous (§3.2.1) | Job creation |
 | Keys and values for an external Environment; resolved format-string values (constraints 5, 6). A key the resolved Environment does not declare is an error even with `required: false` (§3.2.1 item 1) | Job creation |
 | A document that does not list `EXPR` supplies no parameter of type BOOL or a LIST type (constraint 6) | Job creation (entries naming external Environments; for *jobEnvironments* entries the rule holds by construction) |
@@ -1198,7 +1224,7 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 | A resolved, non-literal `default` satisfies its parameter's type and constraints, for each Step that takes it (§4.5) | Job creation |
 | PATH and LIST[PATH] values absolute in the submission path format, or URIs; their string constraints, against the unmapped value. This includes a literal `default` that no Step uses (§4.5) | Job creation |
 | Required parameters of attached `ALL` Environments supplied by every Step of the combined Job, and of attached `ONLY_REQUESTED` Environments by every Step whose entry resolves to one (constraint 7, §3.2.1) | Job creation |
-| With `SERVICE`: a Service does not request an Environment that lists that Service; the SERVICE dependency graph, with an edge from each Service to every Service listed by an Environment its Sessions enter, is acyclic ([Composition with SERVICE](#composition-with-service) item 8) | Template validation for *jobEnvironments*; job creation for attached Environments |
+| With `SERVICE`: the SERVICE dependency graph, with an edge from each Service to every Service listed by an Environment its Sessions enter (including a self-edge from a Service's own entry for such an Environment), is acyclic ([Composition with SERVICE](#composition-with-service) item 8) | Template validation for *jobEnvironments* and entries without an *enableIf* expression; job creation otherwise |
 | With `SERVICE` and `WRAP_ACTIONS`: a wrapping Environment defines the hooks for every kind of Session that enters it ([Composition with SERVICE](#composition-with-service) item 9) | Template validation within one Job Template; job creation for attached Environments |
 | With `CONTROL_FLOW`: an Environment's `enableIf` references `Env.*` only of the enclosing Environment, and `Env.Param.*` only of non-PATH types; in an Environment Template it references `Env.*` only ([Composition with CONTROL_FLOW](#composition-with-control_flow)) | Template validation |
 
@@ -1338,7 +1364,7 @@ The difference is acceptable here for three reasons:
    submission.
 
 What a template validator does with an external entry is specified in
-[`<StepDependency>`](#32-stepdependency): it checks constraints 1–4 and 8 and the form of literal values.
+[`<StepDependency>`](#32-stepdependency): it checks constraints 1–4, 8, and 9 and the form of literal values.
 A validator given the Environment Templates the scheduler will attach, as `openjd run` already accepts
 them, performs the job-creation checks before submission, which is what the Tooling parseable tenet
 asks for.
@@ -1662,8 +1688,9 @@ layer per Step.
   Sessions enter (filtering `ONLY_REQUESTED` Environments by the Step's entries) and the effective
   values for each, and stores both on the Job's Steps in place of the single resolved Environment
   list; the external resolution reuses the code that already merges Environment Template parameter
-  definitions, and must run before *parameters* values are resolved so that `Job.EnvironmentNames` is
-  concrete. The `hostRequirements` type is reused on `Environment`, and job creation resolves each
+  definitions. The attached Environment Templates are determined, and `Job.EnvironmentNames` made concrete,
+  before any Step `let`, entry *enableIf*, or *parameters* value is evaluated; entries are then resolved
+  against them. The `hostRequirements` type is reused on `Environment`, and job creation resolves each
   Environment's requirements per entering Step and combines them with the Step's by the §3.3.3 rules,
   storing the combined set on the Job's Step.
   `openjd-sessions` takes the effective values as part of entering an Environment, the way it takes
