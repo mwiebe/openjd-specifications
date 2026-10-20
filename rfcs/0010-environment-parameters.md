@@ -1013,13 +1013,26 @@ Job. With both extensions:
 6. **Host selection.** An Environment's *hostRequirements* read no Step scope (`<Environment>` *hostRequirements* item
    1), so they are resolved for every Step at Job creation. They join the Step's host selection materialization group
    as already-concrete requirements, and the Step's combined host requirements are known when CONTROL_FLOW says its
-   host requirements are known. When the Step's own *hostRequirements* read `Steps.*`, that is at step input binding,
-   after submission; a §3.3.3 conflict found then cannot reject the submission, and instead fails the Step, naming the
-   sources, as a binding error does.
-7. **Constraint 7.** A Step whose Sessions do not enter an Environment, because its *enableIf* is `false` for that Step,
-   need not supply the Environment's required parameters. Since *enableIf* reads effective values, and a required
-   parameter has no `default`, an *enableIf* that reads a required parameter can be evaluated for a Step only when the
-   Step supplies it; a Step that does not supply it is rejected under constraint 7 before *enableIf* is evaluated.
+   host requirements are known. When the Step's own *hostRequirements* read `Steps.*`, or its *enableIf* is dynamic,
+   that is at step input binding, after submission; a §3.3.3 conflict found then cannot reject the submission, and
+   instead fails the Step, naming the sources, as a binding error does (item 8).
+7. **Constraint 7 and an Environment's `enableIf`.** A Step whose Sessions do not enter an Environment, because the
+   Environment's *enableIf* is `false` for that Step, need not supply the Environment's required parameters. Since that
+   *enableIf* reads effective values, and a required parameter has no `default`, an *enableIf* that reads a required
+   parameter can be evaluated for a Step only when the Step supplies it; a Step that does not supply it is rejected
+   under constraint 7 before the Environment's *enableIf* is evaluated.
+8. **A Step's own `enableIf` comes first.** The checks this RFC makes when the Job is created or later follow
+   CONTROL_FLOW's rule that a Step gains no fact until its *enableIf* is decided. For a Step that is `SKIPPED`, none of
+   the following is evaluated: its entries' *enableIf*, the resolution of its entries against attached Environments
+   (§3.2.1), its effective values, constraint 7 for attached Environments, and its combined host requirements. A
+   skipped Step therefore cannot fail Job creation for a missing parameter or a §3.3.3 conflict, and contributes
+   nothing to Session grouping or, with `SERVICE`, to a Service's scope. The reason is that the condition that skips a
+   Step is often the condition under which its configuration would be invalid: a Step enabled only when a container
+   Environment is present may well have host requirements that contradict the queue's Environments when it is not.
+   For a Step whose *enableIf* is dynamic, those checks are made at step input binding once it is decided `true`, and
+   a failure fails the Step, naming the cause, as a binding error does. Template-validation checks are unaffected: they
+   have no parameter values to condition on, and apply to every Step as written, exactly as CONTROL_FLOW type-checks
+   every expression of a Step it later skips.
 
 A per-entity *enableIf* expresses selection that `runScope` cannot, because it depends on the values rather than on
 whether an entry exists. A GPU-setup Environment can be entered only by Steps whose `Gpus` value is non-empty, or a
@@ -1208,7 +1221,7 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 | `runScope` is `ALL` or `ONLY_REQUESTED`, and not on *stepEnvironments* | Template validation |
 | Environment *hostRequirements*: §3.3 shape and constraints, not on *stepEnvironments*, `Env.*` references only to the enclosing Environment's non-PATH parameters | Template validation |
 | An Environment's *hostRequirements*, resolved for a Step, satisfy §3.3.1 and §3.3.2 (a `min` that is a non-negative number, no two names in one source equal after resolution, and so on) | Job creation, per Step |
-| Combined host requirements have no empty intersection: `min` ≤ `max` for each amount, non-empty `anyOf` for each attribute (§3.3.3 items 1, 2) | Job creation; with `CONTROL_FLOW`, step input binding when the Step's own requirements read `Steps.*` |
+| Combined host requirements have no empty intersection: `min` ≤ `max` for each amount, non-empty `anyOf` for each attribute (§3.3.3 items 1, 2) | Job creation; with `CONTROL_FLOW`, not for a `SKIPPED` Step, and at step input binding when the Step's *enableIf* is dynamic or its own requirements read `Steps.*` |
 | With `CONTROL_FLOW`: an entry's *enableIf* and *parameters* values, and an Environment's *hostRequirements*, do not reference `Steps.*` directly or through a `let` binding ([Composition with CONTROL_FLOW](#composition-with-control_flow) items 5, 6) | Template validation |
 | `default` references only `Param.*` / `RawParam.*` of the same document's Job Parameters | Template validation |
 | A literal `default` satisfies its parameter's type and constraints, whether or not any Step uses it | Template validation |
@@ -1229,7 +1242,7 @@ Every rule this extension adds, by the stage that checks it. Constraint numbers 
 | A format-string value or `default` for a list-typed parameter is a single `{{ }}` expression (§3.2, §4.5) | Template validation for `default`s and *jobEnvironments* entries; job creation for external Environments |
 | A resolved, non-literal `default` satisfies its parameter's type and constraints, for each Step that takes it (§4.5) | Job creation |
 | PATH and LIST[PATH] values absolute in the submission path format, or URIs; their string constraints, against the unmapped value. This includes a literal `default` that no Step uses (§4.5) | Job creation |
-| Required parameters of attached `ALL` Environments supplied by every Step of the combined Job, and of attached `ONLY_REQUESTED` Environments by every Step whose entry resolves to one (constraint 7, §3.2.1) | Job creation |
+| Required parameters of attached `ALL` Environments supplied by every Step of the combined Job, and of attached `ONLY_REQUESTED` Environments by every Step whose entry resolves to one (constraint 7, §3.2.1) | Job creation; with `CONTROL_FLOW`, not for a `SKIPPED` Step, and at step input binding when the Step's *enableIf* is dynamic |
 | With `SERVICE`: the SERVICE dependency graph, with an edge from each Service to every Service listed by an Environment its Sessions enter (including a self-edge from a Service's own entry for such an Environment), is acyclic ([Composition with SERVICE](#composition-with-service) item 8) | Template validation for *jobEnvironments* and entries without an *enableIf* expression; job creation otherwise |
 | With `SERVICE` and `WRAP_ACTIONS`: a wrapping Environment defines the hooks for every kind of Session that enters it ([Composition with SERVICE](#composition-with-service) item 9) | Template validation within one Job Template; job creation for attached Environments |
 | With `CONTROL_FLOW`: an Environment's `enableIf` references `Env.*` only of the enclosing Environment, and `Env.Param.*` only of non-PATH types; in an Environment Template it references `Env.*` only ([Composition with CONTROL_FLOW](#composition-with-control_flow)) | Template validation |

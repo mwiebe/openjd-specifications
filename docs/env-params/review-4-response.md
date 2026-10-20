@@ -72,5 +72,10 @@ pass; none blocks the edits below.
 * **Q1** — Includes disabled Environments, for the reason the question anticipated: the list feeds Step `let` and entry
   values, which feed effective values, which an Environment's `enableIf` may read. Stated in the §7.3.1 row and
   CONTROL_FLOW item 3.
-* **Q3** — Open; under discussion.
+* **Q3** — Resolved by progressive evaluation rather than by either answer offered. A Step's own *enableIf* is decided
+  first, as CONTROL_FLOW already requires for every other fact about a Step; a `SKIPPED` Step has none of this RFC's
+  job-creation checks evaluated (entry *enableIf*, §3.2.1 resolution, effective values, constraint 7 for attached
+  Environments, §3.3.3 conflicts), because the condition that skips a Step is often the one under which its
+  configuration would be invalid. Template-validation checks still apply to every Step as written. New CONTROL_FLOW
+  composition item 8; Validation rows qualified.
 * **Q4** — Open; to be examined with the wrap hook rule as a whole.
