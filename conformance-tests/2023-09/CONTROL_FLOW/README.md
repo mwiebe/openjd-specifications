@@ -220,9 +220,16 @@ and its section.
 - For loops: Session reuse across iterations, a scheduler's display of iterations, re-runs
   of body Tasks that have already succeeded, in any iteration, including the iteration in
   progress, or after the loop is `SUCCEEDED` or finally `FAILED` (a failed or rejected
-  re-run commits nothing, leaves the Task `SUCCEEDED`, and never fails the loop or changes
-  its state, variables, or outputs), a scheduler's limits on total Tasks or body Step
-  instances, the 1 MiB floor for loop values, and chunked body Steps.
+  re-run commits nothing, the Task keeps its earlier succeeded state and all of its
+  committed values, as in any Step, and the re-run never fails the loop or changes its
+  state, variables, or outputs; the iteration boundary does not wait for a re-run), a
+  scheduler's limits on total Tasks or body Step instances, the 1 MiB floor for loop
+  values, and chunked body Steps.
+- The loop rules of `openjd run`, which are CLI-specific: `--tasks` and `--task-param` are
+  rejected whenever the selected Step is a loop, an explicitly given `--maximum-tasks` is
+  rejected with `--step` naming a loop, and otherwise `--maximum-tasks` applies to each body
+  Step instance, so a body Step instance that does not run all its Tasks stops the loop
+  before its boundary.
 - `Steps.*` in `parameterDefinitions`: no field there is a format string.
 - A directive in a Job Environment's `onExit`, because whether a failed `onExit` fails a
   run whose Tasks succeeded is base-spec behavior the RFC doesn't settle.

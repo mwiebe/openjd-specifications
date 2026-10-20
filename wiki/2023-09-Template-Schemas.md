@@ -2073,9 +2073,11 @@ including `minLength` when the loop ends, and reaching *maxIterations*. Any `Ste
 expression has been evaluated. Any re-run of a body Task that has already succeeded, in any iteration, including the
 iteration in progress, or after the loop is `SUCCEEDED` or finally `FAILED`, follows the re-run rules for any Task's
 outputs (a successful re-run replaces an output that has not been consumed, keeps one that it reports unchanged, and
-is reported as failed if it changes a consumed one); a failed or rejected re-run commits nothing, leaves the Task and
-its Step instance `SUCCEEDED`, and never fails the loop or changes its state, variables, or outputs. Only a failed
-attempt of a Task that has not yet succeeded counts as a failure of a Step instance. The loop's
+is reported as failed if it changes a consumed one); a failed or rejected re-run commits nothing, and the Task keeps
+its earlier succeeded state and all of its committed values, as in any Step, so its Step instance stays `SUCCEEDED`
+and the re-run never fails the loop or changes its state, variables, or outputs. A re-run does not change whether the
+instance counts as `SUCCEEDED` for the completion of its iteration, so the iteration boundary does not wait for it.
+Only a failed attempt of a Task that has not yet succeeded counts as a failure of a Step instance. The loop's
 outputs are available to the Steps that depend on it when it succeeds. See
 [How Jobs Are Run](How-Jobs-Are-Run#step-loops).
 

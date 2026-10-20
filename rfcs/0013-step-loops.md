@@ -1095,7 +1095,8 @@ When a loop starts iteration `N`:
    Step's groups whose inputs are concrete at Job creation are. An error in one fails the instance, and so the loop,
    finally (see [Failure](#failure)).
 4. Iteration `N` is complete when every instance of it is `SUCCEEDED` or `SKIPPED`. The loop then evaluates the
-   iteration boundary.
+   iteration boundary. A re-run of a Task that has already succeeded does not change whether its instance counts as
+   `SUCCEEDED` here, so the boundary does not wait for the re-run (see [Retries and re-runs](#retries-and-re-runs)).
 
 No instance of iteration `N + 1` is created, and no Task of it runs, before the boundary of iteration `N` has decided
 to continue. Iterations never overlap.
@@ -1148,13 +1149,15 @@ for loop variables.
 
 #### Failure
 
-* A body Step instance of the iteration in progress that fails, because one of its Tasks fails or one of its groups
-  fails to evaluate, fails the loop at once. No further iteration starts, and the loop does not satisfy the
-  `dependsOn` of the Steps that depend on it, as a failed Step does not. Other instances of the same iteration that do
-  not depend on the failed one may still run, as independent Steps of a Job may today after a Step fails.
+* A body Step instance of the iteration in progress that fails, because an attempt of one of its Tasks that has not yet
+  succeeded fails or one of its groups fails to evaluate, fails the loop at once. No further iteration starts, and the
+  loop does not satisfy the `dependsOn` of the Steps that depend on it, as a failed Step does not. Other instances of
+  the same iteration that do not depend on the failed one may still run, as independent Steps of a Job may today after a
+  Step fails.
 * An error in one of the loop's own groups (*enableIf*, *maxIterations*, an *initial*, or the first *while*) fails the
   loop at once, or fails Job creation if the group is evaluated then (see [Loop binding](#loop-binding)).
-* Exceeding a limit of [Limits](#limits) items 2 and 4 fails the loop, or Job creation, for item 4 at Job creation.
+* Exceeding a limit of [Limits](#limits) items 2 and 4 fails the loop; for item 4 checked at Job creation, it fails Job
+  creation.
 * An error at the iteration boundary fails the loop at once (see
   [The iteration boundary](#the-iteration-boundary)).
 * Reaching the bound fails the loop (step 5 of the boundary).
@@ -1169,11 +1172,13 @@ are blocked, exactly as for a failed Step, and a job output that reads it is not
 [RFC 0011 §Job outputs](0011-control-flow.md#job-outputs) item 4).
 
 Any re-run of a body Task that has already succeeded, in any iteration, including the iteration in progress, or after
-the loop is `SUCCEEDED` or finally `FAILED`, follows
-[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs) rules 1 to 4. A failed re-run, or
-one that rule 3 rejects, commits nothing, leaves the Task and its instance `SUCCEEDED`, and never fails the loop or
-changes its state, its loop variables, or its loop outputs. Only a failed attempt of a Task that has not yet succeeded
-counts as a failure of a body Step instance.
+the loop is `SUCCEEDED` or finally `FAILED`, follows [RFC 0012 §Retries and
+re-runs](0012-step-output-variables.md#retries-and-re-runs) rules 1 to 4. A failed re-run, or one that rule 3 rejects,
+commits nothing, and the Task keeps its earlier succeeded state and all of its committed values, as it does in any Step,
+so its instance stays `SUCCEEDED` and the re-run never fails the loop or changes its state, its loop variables, or its
+loop outputs. A re-run does not change whether the instance counts as `SUCCEEDED` for the completion of its iteration,
+so the boundary does not wait for it. Only a failed attempt of a Task that has not yet succeeded counts as a failure of
+a body Step instance.
 
 Every other failure of a loop is final: the loop is `FAILED` and cannot return to `RUNNING`. These are a group of a body
 Step instance that fails to evaluate; a group of the loop itself that fails to evaluate; exceeding a limit of
@@ -1205,8 +1210,10 @@ body Step instance of the iteration in progress has succeeded after a retry or r
 to `RUNNING`, and the iteration continues to its boundary, unless a final failure has occurred (see
 [Failure](#failure)). Any re-run of a body Task that has already succeeded, in any iteration, including the iteration
 in progress, or after the loop is `SUCCEEDED` or finally `FAILED`, follows rules 1 to 4; a failed re-run, or one that
-rule 3 rejects, commits nothing, leaves the Task and its instance `SUCCEEDED`, and never fails the loop or changes its
-state, variables, or outputs (see [Failure](#failure)).
+rule 3 rejects, commits nothing, and the Task keeps its earlier succeeded state and all of its committed values, as
+it does in any Step, so its instance stays `SUCCEEDED` and the re-run never fails the loop or changes its state,
+variables, or outputs (see [Failure](#failure)). The re-run does not change whether the instance counts as
+`SUCCEEDED` for iteration completion, so the boundary of the iteration in progress does not wait for it.
 
 #### Limits
 
@@ -1250,12 +1257,13 @@ of the Tasks of a body Step instance of the iteration in progress is recoverable
 `FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry or requeue of
 its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. Any re-run of a body Task that has
 already succeeded, in any iteration, including the iteration in progress, or after the loop is `SUCCEEDED` or finally
-`FAILED`, follows the re-run rules of Step outputs; a failed or rejected re-run commits nothing, leaves the Task and its
-instance `SUCCEEDED`, and never fails the loop or changes its state, variables, or outputs. Only a failed attempt of a
-Task that has not yet succeeded counts as a body Step instance failure. Every other loop failure, including an
-expression or constraint error in the loop or at an iteration boundary, a binding error of a body Step instance,
-exceeding a limit, a violated `minLength` when the loop ends, and reaching `maxIterations`, is final, and once one
-occurs the loop cannot return to `RUNNING`. See [Running a loop](#running-a-loop).
+`FAILED`, follows the re-run rules of Step outputs; a failed or rejected re-run commits nothing, and the Task keeps its
+earlier succeeded state and all of its committed values, as in any Step, so its instance stays `SUCCEEDED` and the
+re-run never fails the loop or changes its state, variables, or outputs; the iteration boundary does not wait for a
+re-run. Only a failed attempt of a Task that has not yet succeeded counts as a body Step instance failure. Every other
+loop failure, including an expression or constraint error in the loop or at an iteration boundary, a binding error of a
+body Step instance, exceeding a limit, a violated `minLength` when the loop ends, and reaching `maxIterations`, is
+final, and once one occurs the loop cannot return to `RUNNING`. See [Running a loop](#running-a-loop).
 
 ### Validation
 
@@ -1352,14 +1360,16 @@ What this RFC does differently:
 - **CLI (`openjd run`)**: Runs a loop's iterations in order, each iteration's body Steps in dependency order, prints
   each iteration's index, loop variable values, and loop outputs, and fails the run as the loop fails. `openjd run
   --step` naming a loop runs the whole loop. `--tasks`, `--task-param`, and `--maximum-tasks` choose which Tasks of
-  the selected Step run, and a loop has no Task parameters or Tasks of its own, so with an explicit `--step` naming a
-  loop, the CLI rejects `--tasks`, `--task-param`, and an explicitly given `--maximum-tasks` with an error. This needs
-  the CLI to tell a given `--maximum-tasks` from its default. In every run that includes a loop without `--step`
-  naming it, which covers a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`,
+  the selected Step run, and a loop has no Task parameters or Tasks of its own, so `--tasks` and `--task-param` are
+  rejected with an error whenever the selected Step is a loop, whether named by `--step` or selected as the Job's
+  only top-level Step. Only the rejection of an explicitly given `--maximum-tasks` is limited to an explicit `--step`
+  naming a loop; this needs the CLI to tell a given `--maximum-tasks` from its default. In every other run that
+  includes a loop, which covers a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`,
   `--maximum-tasks` applies to each body Step instance as it does to any Step. A body Step instance that did not run
-  all its Tasks is incomplete: its iteration never completes, so the loop stops at that point without evaluating the
-  boundary, and the CLI reports the loop and the Steps that depend on it as not run because their inputs are
-  incomplete, as it does for any consumer of an incomplete producer. With `--step L` for a loop `L`,
+  all its Tasks is incomplete. The other instances of its iteration follow the CLI's usual rule for an incomplete
+  producer: only the Steps that read the incomplete instance's outputs are blocked. The iteration never completes, so
+  the boundary is not evaluated, the loop is reported as blocked by an incomplete body Step instance, and every Step
+  that depends on the loop is blocked behind it, as for a blocked dependency. With `--step L` for a loop `L`,
   `--step-inputs` supplies the values of the outputs of `L`'s dependencies that the loop and its body read. For a
   Step that depends on a loop, `--step-inputs` supplies each loop output it reads in that output's declared type, a
   single value under `LAST` or the whole list under `APPEND`, not one value per Task, since a loop has no Tasks.

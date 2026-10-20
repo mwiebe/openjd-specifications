@@ -203,7 +203,10 @@ recoverable is `FAILED` until every failed body Step instance of the iteration i
 or requeue of its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. Any re-run of a body
 Task that has already succeeded, in any iteration, including the iteration in progress, or after the loop is `SUCCEEDED`
 or finally `FAILED`, follows the re-run rules for any Task's outputs; a failed or rejected re-run commits nothing,
-leaves the Task and its Step instance `SUCCEEDED`, and never fails the loop or changes its state, variables, or outputs.
+and the Task keeps its earlier succeeded state and all of its committed values, as in any Step, so its Step instance
+stays `SUCCEEDED` and the re-run never fails the loop or changes its state, variables, or outputs. A re-run does not
+change whether the instance counts as succeeded for the completion of its iteration, so the boundary does not wait for
+it.
 Only a failed attempt of a Task that has not yet succeeded counts as a failure of a Step instance. Every other failure
 of a loop is final, the loop cannot return to `RUNNING` once one occurs, and the Steps that depend on it never run: an
 error in a Step instance's or the loop's own materialization expressions, exceeding a limit, an error in any of the
