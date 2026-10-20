@@ -13,9 +13,6 @@
 # offers conda only to Steps that ask for it would set runScope: ONLY_REQUESTED
 # and drop the "no packages requested" branch below.
 #
-# The Environment's hostRequirements keep its Sessions on hosts where its bash
-# script can run. They combine with each Step's own requirements.
-#
 # A Step that lists this Environment in its dependencies supplies its own
 # values instead:
 #
@@ -40,7 +37,6 @@
 specificationVersion: environment-2023-09
 extensions:
 - ENV_PARAMS
-- FEATURE_BUNDLE_1
 parameterDefinitions:
 - name: CondaPackages
   type: STRING
@@ -65,10 +61,6 @@ environment:
   - name: Channels
     type: STRING
     default: "{{Param.CondaChannels}}"
-  hostRequirements:
-    attributes:
-    - name: attr.worker.os.family
-      anyOf: [linux, macos]
   script:
     actions:
       onEnter:
