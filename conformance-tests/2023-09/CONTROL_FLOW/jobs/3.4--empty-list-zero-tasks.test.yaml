@@ -1,4 +1,4 @@
-# RFC 0010 §Empty parameter spaces: a range that evaluates to [] gives a zero-Task Step
+# RFC 0011 §Empty parameter spaces: a range that evaluates to [] gives a zero-Task Step
 # that succeeds, and a Step that depends on it still runs.
 template:
   specificationVersion: jobtemplate-2023-09

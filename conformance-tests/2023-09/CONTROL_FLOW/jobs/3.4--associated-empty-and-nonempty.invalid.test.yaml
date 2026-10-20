@@ -1,4 +1,4 @@
-# RFC 0010 §Empty parameter spaces: an empty range associated, as in (A, B), with a
+# RFC 0011 §Empty parameter spaces: an empty range associated, as in (A, B), with a
 # non-empty one is an error at binding.
 template:
   specificationVersion: jobtemplate-2023-09

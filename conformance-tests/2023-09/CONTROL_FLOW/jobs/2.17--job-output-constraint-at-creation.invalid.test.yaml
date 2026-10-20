@@ -1,4 +1,4 @@
-# RFC 0010 §Job outputs item 3: a violated constraint property fails the job output, and
+# RFC 0011 §Job outputs item 3: a violated constraint property fails the job output, and
 # at Job creation that makes Job creation fail.
 template:
   specificationVersion: jobtemplate-2023-09

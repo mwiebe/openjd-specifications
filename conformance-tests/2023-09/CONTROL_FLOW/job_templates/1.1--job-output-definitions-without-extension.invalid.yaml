@@ -1,4 +1,4 @@
-# RFC 0010 §Job Template: jobOutputDefinitions is @extension CONTROL_FLOW.
+# RFC 0011 §Job Template: jobOutputDefinitions is @extension CONTROL_FLOW.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

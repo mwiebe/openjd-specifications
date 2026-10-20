@@ -1,4 +1,4 @@
-# RFC 0010 §Path values / Design Choice 14: when the Session has path mapping rules, the
+# RFC 0011 §Path values / Design Choice 14: when the Session has path mapping rules, the
 # stored value MUST be in the submission path context AND forward mapping it MUST give back
 # the reported path; "If the runtime can find no such form, the value is invalid."
 # /elsewhere/a.exr is a worker-only path: no rule's destination_path covers it, so it has

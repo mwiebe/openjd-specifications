@@ -1,4 +1,4 @@
-# RFC 0010 §Conditional execution: an enableIf over Steps.* is decided at binding; false
+# RFC 0011 §Conditional execution: an enableIf over Steps.* is decided at binding; false
 # skips the Step and its dependent still runs.
 template:
   specificationVersion: jobtemplate-2023-09

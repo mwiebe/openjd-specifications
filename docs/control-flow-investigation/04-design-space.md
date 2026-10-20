@@ -7,7 +7,7 @@ Status: investigation note, input to the CONTROL_FLOW RFC draft. Not normative.
 > as output variables with no consumer. See [§8](#8-addendum-emission-channel-collect-modes-and-metrics). The rest of
 > this note, including its samples, still reflects the earlier file-based design where it mentions emission, and
 > [§9](#9-addendum-path-outputs-and-job-outputs) adds `PATH` outputs and job outputs;
-> [RFC 0010](../../rfcs/0010-control-flow.md) is current.
+> [RFC 0011](../../rfcs/0011-control-flow.md) is current.
 
 This note synthesizes the three earlier notes into one design for a `CONTROL_FLOW` extension:
 
@@ -1222,4 +1222,4 @@ tasks are known, which can be before `P` is bound. The state machine of
 §2.2 is unchanged: these are facts, not states. The first error in any group fails the step at once. Dispatch stays
 atomic: no task runs until every group has evaluated. The motivation is visibility and capacity planning (showing a
 step's tasks and choosing fleets before slower producers finish), not earlier dispatch, which the direct-dependency
-rule already rules out. See RFC 0010, *Step input binding* and Design Choice 15.
+rule already rules out. See RFC 0011, *Step input binding* and Design Choice 15.

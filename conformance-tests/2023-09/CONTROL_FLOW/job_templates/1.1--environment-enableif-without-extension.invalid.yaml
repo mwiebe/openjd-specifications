@@ -1,4 +1,4 @@
-# RFC 0010 Technical Requirement 2: an Environment's enableIf requires CONTROL_FLOW.
+# RFC 0011 Technical Requirement 2: an Environment's enableIf requires CONTROL_FLOW.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

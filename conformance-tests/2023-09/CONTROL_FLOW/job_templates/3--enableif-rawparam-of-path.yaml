@@ -1,4 +1,4 @@
-# RFC 0010 §<StepTemplate> enableIf constraint 1: may reference RawParam.* even for a PATH
+# RFC 0011 §<StepTemplate> enableIf constraint 1: may reference RawParam.* even for a PATH
 # parameter.
 specificationVersion: jobtemplate-2023-09
 extensions:

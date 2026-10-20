@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, Type conversion table: FLOAT X=3 gives 3.0. This proves
+# RFC 0011 §Processing a directive, Type conversion table: FLOAT X=3 gives 3.0. This proves
 # only that a JSON integer is accepted for a FLOAT output and has the right value: 3 + 0.5
 # is 3.5 whether V is int or float, so the int-to-float conversion itself isn't observable
 # here. Arithmetic avoids depending on how an integral float is printed.

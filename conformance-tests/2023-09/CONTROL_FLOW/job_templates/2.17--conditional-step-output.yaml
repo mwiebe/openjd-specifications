@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition> item 3: the value's target type is made optional, so it
+# RFC 0011 §<JobOutputDefinition> item 3: the value's target type is made optional, so it
 # may read a conditional Step's T? output directly.
 specificationVersion: jobtemplate-2023-09
 extensions:

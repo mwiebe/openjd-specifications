@@ -1,4 +1,4 @@
-# RFC 0010 Technical Requirement 4 / Validation item 7: expressions over Steps.* are
+# RFC 0011 Technical Requirement 4 / Validation item 7: expressions over Steps.* are
 # type-checked at validation; a BOOL output in integer arithmetic is a type error.
 specificationVersion: jobtemplate-2023-09
 extensions:

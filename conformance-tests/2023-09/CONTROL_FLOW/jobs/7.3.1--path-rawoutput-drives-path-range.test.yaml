@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope: a consumer's PATH Task parameter whose range comes from
+# RFC 0011 §The Steps.* scope: a consumer's PATH Task parameter whose range comes from
 # RawOutput holds submission-context values, and Task.Param is mapped forward on the worker.
 template:
   specificationVersion: jobtemplate-2023-09

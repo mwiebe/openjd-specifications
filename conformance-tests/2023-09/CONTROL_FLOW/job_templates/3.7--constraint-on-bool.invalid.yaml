@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 2 table: BOOL has no constraint properties.
+# RFC 0011 §<OutputVariableDefinition> item 2 table: BOOL has no constraint properties.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

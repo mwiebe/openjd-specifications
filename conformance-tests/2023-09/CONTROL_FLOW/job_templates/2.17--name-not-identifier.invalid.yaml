@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition> item 1: name is an <Identifier>.
+# RFC 0011 §<JobOutputDefinition> item 1: name is an <Identifier>.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

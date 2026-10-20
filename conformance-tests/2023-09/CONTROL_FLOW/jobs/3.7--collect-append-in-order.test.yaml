@@ -1,4 +1,4 @@
-# RFC 0010 §Collect modes: under APPEND, each directive supplies one element, in the order
+# RFC 0011 §Collect modes: under APPEND, each directive supplies one element, in the order
 # read.
 template:
   specificationVersion: jobtemplate-2023-09

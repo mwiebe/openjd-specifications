@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> constraint 1: LIST[LIST[INT]] may only be declared
+# RFC 0011 §<OutputVariableDefinition> constraint 1: LIST[LIST[INT]] may only be declared
 # by a Step without a parameterSpace (a multi-Task producer's value would nest 3 deep).
 specificationVersion: jobtemplate-2023-09
 extensions:

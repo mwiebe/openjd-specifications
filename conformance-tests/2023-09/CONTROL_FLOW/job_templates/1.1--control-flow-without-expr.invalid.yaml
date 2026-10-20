@@ -1,4 +1,4 @@
-# RFC 0010 §Extension name and dependencies: a template that lists CONTROL_FLOW must
+# RFC 0011 §Extension name and dependencies: a template that lists CONTROL_FLOW must
 # also list EXPR. This one lists CONTROL_FLOW alone and uses none of its features.
 specificationVersion: jobtemplate-2023-09
 extensions:

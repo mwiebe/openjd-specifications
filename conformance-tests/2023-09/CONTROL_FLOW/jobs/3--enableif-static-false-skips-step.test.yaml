@@ -1,4 +1,4 @@
-# RFC 0010 §Conditional execution: a Step whose enableIf is false runs no Tasks; its
+# RFC 0011 §Conditional execution: a Step whose enableIf is false runs no Tasks; its
 # dependents run and see its outputs as null, handled with == null and 'or'.
 template:
   specificationVersion: jobtemplate-2023-09

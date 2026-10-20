@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 5: unit is at most 32 characters.
+# RFC 0011 §<OutputVariableDefinition> item 5: unit is at most 32 characters.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

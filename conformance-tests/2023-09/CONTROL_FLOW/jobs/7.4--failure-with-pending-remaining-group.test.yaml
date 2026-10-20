@@ -1,4 +1,4 @@
-# RFC 0010 §How a Step is bound items 2 and 3: once C's enableIf is true, a failure in its
+# RFC 0011 §How a Step is bound items 2 and 3: once C's enableIf is true, a failure in its
 # Task enumeration group fails C, even though its remaining group, which uses its let, still
 # waits for Q, which runs only after P. This checks only that C fails and none of its Tasks
 # runs. It does not show *when* C fails: evaluating early is a SHOULD after Job creation, and

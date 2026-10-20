@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition>: typed outputs whose value reads job parameters and the
+# RFC 0011 §<JobOutputDefinition>: typed outputs whose value reads job parameters and the
 # Steps.* of any Step, with description, unit, and constraint properties.
 specificationVersion: jobtemplate-2023-09
 extensions:

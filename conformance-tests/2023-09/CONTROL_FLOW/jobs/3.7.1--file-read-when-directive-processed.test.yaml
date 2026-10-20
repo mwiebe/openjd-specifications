@@ -1,4 +1,4 @@
-# RFC 0010 §File values item 5: the value is the file's content when the runtime processes
+# RFC 0011 §File values item 5: the value is the file's content when the runtime processes
 # the directive; later changes have no effect. The Action waits 3 s before overwriting
 # the file, which assumes the runtime processes a flushed line within that time.
 template:

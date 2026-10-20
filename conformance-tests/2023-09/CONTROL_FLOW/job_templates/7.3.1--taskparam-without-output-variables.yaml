@@ -1,4 +1,4 @@
-# RFC 0010 §Terminology, Producer: any Step with a parameterSpace can be a producer of
+# RFC 0011 §Terminology, Producer: any Step with a parameterSpace can be a producer of
 # Steps.*.TaskParam, whether or not it declares outputVariables.
 specificationVersion: jobtemplate-2023-09
 extensions:
