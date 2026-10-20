@@ -174,7 +174,7 @@ needs it:
 
 A `FAILED` Step can still become `SUCCEEDED` if a retry or requeue of its failed Tasks succeeds (see [Job
 outputs](#job-outputs) item 4); the diagram omits that edge. A Step that failed because a materialization group failed
-has no Tasks to retry and stays `FAILED`.
+has no failed Tasks to retry and stays `FAILED`.
 
 `SKIPPED` and a zero-Task `SUCCEEDED` both satisfy `dependsOn`. `FAILED` does not. A Step whose `enableIf` is absent
 or decided at Job creation goes directly to `SKIPPED` (if it is `false`) or to one of the other two paths: to `READY`
