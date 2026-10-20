@@ -195,17 +195,20 @@ A loop with `while` whose first `while` is `false` runs zero iterations, as a St
 its dependencies are satisfied. When a loop ends, by `until`, by `while`, or with zero iterations, the `minLength` of
 every `collect: APPEND` output is checked, and then the loop succeeds. This check runs when the loop would succeed and
 is never part of Job creation. When a loop succeeds, its outputs are available to the Steps that depend on it: a
-`collect: LAST` output is the value of the last iteration (`null` after zero iterations), and a `collect: APPEND`
-output is the list of every iteration's value, in order. A failed Step instance in any iteration, or an error in any
-of the loop's expressions, fails the loop at once, and the Steps that depend on it do not run while it is failed. Only
-a failure of the Tasks of a Step instance of the iteration in progress can be recovered: if a retry or requeue of
-those Tasks makes the instance succeed, the iteration continues and the loop resumes. A re-run of a Task of an earlier
-iteration, or after the loop has ended, follows the re-run rules for any Task's outputs and never changes the loop's
-state, variables, or outputs; a failed re-run commits nothing, and the Step instance keeps its committed values. Every
-other failure of a loop is final, the loop cannot resume once one occurs, and the Steps that depend on it never run:
-an error in a Step instance's or the loop's own materialization expressions, exceeding a limit, an error in any of
-the loop's expressions at an iteration boundary or a violated constraint, including `minLength` when the loop ends,
-and reaching `maxIterations`.
+`collect: LAST` output is the value of the last iteration (`null` after zero iterations), and a `collect: APPEND` output
+is the list of every iteration's value, in order. A failed Step instance in the iteration in progress, or an error in
+any of the loop's expressions, fails the loop at once, and the Steps that depend on it do not run while it is failed.
+Only a failure of the Tasks of a Step instance of the iteration in progress can be recovered: a loop whose failure is
+recoverable is `FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry
+or requeue of its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. Any re-run of a body
+Task that has already succeeded, in any iteration, including the iteration in progress, or after the loop is `SUCCEEDED`
+or finally `FAILED`, follows the re-run rules for any Task's outputs; a failed or rejected re-run commits nothing,
+leaves the Task and its Step instance `SUCCEEDED`, and never fails the loop or changes its state, variables, or outputs.
+Only a failed attempt of a Task that has not yet succeeded counts as a failure of a Step instance. Every other failure
+of a loop is final, the loop cannot return to `RUNNING` once one occurs, and the Steps that depend on it never run: an
+error in a Step instance's or the loop's own materialization expressions, exceeding a limit, an error in any of the
+loop's expressions at an iteration boundary or a violated constraint, including `minLength` when the loop ends, and
+reaching `maxIterations`.
 
 A scheduler should show each iteration with its index, the loop variable values it ran with, and its Step instances
 and their Tasks. A loop's total number of Tasks is not known until it ends. A Session holds the Step Environments of
