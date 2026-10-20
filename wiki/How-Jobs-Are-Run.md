@@ -84,7 +84,7 @@ The following diagram provides an overview of the steps taken to run a Session.
 ## Environment Parameters
 
 With the ENV_PARAMS extension, introduced in
-[RFC NNNN](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/NNNN-environment-parameters.md),
+[RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-environment-parameters.md),
 an **Environment** may declare parameters, and a Step supplies values for them in an `environment:` entry of its
 `dependencies`. The **Environment** reads the values as `{{Env.Param.<name>}}`.
 

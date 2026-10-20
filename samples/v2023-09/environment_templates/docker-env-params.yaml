@@ -4,7 +4,7 @@
 # Demonstrates
 # ----
 # A queue Docker Environment that each Step of a Job configures, combining
-# the ENV_PARAMS extension (RFC NNNN) with WRAP_ACTIONS (RFC 0008). The
+# the ENV_PARAMS extension (RFC 0010) with WRAP_ACTIONS (RFC 0008). The
 # container starts in onEnter, and every inner Environment action and Task of
 # the Session runs inside it via the wrap hooks. The Environment declares
 # three parameters:

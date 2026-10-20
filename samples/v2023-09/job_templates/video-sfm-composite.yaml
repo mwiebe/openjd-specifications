@@ -5,7 +5,7 @@
 # ----
 # A multi-application pipeline in one Job, where each Step asks the queue's
 # software Environment for only the software it needs, using the ENV_PARAMS
-# extension (RFC NNNN):
+# extension (RFC 0010):
 #
 #   DecodeFrames (ffmpeg) -> SolveSfM (COLMAP) -> Composite (Maya) -> EncodeVideo (ffmpeg)
 #
