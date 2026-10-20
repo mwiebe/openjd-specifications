@@ -1356,7 +1356,7 @@ What this RFC does differently:
   rejected with an error whenever the selected Step is a loop, whether named by `--step` or selected as the Job's
   only top-level Step. Only the rejection of an explicitly given `--maximum-tasks` is limited to an explicit `--step`
   naming a loop; this needs the CLI to tell a given `--maximum-tasks` from its default. In every other run that
-  includes a loop, which covers a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`
+  includes a loop, including a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`
   for a `--step` that is not a loop,
   `--maximum-tasks` applies to each body Step instance as it does to any Step. A body Step instance that did not run
   all its Tasks is incomplete. The other instances of its iteration follow the CLI's usual rule for an incomplete

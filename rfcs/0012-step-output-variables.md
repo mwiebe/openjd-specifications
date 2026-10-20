@@ -569,8 +569,9 @@ has its own outputs. A directive says which Task it is for with a `<TaskSelector
    `APPEND` outputs meets its `minLength`.
 3. **The chunk is one attempt.** If the Action fails, is canceled, or times out, a directive is invalid, or the exit
    check of item 2 fails for any Task of the chunk, the whole chunk fails and no Task in it commits any output, as no
-   Task in a failed chunk succeeds under `TASK_CHUNKING`. The selector is required whatever the chunk's size,
-   including chunks of one Task.
+   Task in a failed chunk succeeds under `TASK_CHUNKING`; a Task of the chunk that had already succeeded keeps its
+   earlier state and values (see [Retries and re-runs](#retries-and-re-runs)). The selector is required whatever the
+   chunk's size, including chunks of one Task.
 4. **Consumers see Tasks, not chunks.** `Steps.<Name>.Output.*` and `Steps.<Name>.TaskParam.*` have one element per
    Task in parameter-space iteration order, however the Tasks were chunked.
 
@@ -749,10 +750,11 @@ Output values are stored, logged, and may be displayed, so they are not redacted
 #### Retries and re-runs
 
 A re-run of a Task that has already succeeded, whether or not its Step declares outputs, leaves the Task `SUCCEEDED`
-for every purpose while the re-run is pending or running, and after it fails or is rejected: for `dependsOn`, for
-completeness ([RFC 0011 §Reductions](0011-control-flow.md#reductions) item 3), for Step and Job success, and for loop
-iteration completion ([RFC 0013 §Iterations](0013-step-loops.md#iterations)). A scheduler MAY show the re-run
-attempt's own status separately. Only a re-run that succeeds and commits changes anything, under the rules below.
+for every purpose while the re-run is pending or running, and after it fails (including cancellation or timeout) or
+is rejected: for `dependsOn`, for completeness ([RFC 0011 §Reductions](0011-control-flow.md#reductions) item 3), for
+Step and Job success, and for loop iteration completion ([RFC 0013 §Iterations](0013-step-loops.md#iterations)). A
+scheduler MAY show the re-run attempt's own status separately. Only a re-run that succeeds and commits changes
+anything, under the rules below and [RFC 0011 §Job outputs](0011-control-flow.md#job-outputs) item 5.
 
 * **Retry of a failed attempt.** A failed attempt committed nothing, so a retry starts with no values.
 * **Re-run of a succeeded Task.** An output of a producer is **consumed** once a consumer that references it (as found
@@ -766,13 +768,14 @@ attempt's own status separately. Only a re-run that succeeds and commits changes
     3. If the output has been consumed and the re-run succeeds with a different value, the re-run attempt is
        reported as failed, with a message that names the output and a consumer that has consumed it. The Task keeps
        its earlier succeeded state and all of its committed values, so the Step and its consumers are unaffected.
-    4. If the re-run fails, it commits nothing, as any failed attempt, and the committed values are unchanged. The
-       Task keeps its earlier succeeded state and all of its committed values, as in rule 3.
+    4. If the re-run fails (including cancellation or timeout) or is rejected, it commits nothing, as any failed
+       attempt, and the committed values are unchanged. The Task keeps its earlier succeeded state and all of its
+       committed values, as in rule 3.
 
   The check is all or nothing: if any output falls under rule 3, nothing from the re-run is committed, and in a
-  chunked Step the check covers every Task of the re-run chunk. If rule 3 rejects a re-run chunk that mixes Tasks
-  that have already succeeded with Tasks that have not, nothing is committed for any of them, and the attempt of the
-  Tasks that have not yet succeeded fails. Values are the same if their converted, typed values are equal.
+  chunked Step the check covers every Task of the re-run chunk. A chunk that mixes succeeded and not-yet-succeeded
+  Tasks can only run before any of the Step's outputs is consumed, so rule 3 never applies to it. Values are the
+  same if their converted, typed values are equal.
 
   So a metric that no Step reads never blocks a re-run, but a consumed value that varies from run to run, such as a
   measured frame rate that a later Step reduces, makes every differing re-run of its Task fail once it is consumed.

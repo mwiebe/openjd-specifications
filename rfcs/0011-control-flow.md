@@ -172,6 +172,9 @@ needs it:
                        └──a dependency FAILED ──► (blocked; never runs, as today)
 ```
 
+A `FAILED` Step can still become `SUCCEEDED` if a retry or requeue of its failed Tasks succeeds (see
+[Job outputs](#job-outputs) item 4); the diagram omits that edge.
+
 `SKIPPED` and a zero-Task `SUCCEEDED` both satisfy `dependsOn`. `FAILED` does not. A Step whose `enableIf` is absent
 or decided at Job creation goes directly to `SKIPPED` (if it is `false`) or to one of the other two paths: to `READY`
 if every group evaluates then, and to `PENDING_INPUTS` otherwise. A group that fails at Job creation fails Job
