@@ -1,0 +1,27 @@
+# RFC 0013 §<LoopVariableDefinition> item 1: a variable may not be named Iteration, which is
+# Loop.Iteration.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    variables:
+    - name: Iteration
+      type: INT
+      initial: '{{0}}'
+      next: '{{1}}'
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

@@ -1,0 +1,47 @@
+# RFC 0013 §<LoopVariableDefinition>: variables of several types with constraint properties,
+# read in body Steps and in next.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+      minValue: 0
+      maxValue: 10
+    - name: Name
+      type: STRING
+      initial: '{{''a''}}'
+      next: '{{Loop.Name + ''a''}}'
+      maxLength: 8
+    - name: Xs
+      type: LIST[INT]
+      initial: '{{[]}}'
+      next: '{{Loop.Xs + [Loop.N]}}'
+      maxLength: 10
+    - name: Ok
+      type: BOOL
+      initial: '{{true}}'
+      next: '{{not Loop.Ok}}'
+    - name: G
+      type: LIST[LIST[INT]]
+      initial: '{{[[1]]}}'
+      next: '{{Loop.G}}'
+    until: '{{Loop.Iteration >= 2}}'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print({{repr_py(Loop.Name + string(Loop.N))}}, {{repr_py(Loop.Xs)}}, {{repr_py(Loop.Ok)}})

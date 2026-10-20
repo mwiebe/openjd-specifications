@@ -1,0 +1,28 @@
+# RFC 0013 §Steps.* in and around a loop item 4: a job output may not read a body Step.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+jobOutputDefinitions:
+- name: X
+  type: INT
+  value: '{{Steps.A.Output.X}}'
+steps:
+- name: L
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: A
+      outputVariables:
+      - name: X
+        type: INT
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('openjd_output_var: X=1')

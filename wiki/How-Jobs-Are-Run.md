@@ -168,6 +168,40 @@ if it reads none, so that each can be shown as soon as it is known. A Job does n
 whose inputs are known have been evaluated, and a Job output that fails to evaluate fails the Job. See the [Template Schemas](2023-09-Template-Schemas#217-joboutputdefinition-extension-control_flow).
 
 
+## Step Loops
+
+With the CONTROL_FLOW extension (introduced for loops in [RFC 0013](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0013-step-loops.md), draft), an element of a
+Job Template's `steps` may be a **loop**: a group of Steps, its **body**, that runs again and again until a condition
+says to stop. A loop is a Step of the Job for scheduling: it has dependencies, may have an `enableIf`, and has the
+states of a Step, and the Steps that depend on it wait for the whole loop. It has no Tasks of its own.
+
+Once a loop's `enableIf` is decided `true`, the scheduler evaluates its `maxIterations`, each loop variable's
+`initial` value, and, for a loop with `while`, the first `while`. When the loop's dependencies are satisfied, it runs
+its **iterations** one after another, numbered from 0:
+
+1. At the start of an iteration, the loop variables take their values for the iteration, which every Step of the
+   body reads as `Loop.<Name>` for the whole iteration, along with `Loop.Iteration`. A new instance of every Step of
+   the body is created, with its own Tasks, states, and output values. Each instance is bound and run as any Step
+   is, in the order of the body's dependencies, and may read the outputs of the body Steps it depends on in the same
+   iteration and of the Steps the loop depends on. It never reads an earlier iteration.
+2. The iteration ends when every instance has completed successfully or been skipped. The scheduler then evaluates,
+   in order: each of the loop's outputs for this iteration; `until`, if the loop has it, which ends the loop if it is
+   `true`; every loop variable's `next`, each reading the values of the iteration that just ended; and `while`, if
+   the loop has it, with the new values, which ends the loop if it is `false`.
+3. If the loop has not ended and has already run `maxIterations` iterations, it fails. Otherwise the next iteration
+   starts. Iterations never overlap.
+
+A loop with `while` whose first `while` is `false` runs zero iterations and succeeds, as a Step with zero Tasks does.
+When a loop succeeds, its outputs are available to the Steps that depend on it: a `collect: LAST` output is the value
+of the last iteration (`null` after zero iterations), and a `collect: APPEND` output is the list of every iteration's
+value, in order. A failed Step instance in any iteration, or an error in any of the loop's expressions, fails the loop
+at once, and the Steps that depend on it never run.
+
+A scheduler should show each iteration with its index, the loop variable values it ran with, and its Step instances
+and their Tasks. A loop's total number of Tasks is not known until it ends. A Session holds the Step Environments of
+one Step instance at a time, as it does for one Step. See the
+[Template Schemas](2023-09-Template-Schemas#38-steploop-extension-control_flow).
+
 ## Host Requirements
 
 Open Job Description provides a mechanism for a Step to impose requirements that must be satisfied for Tasks from the

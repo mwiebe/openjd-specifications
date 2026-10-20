@@ -1,0 +1,58 @@
+# RFC 0013 §Failure: a body Step instance that fails fails the loop at once. Its dependents in
+# the same iteration never run, no further iteration starts, and the Steps after the loop
+# never run.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 4}}'
+      maxIterations: 10
+      steps:
+      - name: Work
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+                import sys
+                sys.exit(1 if {{Loop.Iteration}} == 1 else 0)
+      - name: Check
+        dependencies:
+        - dependsOn: Work
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('K_' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - IT_0
+  - IT_1
+  - K_0
+  forbidden:
+  - IT_2
+  - K_1
+  - C_RAN

@@ -1,0 +1,63 @@
+# RFC 0013 §The iteration boundary items 1 and 2 / §Loop outputs: an until loop runs until its
+# condition is true after an iteration (here after iteration 2, V = 20). The APPEND output has
+# one element per iteration in order, and the LAST outputs are the final iteration's values.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Steps.Count.Output.V >= 20}}'
+      maxIterations: 10
+      steps:
+      - name: Count
+        outputVariables:
+        - name: V
+          type: INT
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}})); print('openjd_output_var: V=' + str({{Loop.Iteration}} * 10))
+    outputVariables:
+    - name: History
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Steps.Count.Output.V}}'
+    - name: Final
+      type: INT
+      collect: LAST
+      value: '{{Steps.Count.Output.V}}'
+    - name: Index
+      type: INT
+      collect: LAST
+      value: '{{Loop.Iteration}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:history=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.History))}})))
+            import json; print('GOT:final=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Final))}})))
+            import json; print('GOT:index=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Index))}})))
+expected:
+  output:
+  - IT_0
+  - IT_1
+  - IT_2
+  - GOT:history=[0, 10, 20]
+  - GOT:final=20
+  - GOT:index=2
+  forbidden:
+  - IT_3

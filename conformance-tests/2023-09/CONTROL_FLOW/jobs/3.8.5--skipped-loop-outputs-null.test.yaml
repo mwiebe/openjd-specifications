@@ -1,0 +1,53 @@
+# RFC 0013 §<StepLoop> item 3 / §Loop outputs: a loop whose enableIf is false is SKIPPED: its
+# body never runs, its dependents run, and both its LAST and APPEND outputs are null.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    enableIf: false
+    loop:
+      until: '{{true}}'
+      maxIterations: 5
+      steps:
+      - name: B
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('B_' + 'RAN')
+    outputVariables:
+    - name: Last
+      type: INT
+      collect: LAST
+      value: '{{1}}'
+    - name: Hist
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{1}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+            import json; print('GOT:last=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Last))}})))
+            import json; print('GOT:hist=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Hist))}})))
+expected:
+  output:
+  - C_RAN
+  - GOT:last=null
+  - GOT:hist=null
+  forbidden:
+  - B_RAN

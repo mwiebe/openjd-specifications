@@ -1,0 +1,34 @@
+# RFC 0013 §The Loop.* scope: a PATH loop variable is read as RawLoop.* in TEMPLATE-scope
+# fields (here a body Step let and the loop's next) and as Loop.* on the worker host.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Root
+  type: PATH
+  objectType: DIRECTORY
+  default: root
+steps:
+- name: L
+  loop:
+    variables:
+    - name: Dir
+      type: PATH
+      initial: '{{RawParam.Root}}'
+      next: '{{RawLoop.Dir}}'
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: W
+      let:
+      - d = RawLoop.Dir
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print({{repr_py(Loop.Dir)}})

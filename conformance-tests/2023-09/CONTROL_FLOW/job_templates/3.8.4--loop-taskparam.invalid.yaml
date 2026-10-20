@@ -1,0 +1,33 @@
+# RFC 0013 §Steps.* in and around a loop item 5: a loop has no Task parameters, so
+# Steps.<Loop>.TaskParam.* is not available.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+- name: C
+  dependencies:
+  - dependsOn: L
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Steps.L.TaskParam.X}})
