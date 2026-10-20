@@ -1,0 +1,42 @@
+# RFC 0013 §Steps.* in and around a loop, types table: an APPEND output is a list, one
+# element per iteration, and a LAST output of an until loop is the declared type.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{Loop.Iteration >= 1}}'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+  outputVariables:
+  - name: H
+    type: LIST[INT]
+    collect: APPEND
+    value: '{{Loop.Iteration}}'
+  - name: Last
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+- name: C
+  dependencies:
+  - dependsOn: L
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{sum(Steps.L.Output.H) + Steps.L.Output.Last}})

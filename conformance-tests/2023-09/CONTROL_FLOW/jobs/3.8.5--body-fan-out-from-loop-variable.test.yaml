@@ -1,0 +1,78 @@
+# RFC 0013 §Iterations items 1 to 3: a body Step's parameter space is computed from a loop
+# variable when its iteration starts, and each iteration has its own Tasks: frames [1, 2, 3],
+# then the rest [2, 3], then [3].
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: Frames
+        type: LIST[INT]
+        initial: '{{[1, 2, 3]}}'
+        next: '{{Steps.K.Output.Rest}}'
+        minLength: 1
+      until: '{{len(Steps.K.Output.Rest) == 0}}'
+      maxIterations: 10
+      steps:
+      - name: R
+        parameterSpace:
+          taskParameterDefinitions:
+          - name: F
+            type: INT
+            range: '{{Loop.Frames}}'
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('F' + str({{Loop.Iteration}}) + '_' + str({{Task.Param.F}}))
+      - name: K
+        dependencies:
+        - dependsOn: R
+        outputVariables:
+        - name: Rest
+          type: LIST[INT]
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                import json; print('openjd_output_var: Rest=' + json.dumps({{repr_py(Loop.Frames[1:])}}))
+    outputVariables:
+    - name: Counts
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{len(Loop.Frames)}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Counts))}})))
+expected:
+  output:
+  - F0_1
+  - F0_2
+  - F0_3
+  - F1_2
+  - F1_3
+  - F2_3
+  - GOT:[3, 2, 1]
+  forbidden:
+  - F1_1
+  - F2_1
+  - F2_2

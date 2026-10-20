@@ -1,0 +1,74 @@
+# RFC 0013 §Iterations / §The iteration boundary: a two-Step body, where Check depends on
+# Render, and next sets the variable from Check's output: Value 1, 2, 4, 8, and the loop ends
+# when Score (2 * Value) passes 10.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: Value
+        type: INT
+        initial: '{{1}}'
+        next: '{{Steps.Check.Output.Score}}'
+      until: '{{Steps.Check.Output.Score > 10}}'
+      maxIterations: 10
+      steps:
+      - name: Render
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('R_' + str({{Loop.Value}}))
+      - name: Check
+        dependencies:
+        - dependsOn: Render
+        outputVariables:
+        - name: Score
+          type: INT
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('openjd_output_var: Score=' + str({{Loop.Value}} * 2))
+    outputVariables:
+    - name: Values
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Loop.Value}}'
+    - name: FinalScore
+      type: INT
+      collect: LAST
+      value: '{{Steps.Check.Output.Score}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:values=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Values))}})))
+            import json; print('GOT:final=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.FinalScore))}})))
+expected:
+  output:
+  - R_1
+  - R_2
+  - R_4
+  - R_8
+  - GOT:values=[1, 2, 4, 8]
+  - GOT:final=16
+  forbidden:
+  - R_16

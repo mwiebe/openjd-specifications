@@ -1,0 +1,58 @@
+# RFC 0013 §<StepLoop> item 3: a loop may have an enableIf, with the meaning and scope of a
+# Step's.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Run
+  type: BOOL
+  default: true
+steps:
+- name: L
+  enableIf: '{{Param.Run}}'
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{1}}'
+      next: '{{Loop.N + 1}}'
+    until: '{{Steps.Check.Output.Score >= 3}}'
+    maxIterations: 10
+    steps:
+    - name: Work
+      outputVariables:
+      - name: Value
+        type: INT
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('openjd_output_var: Value=' + str({{Loop.N}}))
+    - name: Check
+      dependencies:
+      - dependsOn: Work
+      outputVariables:
+      - name: Score
+        type: INT
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('openjd_output_var: Score=' + str({{Steps.Work.Output.Value}}))
+  outputVariables:
+  - name: Final
+    type: INT
+    collect: LAST
+    value: '{{Steps.Check.Output.Score}}'
+  - name: History
+    type: LIST[INT]
+    collect: APPEND
+    value: '{{Steps.Check.Output.Score}}'

@@ -1,0 +1,40 @@
+# RFC 0013 §The iteration boundary items 2 and 5: a loop whose condition ends it in its last
+# allowed iteration succeeds; the bound fails only a loop that would continue.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 2}}'
+      maxIterations: 3
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  output:
+  - IT_0
+  - IT_1
+  - IT_2
+  - C_RAN

@@ -61,7 +61,8 @@ job outputs read the values this RFC produces, the types those symbols have, and
 which the values are read. A Task's committed values are its contribution to those symbols: for a Step with a
 `parameterSpace`, `Steps.<StepName>.Output.<VarName>` is the list of its Tasks' values in parameter-space iteration
 order (see [RFC 0011 §Reductions](0011-control-flow.md#reductions)). Nothing in this RFC depends on whether any Step
-reads an output.
+reads an output. [RFC 0013](0013-step-loops.md)'s loop variables and loop outputs use the types and constraint
+properties defined here, and its loop outputs the `LAST` and `APPEND` collect modes.
 
 ## Basic Examples
 

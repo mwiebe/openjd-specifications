@@ -1,0 +1,30 @@
+# RFC 0013 §<LoopDefinition> item 1 constraint 3: no two loop variables have the same name.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{1}}'
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{1}}'
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

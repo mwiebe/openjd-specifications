@@ -1,0 +1,55 @@
+# RFC 0013 §The iteration boundary item 2: when until is true the loop ends and no next is
+# evaluated, so a next that would fail on the last iteration's values is never run.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: N
+        type: INT
+        initial: '{{0}}'
+        next: '{{fail(''next evaluated'') if Steps.W.Output.Done else Loop.N + 1}}'
+      until: '{{Steps.W.Output.Done}}'
+      maxIterations: 5
+      steps:
+      - name: W
+        outputVariables:
+        - name: Done
+          type: BOOL
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}})); print('openjd_output_var: Done=' + ('true' if {{Loop.Iteration}} == 1 else 'false'))
+    outputVariables:
+    - name: N
+      type: INT
+      collect: LAST
+      value: '{{Loop.N}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+            import json; print('GOT:n=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.N))}})))
+expected:
+  output:
+  - IT_1
+  - C_RAN
+  - GOT:n=1
+  forbidden:
+  - IT_2

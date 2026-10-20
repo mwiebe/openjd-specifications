@@ -43,7 +43,8 @@ that depend on it use those values in EXPR expressions through a new `Steps.<Nam
 its parameter space (**dynamic fan-out**), decide whether it runs at all (**conditional execution** with `enableIf`),
 and reduce the values of every Task of a multi-Task Step (**fan-in**) with the existing EXPR function library. The
 Job's Steps and their dependencies stay fixed and are validated before submission; only Task counts, Task parameter
-values, and enablement are late-bound, in one new evaluation stage called **step input binding**. Output variables
+values, and enablement are late-bound, in one new evaluation stage called **step input binding**. A **loop** repeats
+a group of Steps until a condition holds, carrying typed state from one iteration to the next. Output variables
 are also how a Task reports **metrics**, such as an error score or a frame rate, for a scheduler to show beside the
 Task's parameters: a metric is an output variable that no Step reads. A Job can also declare **job outputs**, typed
 values computed from its parameters and its Steps' outputs, which complement job parameters by reporting results
@@ -57,7 +58,7 @@ Like EXPR, the extension is specified in more than one RFC. All of them define p
 |---|---|
 | RFC 0011, Control Flow (this RFC) | The extension as a whole and the consumer side: the `Steps.*` scope, step input binding and the `PENDING_INPUTS` state, `enableIf` and the `SKIPPED` state, fan-out from computed parameter spaces, reductions, job outputs, and composition with `TASK_DEPENDENCIES`. |
 | [RFC 0012, Step Output Variables](0012-step-output-variables.md) | The producer side: `outputVariables`, the `openjd_output_var:` directive and its `@<file>` form, collect modes, chunked Steps, type conversion, `PATH` reverse mapping, limits on output values, committing values, and retries and re-runs. |
-| [RFC 0013, Step Loops](0013-step-loops.md) | Loops. In this revision it holds only the sketch that was this RFC's Future Work. |
+| [RFC 0013, Step Loops](0013-step-loops.md) | Loops over a group of Steps: the `<StepLoop>` entry, loop variables and the `Loop.*` scope, `while`, `until`, and `maxIterations`, iterations and the iteration boundary, and loop outputs. |
 
 ## Overview
 
@@ -88,15 +89,19 @@ The `CONTROL_FLOW` extension adds the following, each specified in the section l
   that read them unmapped ([The `Steps.*` scope](#the-steps-scope)).
 * **Composition with task-task dependencies.** A rule that makes computed task DAGs work when a template also enables
   the separate `TASK_DEPENDENCIES` extension: [Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies).
-* **Validation.** An index of every rule this RFC adds, static and runtime: [Validation](#validation). RFC 0012
-  has an index of its own.
+* **Loops.** A `<StepLoop>` entry in `steps` whose body, a group of ordinary Steps, runs once per iteration until a
+  `while` or `until` condition says to stop, within a required `maxIterations`, with typed loop variables carried
+  from one iteration to the next: [RFC 0013](0013-step-loops.md).
+* **Validation.** An index of every rule this RFC adds, static and runtime: [Validation](#validation). RFCs 0012 and
+  0013 have indexes of their own.
 
 ### Key concepts
 
 **Fixed step graph, late-bound width.** The set of Steps, their names, their dependencies, and the types of their
 outputs are in the template, so a validator can check every reference before submission. What may depend on a value
 produced at run time is how many Tasks a Step has, the values those Tasks receive, and whether a Step or Environment
-runs. Steps never create new Steps.
+runs. Steps never create new Steps. A loop (RFC 0013) repeats a fixed group of Steps a late-bound number of times,
+within a declared bound, which is the same kind of late binding as a Task count.
 
 **Output variables are control data.** An output is a small typed value that shapes the rest of the Job: a count, a
 list of keys, a score, an adjacency list. Bulk data keeps flowing through files and `PATH` job parameters.
@@ -751,7 +756,7 @@ because the input lives on the farm or in a bucket the workstation can't reach.
 | U8–U14 | **Static task-task dependencies**: export→render per frame, simulation chains, temporal offsets, static DAGs, fan-in by frame. | #82, #79 | Nothing | `TASK_DEPENDENCIES` (separate extension) |
 | U15 | **Fully dynamic work items** such as Houdini PDG. | #22 | Number and shape of the work | Out of scope |
 | U16 | **Task metrics.** Each Task reports measurements (error, coverage, frames per second, render time, peak memory) that a scheduler shows as sortable columns beside the Task's parameters. | folouiseAWS, #111; the Task metrics proposal | Nothing; the values are the result | Outputs with no consumer, `unit`, `collect` |
-| U17 | **Loop until done.** Run a Step's Tasks one after another, each one's parameters computed from the outputs of the Task before it, until a condition holds: refine until converged, list S3 one page at a time with a continuation token, or re-render with more samples until a quality check passes. | Discussion of this draft | How many Tasks run, and each one's parameters | Future Work: a separate loop extension (see [RFC 0013](0013-step-loops.md)) |
+| U17 | **Loop until done.** Repeat a group of Steps until a condition holds, each repetition's work computed from what the one before it found: render, check, and re-render the frames that failed until the check passes; refine until converged; list S3 one page at a time with a continuation token. | Discussion of this draft: a group of Steps repeated until a condition holds | How many times the group runs, and what each repetition does | Loops, [RFC 0013](0013-step-loops.md) |
 | U18 | **Job outputs.** Report a Job's results back to its caller as typed values: the winning configuration of a sweep, the number of items processed, the directories that hold the results. A caller reads them as it supplies job parameters, and a user interface shows each as soon as it is known. | Discussion of this draft | The values, until the Steps they come from run | `jobOutputDefinitions`, `PATH` reverse mapping |
 
 U1–U4 need a value from a running Task and are the core of this RFC. U5 and U6 need no run-time data, but their hard
@@ -765,10 +770,10 @@ Task's metrics next to its parameters replaces the workarounds users reach for t
 separate `TASK_METRICS` extension with its own `openjd_metric:` directive; this RFC covers it with output variables
 instead (see [RFC 0012 Design Choice 3](0012-step-output-variables.md#3-task-metrics-are-output-variables)).
 
-U17 needs everything this RFC adds, and one thing it doesn't: a Step whose Task count isn't known when its Task
-enumeration group is evaluated, because each Task's parameters come from the Task before it. Today it can only be
-written by unrolling the loop into a fixed number of copies of the Step, chained with *enableIf*. It is deferred to
-a separate extension (see [RFC 0013](0013-step-loops.md)).
+U17 needs everything this RFC adds, and one thing more: a group of Steps that runs again, with inputs computed
+from its own previous run, until a condition holds. Under this RFC alone it can only be written by unrolling the loop
+into a fixed number of copies of the Steps, chained with *enableIf*. [RFC 0013](0013-step-loops.md) adds loops for
+it.
 
 U18 is the Job-level counterpart of U16. Today a caller learns a Job's results only from files at agreed-upon
 locations, and a downstream system has to know the Job's internals to find them. A job output names each result, its
@@ -814,7 +819,9 @@ This RFC is additive and gated by the `CONTROL_FLOW` extension name declared und
 2. **Opt-in activation.** Every new field and symbol is available only when `CONTROL_FLOW` is listed in
    `extensions`, and `CONTROL_FLOW` requires `EXPR`.
 3. **Fixed step graph.** The Steps of a Job, their names, their dependencies, and their output types are determined by
-   the template and are the same for every Job created from it, whatever the parameter values or run-time data.
+   the template and are the same for every Job created from it, whatever the parameter values or run-time data. A
+   loop's body Steps are Steps of the template; how many times a loop instantiates them is late-bound, as a Task
+   count is, within its declared bound (RFC 0013).
 4. **Fail fast where possible.** Every reference to an output, every expression that uses one, and every type error
    in those expressions is caught at template validation, before submission. Only the values themselves, and the
    checks that depend on them, are deferred.
@@ -1019,8 +1026,8 @@ reported at submission on every scheduler.
   `WRAP_ACTIONS`, and a relative `@` path resolves against the Session's Working Directory wherever the Action runs.
   The observable contract of
   binding allows both deferred-creation and create-then-update schedulers. The tension is that this is the most
-  demanding extension for schedulers so far (persisted values, a new stage, two new states); keeping task-task
-  dependencies out of it keeps the minimum smaller.
+  demanding extension for schedulers so far (persisted values, a new stage, two new states, and with RFC 0013, Steps
+  instantiated per loop iteration); keeping task-task dependencies out of it keeps the minimum smaller.
 * **Expressive.** One mechanism, typed outputs read by EXPR expressions at a defined stage, covers fan-out,
   conditions, reductions, and (with `TASK_DEPENDENCIES`) computed DAGs. The fixed step graph rules out PDG-style work
   by design, as #22 accepted.
@@ -1069,7 +1076,8 @@ Template whose `extensions` list includes `CONTROL_FLOW`.
 | **`SKIPPED`** | The terminal state of a Step whose `enableIf` evaluated to `false`. |
 
 The terms *output directive*, *collect mode*, and *submission path context* are defined in
-[RFC 0012 §Terminology](0012-step-output-variables.md#terminology).
+[RFC 0012 §Terminology](0012-step-output-variables.md#terminology), and the terms for loops in
+[RFC 0013 §Terminology](0013-step-loops.md#terminology).
 
 ### Schema modifications
 
@@ -1301,6 +1309,10 @@ the following hold:
    `range`s and the other format strings of *parameterSpace*, *stepEnvironments* (any format string, including their
    *enableIf*), or *script*.
 
+For a Step in a loop's body, for a loop's own expressions, and for the Steps and job outputs that read a loop, these
+rules, including the job output rule below, are modified by
+[RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop).
+
 In addition, the *value* of a [`<JobOutputDefinition>`](#joboutputdefinition) may read the `Steps.*` symbols of any
 Step of the Job, with no dependency required (see [Job outputs](#job-outputs)).
 
@@ -1487,6 +1499,9 @@ known, or create the Step first and fill in its Tasks later (create-then-update)
 same: a Step's Tasks are enumerable once its Task enumeration group has evaluated, after its *enableIf* is decided
 `true` (a `SKIPPED` Step has none), and none of them is dispatched before the Step is bound. Enumerable means the
 scheduler can list and count them, whether or not it has created records for them.
+
+A loop has no Tasks of its own, and its body Steps' Tasks become known iteration by iteration, so a loop's Task count
+is not known until it ends; see [RFC 0013 §Iterations](0013-step-loops.md#iterations).
 
 A scheduler or tool that reports a `PENDING_INPUTS` Step SHOULD report, for its enablement, its Tasks, and its host
 requirements, whether each is known, and for each that is not, what it is waiting for: the `Steps.*` symbols that
@@ -1686,8 +1701,9 @@ does not depend on `CONTROL_FLOW`, and `CONTROL_FLOW` does not depend on it. Whe
 
 ### Validation
 
-Every rule this RFC adds, and when it is checked. The rules of RFC 0012 are indexed in
-[RFC 0012 §Validation](0012-step-output-variables.md#validation).
+Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 0013 are indexed in
+[RFC 0012 §Validation](0012-step-output-variables.md#validation) and
+[RFC 0013 §Validation](0013-step-loops.md#validation).
 
 **At template validation** (by the model library, before submission):
 
@@ -1874,8 +1890,8 @@ Rejected in favor of a separate `TASK_DEPENDENCIES` extension that composes with
 Houdini PDG-style dynamic work (U15) needs the step graph itself to change. Every surveyed system that allows this
 loses static validation and the view of total work at the dynamic boundary. Discussion #22 pointed that use case at a
 separate mechanism, standalone StepTemplates submitted into a running Job, which this RFC neither replaces nor
-precludes. A loop Step (U17, [RFC 0013](0013-step-loops.md)) is different: the step graph stays fixed and only one Step's
-width grows, within a declared bound.
+precludes. A loop (U17, [RFC 0013](0013-step-loops.md)) is different: the step graph, the loop's body included, stays
+fixed, and only the number of times the body runs is late-bound, within a declared bound.
 
 ## Open Questions
 
@@ -1931,7 +1947,6 @@ are listed in [RFC 0012 §Future Work](0012-step-output-variables.md#future-work
 | Task-task dependencies | A separate `TASK_DEPENDENCIES` RFC, from #82. |
 | Passing one Job's outputs to another Job's parameters | Job outputs share the parameter type vocabulary for this; a chaining mechanism is a separate design (Open Question 11). |
 | Standalone StepTemplates appended to a running Job (#22) | A different mechanism, for a separate RFC. |
-| Loop Steps (U17) | Moved to [RFC 0013](0013-step-loops.md). |
 
 ## Copyright
 

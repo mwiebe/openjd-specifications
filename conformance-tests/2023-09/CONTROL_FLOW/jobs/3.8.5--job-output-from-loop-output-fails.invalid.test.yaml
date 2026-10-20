@@ -1,0 +1,32 @@
+# RFC 0013 §Steps.* in and around a loop item 4 / RFC 0011 §Job outputs items 1 and 3: a job
+# output that reads a loop output and fails when the loop succeeds fails the Job.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  jobOutputDefinitions:
+  - name: Final
+    type: INT
+    value: '{{fail(''final is '' + string(Steps.L.Output.Final)) if Steps.L.Output.Final == 2 else Steps.L.Output.Final}}'
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 2}}'
+      maxIterations: 5
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+    outputVariables:
+    - name: Final
+      type: INT
+      collect: LAST
+      value: '{{Loop.Iteration}}'

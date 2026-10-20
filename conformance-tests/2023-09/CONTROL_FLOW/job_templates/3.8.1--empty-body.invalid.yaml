@@ -1,0 +1,12 @@
+# RFC 0013 §<LoopDefinition> item 5 constraint 1: a body has at least one Step.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps: []

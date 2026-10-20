@@ -1,0 +1,34 @@
+# RFC 0013 §The Loop.* scope: a Loop.* value whose type is path is available only in format
+# strings resolved on the worker host; a body Step let uses RawLoop.* instead.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Root
+  type: PATH
+  objectType: DIRECTORY
+  default: root
+steps:
+- name: L
+  loop:
+    variables:
+    - name: Dir
+      type: PATH
+      initial: '{{RawParam.Root}}'
+      next: '{{RawLoop.Dir}}'
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: W
+      let:
+      - d = Loop.Dir
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print()

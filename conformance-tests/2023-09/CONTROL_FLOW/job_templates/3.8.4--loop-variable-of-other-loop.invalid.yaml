@@ -1,0 +1,40 @@
+# RFC 0013 §The Loop.* scope: Loop.<VarName> names a variable of the body Step's own loop.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: A
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{1}}'
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: WA
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+- name: B
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: WB
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print({{Loop.N}})

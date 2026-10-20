@@ -1,0 +1,21 @@
+# RFC 0013 §<LoopDefinition> constraint 1 / Design Choice 4: a loop with neither while nor
+# until is invalid, rather than running until maxIterations.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

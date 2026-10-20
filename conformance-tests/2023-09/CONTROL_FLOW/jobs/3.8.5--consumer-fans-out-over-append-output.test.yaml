@@ -1,0 +1,52 @@
+# RFC 0013 §Loop outputs / RFC 0011 §Task parameter ranges: a Step after the loop computes its
+# parameter space from an APPEND loop output, one Task per iteration's value.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 2}}'
+      maxIterations: 10
+      steps:
+      - name: Count
+        outputVariables:
+        - name: V
+          type: INT
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}})); print('openjd_output_var: V=' + str({{Loop.Iteration}} * 10))
+    outputVariables:
+    - name: H
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Steps.Count.Output.V}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: X
+        type: INT
+        range: '{{Steps.L.Output.H}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + str({{Task.Param.X}}))
+expected:
+  output:
+  - T_0
+  - T_10
+  - T_20
