@@ -1,0 +1,57 @@
+# RFC 0013 §Loop binding / §Loop outputs: a while that is false before the first iteration
+# runs zero iterations, and the loop succeeds; a LAST output is null and an APPEND output [].
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: N
+        type: INT
+        initial: '{{0}}'
+        next: '{{Loop.N - 1}}'
+      while: '{{Loop.N > 0}}'
+      maxIterations: 5
+      steps:
+      - name: B
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('B_' + 'RAN')
+    outputVariables:
+    - name: Last
+      type: INT
+      collect: LAST
+      value: '{{Loop.N}}'
+    - name: Hist
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Loop.N}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+            import json; print('GOT:last=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Last))}})))
+            import json; print('GOT:hist=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Hist))}})))
+expected:
+  output:
+  - C_RAN
+  - GOT:last=null
+  - GOT:hist=[]
+  forbidden:
+  - B_RAN

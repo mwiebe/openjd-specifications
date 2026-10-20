@@ -1,0 +1,33 @@
+# RFC 0013 §Job Template constraint 2: a top-level Step's dependencies name only top-level
+# Steps; it depends on the loop, never on a body Step.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: Work
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+- name: C
+  dependencies:
+  - dependsOn: Work
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('C_' + 'RAN')

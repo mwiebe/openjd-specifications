@@ -1,0 +1,31 @@
+# RFC 0013 §Job Template constraint 1: the names of all Steps of the template, top-level
+# Steps, loops, and body Steps, are distinct. A body Step may not reuse a top-level name.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: Work
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print()
+- name: L
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: Work
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

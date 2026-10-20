@@ -1,8 +1,9 @@
 # CONTROL_FLOW Conformance Tests
 
 Conformance tests for the draft `CONTROL_FLOW` extension defined in
-[RFC 0011 — Control Flow](../../../rfcs/0011-control-flow.md) and
-[RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md).
+[RFC 0011 — Control Flow](../../../rfcs/0011-control-flow.md),
+[RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
+[RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
 > **Unverified.** These tests were written from the RFC text before any implementation of
 > `CONTROL_FLOW` existed, so none of them has been run. They are meant to be correct
@@ -21,13 +22,17 @@ that read upstream outputs are evaluated at a new stage, *step input binding*, g
 group as the values each group reads arrive (`enableIf` first), and no Task runs until
 every group has been evaluated. A Job can
 also declare `jobOutputDefinitions`, typed values computed from parameters and Step
-outputs. `PATH` outputs are reverse-mapped to the submission path context.
+outputs. `PATH` outputs are reverse-mapped to the submission path context. A `<StepLoop>`
+entry in `steps` runs a body of Steps once per iteration, one iteration after another,
+carrying typed loop variables (`Loop.<Name>`, `Loop.Iteration`) from one iteration to the
+next with `next`, until `while` or `until` says to stop, within a required `maxIterations`;
+Steps after the loop read its declared `LAST` or `APPEND` outputs.
 
 ## RFC rules these tests verify
 
 The filename prefix is the [Template Schemas](../../../wiki/2023-09-Template-Schemas.md)
-section; each file's header comment cites the RFC (0011 or 0012) that holds the rule, and its
-section.
+section; each file's header comment cites the RFC (0011, 0012, or 0013) that holds the rule,
+and its section.
 
 - **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `EXPR`; every new
   field and symbol requires `CONTROL_FLOW`; Environment Templates can't declare
@@ -100,6 +105,33 @@ section.
   `RawOutput`, and `TaskRawParam` allowed; `Param` of `PATH` and `LIST[PATH]` parameters
   and `TaskParam` of a `PATH` Task parameter forbidden), other forbidden symbols, type and `collect`; at run time, failures at Job
   creation and after a Step fail the run, and valid or `null` job outputs don't.
+- **Loop schema** (`1.1--loop-*`, `job_templates/3.8--*`, `3.8.1--*`, `3.8.2--*`, `3.8.3--*`):
+  gating; no `script` or `parameterSpace` on a loop; names unique across top-level Steps,
+  loops, and body Steps (also across two loops, and a loop and its own body Step); top-level
+  Steps depend only on top-level Steps; exactly one of `while` and `until`; `maxIterations`
+  required, 1 to 1,000, from `Param.*` but not from `Steps.*` or `Loop.*`; no nested loops;
+  a non-empty, acyclic body whose dependencies stay inside it; `while` can't read body Steps;
+  `until` is `bool`; variables of several types with constraints, unique, not named
+  `Iteration`, `initial` without `Loop.*` and only from the loop's dependencies, `next`
+  with the variable's type; `PATH` variables through `RawLoop.*` in TEMPLATE scope; loop
+  outputs need `value` and `collect` (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a
+  list, its value of the element type), unique names, `LAST` scalar and `APPEND` list types.
+- **Loop scopes** (`job_templates/3.8.4--*`): a body Step reads the loop's dependencies, but
+  not other outside Steps nor body Steps it doesn't depend on; `until`/`next`/`value` read
+  any body Step; outside Steps and job outputs read loop outputs, never body Steps, and
+  need a dependency on the loop; `Loop.*` only in the loop and its body, and only the
+  loop's own variables; no `TaskParam` or undeclared outputs of a loop.
+- **Running loops** (`jobs/3.8.5--*`): `until` after each iteration, with `APPEND` history,
+  `LAST` final value, and `Loop.Iteration` from 0; `while` before each iteration, including
+  zero iterations (`LAST` is `null`, `APPEND` is `[]`); a two-Step body whose check drives
+  `next`; every `next` reading the old values (a swap); `until` true skips `next`; the bound
+  fails a loop that would continue, from a literal or a parameter, but not one whose
+  condition ends it in the last allowed iteration; a failed body Step, a `fail(...)` in
+  `next` or in a loop output `value`, and a loop variable constraint violation each fail the
+  loop and stop its iterations and its dependents; a body fan-out from a loop variable with
+  its own Tasks per iteration; a fan-out after the loop over an `APPEND` output; a skipped
+  loop's `null` outputs; a body Step skipped in some iterations; body Steps reading the
+  loop's dependency; and a job output from a loop output, valid and failing.
 
 ## Conventions in this directory
 
@@ -130,6 +162,14 @@ section.
   valid directive for it, so only the line under test can fail the run. (The
   `indented-directive-not-recognized` and `chunk-task-missing-value` tests rely on the
   missing value on purpose.)
+- **Loop failures.** A loop that must fail at run time is asserted with
+  `expected.taskFailure` and markers, not `.invalid.`: the iteration markers it must print
+  (`IT_0`, ...) show the template was accepted and how far it ran, and the forbidden ones
+  show where it stopped. A test of the bound makes its condition true a little after
+  `maxIterations` (for example `until: Loop.Iteration >= 4` with `maxIterations: 3`), so a
+  runtime that ignored the bound succeeds and prints a forbidden marker instead of hanging.
+  Only `3.8.5--job-output-from-loop-output-fails` is `.invalid.`, as the other job output
+  failure tests are, with `3.8.5--job-output-from-loop-output-valid` as its companion.
 - **Markers are built at run time** (`print('C_' + 'RAN')`) so that a forbidden or
   expected marker never appears literally in the template, in case a runner logs the
   command line. Directive lines that are asserted in the log are built the same way.
@@ -169,6 +209,9 @@ section.
 - Reading `@` files with the Action user's access (needs a cross-user setup), and FIFOs
   (a runtime that blocks would hang the runner).
 - A scheduler's Task-count limit, and `TASK_DEPENDENCIES` composition.
+- For loops: Session reuse across iterations, a scheduler's display of iterations, re-runs
+  of a completed iteration's Tasks, a scheduler's limits on total Tasks or body Step
+  instances, the 1 MiB floor for loop values, and chunked body Steps.
 - `Steps.*` in `parameterDefinitions`: no field there is a format string.
 - A directive in a Job Environment's `onExit`, because whether a failed `onExit` fails a
   run whose Tasks succeeded is base-spec behavior the RFC doesn't settle.
@@ -184,6 +227,8 @@ section.
   (`7.3.1--non-identifier-step-name-unreferenced` checks that such a Step is still valid.)
 
 ## Ambiguities found while writing these tests
+
+Items 9 and later concern loops (RFC 0013).
 
 1. **Path reverse mapping (RFC 0012 §Path values).** When the Session has rules, there are two
    MUSTs: the stored value MUST be in the submission path context, and forward mapping it
@@ -211,6 +256,15 @@ section.
 7. **The 64 KiB line floor**: whether it includes the line terminator. The test uses a
    65,023-byte line.
 8. **`@` file read time**: no bound on how soon a runtime must process a flushed line.
+9. **Other body Steps after a failure.** RFC 0013 §Failure lets instances of the same
+   iteration that don't depend on a failed one keep running. Tests forbid only markers of
+   dependents of the failed instance and of later iterations.
+10. **Iteration order is not observed directly.** That iteration `N + 1` starts only after
+    iteration `N` ends is implied by the values the tests check (each iteration reads `next`
+    from the one before), not by timing.
+11. **A loop's own failure is not a Task failure.** A boundary error or the bound fails the
+    loop, not a Task, but `openjd run` reports it as a failed run, which `taskFailure`
+    accepts; its exit-code check is not used.
 
 ## Running the tests
 

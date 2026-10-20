@@ -1,0 +1,58 @@
+# RFC 0013 §The iteration boundary items 3 and 4: next runs, then while reads the new values
+# with Loop.Iteration N + 1. With N from 0 and while N < 3, iterations 0 to 2 run.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: N
+        type: INT
+        initial: '{{0}}'
+        next: '{{Loop.N + 1}}'
+      while: '{{Loop.N < 3}}'
+      maxIterations: 5
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+    outputVariables:
+    - name: Ns
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Loop.N}}'
+    - name: Last
+      type: INT
+      collect: LAST
+      value: '{{Loop.Iteration}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:ns=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Ns))}})))
+            import json; print('GOT:last=' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Last))}})))
+expected:
+  output:
+  - IT_0
+  - IT_1
+  - IT_2
+  - GOT:ns=[0, 1, 2]
+  - GOT:last=2
+  forbidden:
+  - IT_3

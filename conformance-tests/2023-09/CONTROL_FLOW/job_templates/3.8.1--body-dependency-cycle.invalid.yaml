@@ -1,0 +1,35 @@
+# RFC 0013 §<LoopDefinition> item 5 constraint 3 / Design Choice 1: the body's dependency
+# graph is acyclic; the back edge of a loop is next, not dependsOn.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: A
+      dependencies:
+      - dependsOn: B
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+    - name: B
+      dependencies:
+      - dependsOn: A
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

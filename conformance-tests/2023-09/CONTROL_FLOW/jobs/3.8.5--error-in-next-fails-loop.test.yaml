@@ -1,0 +1,50 @@
+# RFC 0013 §The iteration boundary: a fail(...) in next fails the loop at the boundary where
+# it is evaluated (after iteration 1), before another iteration starts.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: N
+        type: INT
+        initial: '{{0}}'
+        next: '{{fail(''stop'') if Steps.W.Output.V == 1 else Loop.N + 1}}'
+      until: '{{Loop.Iteration >= 4}}'
+      maxIterations: 10
+      steps:
+      - name: W
+        outputVariables:
+        - name: V
+          type: INT
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}})); print('openjd_output_var: V=' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - IT_0
+  - IT_1
+  forbidden:
+  - IT_2
+  - C_RAN

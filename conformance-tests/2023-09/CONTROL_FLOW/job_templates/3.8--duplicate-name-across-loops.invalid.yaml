@@ -1,0 +1,35 @@
+# RFC 0013 §Job Template constraint 1: two loops' bodies may not have Steps of the same name.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: A
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: Work
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+- name: B
+  loop:
+    until: '{{true}}'
+    maxIterations: 5
+    steps:
+    - name: Work
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

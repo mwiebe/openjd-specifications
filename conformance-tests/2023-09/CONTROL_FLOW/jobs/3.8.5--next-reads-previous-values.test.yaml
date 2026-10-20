@@ -1,0 +1,51 @@
+# RFC 0013 §The iteration boundary item 3 / Design Choice 2: every next reads the values of
+# the iteration that just finished, so swapping two variables works: (1, 2), (2, 1), (1, 2).
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: A
+        type: INT
+        initial: '{{1}}'
+        next: '{{Loop.B}}'
+      - name: B
+        type: INT
+        initial: '{{2}}'
+        next: '{{Loop.A}}'
+      until: '{{Loop.Iteration >= 2}}'
+      maxIterations: 5
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+    outputVariables:
+    - name: Pairs
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Loop.A * 10 + Loop.B}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.L.Output.Pairs))}})))
+expected:
+  output:
+  - GOT:[12, 21, 12]
