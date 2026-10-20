@@ -17,10 +17,10 @@
 # neither applies. The Job Template is the same in all three cases.
 #
 # A queue may attach both. The Conda entries carry
-#   enableIf: "{{ 'Docker' not in Job.EnvironmentNames }}"
+#   enableIf: "{{ 'Docker' not in Job.EnvNames }}"
 # which disables them when a Docker Environment is present, so a Step is
 # never told to install conda packages inside a container that has no conda.
-# Job.EnvironmentNames lists the names of every Environment the Job has once
+# Job.EnvNames lists the names of every Environment the Job has once
 # the queue's are attached. The Docker Environment is ONLY_REQUESTED, so the
 # Steps' requests are what bring it into their Sessions.
 #
@@ -37,8 +37,9 @@
 #
 # The Docker entries also tell the container which host paths to mount (the
 # Job's PATH parameters, path-mapped on the host) and, for SolveSfM, to pass
-# the host's GPUs. The Mounts value is the same for every Step, so it is
-# written once with a YAML anchor (&mounts) and reused (*mounts).
+# the host's GPUs. The Mounts value and the Conda enableIf are the same for
+# every Step, so each is written once with a YAML anchor (&mounts,
+# &prefer_docker) and reused.
 #
 # Steps whose values differ never share a Session, so each Session installs
 # (or pulls) only one application. DecodeFrames and EncodeVideo supply equal
@@ -118,7 +119,7 @@ steps:
   dependencies:
   - environment: Conda
     required: false
-    enableIf: &prefer_docker "{{ 'Docker' not in Job.EnvironmentNames }}"
+    enableIf: &prefer_docker "{{ 'Docker' not in Job.EnvNames }}"
     parameters:
       Packages: "ffmpeg=7"
   - environment: Docker

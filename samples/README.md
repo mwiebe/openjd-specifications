@@ -36,7 +36,7 @@ Please see the [CONTRIBUTING guide](../CONTRIBUTING.md) for additional informati
 | [stdout-messages](./v2023-09/job_templates/stdout-messages.yaml) | stdout messages, embedded files |
 | [task-parameter-definition-showcase](./v2023-09/job_templates/task-parameter-definition-showcase.yaml) | task parameters, task parameter combination operators |
 | [ui-controls-showcase](./v2023-09/job_templates/ui-controls-showcase.yaml) | job parameters, ui metadata, embedded file |
-| [video-sfm-composite](./v2023-09/job_templates/video-sfm-composite.yaml) | ENV_PARAMS extension, per-step environment parameters, optional and conditional environment dependencies (`required`, `enableIf`), `Job.EnvironmentNames`, step dependencies, multi-application pipeline |
+| [video-sfm-composite](./v2023-09/job_templates/video-sfm-composite.yaml) | ENV_PARAMS extension, per-step environment parameters, optional and conditional environment dependencies (`required`, `enableIf`), `Job.EnvNames`, step dependencies, multi-application pipeline |
 
 | Environment Template | Concepts Demonstrated |
 | ------ | --------------------- |

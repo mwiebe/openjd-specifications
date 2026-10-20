@@ -870,7 +870,7 @@ With the `ENV_PARAMS` extension, every template can also read:
 
 | Symbol | Type | Description |
 |--------|------|-------------|
-| `Job.EnvironmentNames` | `list[string]` | The names of the Job's Job Environments, including those attached from Environment Templates, in entry order. `unresolved[list[string]]` at template validation; concrete at Job creation. |
+| `Job.EnvNames` | `list[string]` | The names of the Job's Job Environments, including those attached from Environment Templates, in entry order. `unresolved[list[string]]` at template validation; concrete at Job creation. |
 
 #### 1.2.3. Implicit Type Coercion
 

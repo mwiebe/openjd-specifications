@@ -48,3 +48,29 @@ pass; none blocks the edits below.
   is written: a Service's Sessions do not enter an `ALL` Environment that lists that Service, since otherwise every
   client-configuring Environment would put its Service in a cycle by default. Item 8 is rewritten in those terms and
   names both SERVICE graphs (constraint 3 and §1.2 item 6 constraint 4).
+
+## Second pass (suggestions and questions)
+
+* **S1** — Summary rewritten as one paragraph that opens with the problem (a queue's Environment is configured once
+  per Job) and gives `runScope` and `hostRequirements` one purpose clause each. The inaccurate "all Steps share the
+  same Environment" is gone.
+* **S2** — §3.3.3 now says amounts do not add, that "the same capability" compares names after resolution ignoring
+  case (and `anyOf`/`allOf` values likewise), and that a conflict names "the Step, the conflicting sources, and the
+  capability", which may be two Environments.
+* **S3** — Reworded as suggested: an Environment's requirements are checked on their own, and combining adds no error
+  other than the item 1 and 2 conflicts.
+* **S5** — "is taken only by a Step that requests `Conda` without any packages".
+* **S6** — Item 6 adds the `ALL` exception to its "read as" list; item 7 points to item 8. Both graphs were already
+  named under Q2.
+* **S7** — Composition preamble notes the `<Environment>` item renumbering for whichever RFC merges second.
+* **S8** — The §7.3.1 row states availability directly: every format string of a Job Template or Environment Template
+  resolved at Job creation or later, including an Environment's `hostRequirements` and script; not a parameter
+  `default` or the Job Template's `name`.
+* **S9** — All four editorial items applied.
+* **Rename** — `Job.EnvironmentNames` is now `Job.EnvNames`, using `Env` as `Env.File.*` and `Env.Param.*` already do.
+  The rationale notes the choice.
+* **Q1** — Includes disabled Environments, for the reason the question anticipated: the list feeds Step `let` and entry
+  values, which feed effective values, which an Environment's `enableIf` may read. Stated in the §7.3.1 row and
+  CONTROL_FLOW item 3.
+* **Q3** — Open; under discussion.
+* **Q4** — Open; to be examined with the wrap hook rule as a whole.
