@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: STRING S=123 gives the string "123" (EXPR implicit
+# RFC 0011 Type conversion table: STRING S=123 gives the string "123" (EXPR implicit
 # coercion; see Open Question 16).
 template:
   specificationVersion: jobtemplate-2023-09

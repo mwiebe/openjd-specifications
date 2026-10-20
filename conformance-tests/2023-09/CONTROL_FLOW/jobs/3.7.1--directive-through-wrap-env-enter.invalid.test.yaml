@@ -1,4 +1,4 @@
-# RFC 0010 §Which Actions may print it / WRAP_ACTIONS: a line forwarded by a wrap hook is
+# RFC 0011 §Which Actions may print it / WRAP_ACTIONS: a line forwarded by a wrap hook is
 # output of the Action the hook runs in place of. A directive forwarded by onWrapEnvEnter
 # from a Job Template Step Environment's onEnter is a directive of that onEnter, which is
 # invalid "whether or not a wrap hook runs in its place". The directive itself is valid

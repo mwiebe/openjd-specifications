@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 9: a directive line that is not valid
+# RFC 0011 §Processing a directive, invalid item 9: a directive line that is not valid
 # UTF-8 is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

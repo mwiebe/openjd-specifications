@@ -56,7 +56,7 @@ Where:
          [FEATURE_BUNDLE_1](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0004-enhanced-limits-and-capabilities.md),
          [EXPR](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0005-expression-language.md),
          [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md),
-         [CONTROL_FLOW](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md) (draft)
+         [CONTROL_FLOW](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) (draft)
       * A template that lists `CONTROL_FLOW` must also list `EXPR`. Schedulers must reject templates that list
         `CONTROL_FLOW` without `EXPR`.
 4. *name* — The name to give to a Job that is created from the template. See: [&lt;JobName&gt;](#111-jobname).
@@ -880,7 +880,7 @@ The value of a Job Parameter of this type is referenced in format strings as:
 ### 2.17. `<JobOutputDefinition>` `@extension CONTROL_FLOW`
 
 Defines a Job output, the counterpart of a Job Parameter: a value the Job reports back to its submitter and other
-callers. Introduced in [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md) (draft).
+callers. Introduced in [RFC 0011](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) (draft).
 
 ```yaml
 name: <Identifier>
@@ -1641,7 +1641,7 @@ no enclosing Step exists.
 
 Defines a value that every Task of a Step reports, for the Steps that depend on it to read and for the render
 management system to store and display. A metric, such as an error score or a frame rate, is an output variable that
-no Step reads. Introduced in [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md) (draft).
+no Step reads. Introduced in [RFC 0011](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) (draft).
 
 An `<OutputVariableDefinition>` is the object:
 

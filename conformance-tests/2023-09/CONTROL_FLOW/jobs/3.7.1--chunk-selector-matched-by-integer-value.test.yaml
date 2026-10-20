@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: <Int> in the selector is matched by its
+# RFC 0011 §The openjd_output_var directive: <Int> in the selector is matched by its
 # integer value, so [012] names the Task whose Frame is 12.
 template:
   specificationVersion: jobtemplate-2023-09

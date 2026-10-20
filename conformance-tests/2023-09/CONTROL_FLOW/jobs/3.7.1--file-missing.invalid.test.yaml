@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 6: the path does not resolve to a file.
+# RFC 0011 §Processing a directive, invalid item 6: the path does not resolve to a file.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.
 template:

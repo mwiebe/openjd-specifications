@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 2: a directive naming an output the Step
+# RFC 0011 §Processing a directive, invalid item 2: a directive naming an output the Step
 # does not declare is invalid (V is reported correctly too).
 template:
   specificationVersion: jobtemplate-2023-09

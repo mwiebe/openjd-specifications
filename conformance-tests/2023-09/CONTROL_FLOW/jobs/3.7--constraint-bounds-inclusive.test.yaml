@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 6: constraints have the job parameter meaning,
+# RFC 0011 §<OutputVariableDefinition> item 6: constraints have the job parameter meaning,
 # so minValue/maxValue are inclusive and a value at the bound is accepted.
 template:
   specificationVersion: jobtemplate-2023-09

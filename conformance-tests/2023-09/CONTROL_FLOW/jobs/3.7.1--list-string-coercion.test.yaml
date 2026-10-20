@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: LIST[STRING] L=[1, "a"] gives ["1", "a"].
+# RFC 0011 Type conversion table: LIST[STRING] L=[1, "a"] gives ["1", "a"].
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 11: in a Step with a CHUNK[INT] parameter
+# RFC 0011 §Processing a directive, invalid item 11: in a Step with a CHUNK[INT] parameter
 # a directive without a <TaskSelector> is invalid.
 # X is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

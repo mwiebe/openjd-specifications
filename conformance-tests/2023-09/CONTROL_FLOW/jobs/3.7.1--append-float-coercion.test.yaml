@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: LIST[FLOAT], collect: APPEND, E=1 then E=2.5 gives
+# RFC 0011 Type conversion table: LIST[FLOAT], collect: APPEND, E=1 then E=2.5 gives
 # [1.0, 2.5]. This proves only that an int element is accepted for a FLOAT element type
 # with the right value: 1 + 0.25 is 1.25 whether the element is int or float, so the
 # int-to-float conversion itself isn't observable here. Arithmetic avoids depending on how

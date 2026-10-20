@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition> item 3: may not reference Step.Name.
+# RFC 0011 §<JobOutputDefinition> item 3: may not reference Step.Name.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

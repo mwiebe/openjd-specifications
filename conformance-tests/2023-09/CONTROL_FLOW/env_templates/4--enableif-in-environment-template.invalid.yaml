@@ -1,4 +1,4 @@
-# RFC 0010 §<Environment> enableIf constraint 4: enableIf is permitted only in a Job
+# RFC 0011 §<Environment> enableIf constraint 4: enableIf is permitted only in a Job
 # Template; an <Environment> in an Environment Template may not have it.
 specificationVersion: environment-2023-09
 extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 §<StepTemplate> enableIf constraint 1: Param.* of a PATH parameter is excluded
+# RFC 0011 §<StepTemplate> enableIf constraint 1: Param.* of a PATH parameter is excluded
 # (available only on the worker host).
 specificationVersion: jobtemplate-2023-09
 extensions:

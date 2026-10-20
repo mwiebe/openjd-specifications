@@ -1,4 +1,4 @@
-# RFC 0010 §Which Actions may print it: a directive from a Step Environment's onEnter is
+# RFC 0011 §Which Actions may print it: a directive from a Step Environment's onEnter is
 # invalid, even in a Step that declares outputVariables.
 template:
   specificationVersion: jobtemplate-2023-09

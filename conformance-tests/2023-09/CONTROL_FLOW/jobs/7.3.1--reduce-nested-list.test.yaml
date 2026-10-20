@@ -1,4 +1,4 @@
-# RFC 0010 §Reductions item 4: a per-Task LIST[T] output becomes list[list[T]].
+# RFC 0011 §Reductions item 4: a per-Task LIST[T] output becomes list[list[T]].
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: <FilePath> must not be empty ('V=@').
+# RFC 0011 §The openjd_output_var directive: <FilePath> must not be empty ('V=@').
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.
 template:

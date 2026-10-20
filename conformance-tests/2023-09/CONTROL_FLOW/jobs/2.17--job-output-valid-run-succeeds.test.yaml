@@ -1,4 +1,4 @@
-# RFC 0010 §Job outputs: job outputs that evaluate successfully (at creation and after a
+# RFC 0011 §Job outputs: job outputs that evaluate successfully (at creation and after a
 # Step) don't affect a successful run.
 template:
   specificationVersion: jobtemplate-2023-09

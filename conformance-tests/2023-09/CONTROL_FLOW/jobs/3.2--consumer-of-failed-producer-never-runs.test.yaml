@@ -1,4 +1,4 @@
-# RFC 0010 §How a Step is bound: a consumer whose producer fails can never be bound and
+# RFC 0011 §How a Step is bound: a consumer whose producer fails can never be bound and
 # never runs. A failed attempt commits nothing (§Processing a directive). C reads P's output
 # in its range, a binding-time field, so a runtime that committed the failed attempt's N=1
 # and bound C with it would run C's one Task.

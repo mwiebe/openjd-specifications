@@ -96,7 +96,7 @@ The `OPENJD_SESSION_WORKING_DIR` environment variable is an example of this cons
 
 ## Step States and Step Input Binding
 
-Without the CONTROL_FLOW extension (introduced in [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-control-flow.md), draft), every Step's Tasks are known when the Job is
+Without the CONTROL_FLOW extension (introduced in [RFC 0011](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md), draft), every Step's Tasks are known when the Job is
 created, and a Step's Tasks are scheduled once the Steps it depends on have completed successfully.
 
 With CONTROL_FLOW, a Step may compute its parameter space, its host requirements, its `let` bindings, its Step

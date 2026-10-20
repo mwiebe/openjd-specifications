@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition> item 3: may reference RawParam.* of a PATH parameter.
+# RFC 0011 §<JobOutputDefinition> item 3: may reference RawParam.* of a PATH parameter.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

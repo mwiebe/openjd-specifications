@@ -1,7 +1,7 @@
 # CONTROL_FLOW Conformance Tests
 
 Conformance tests for the draft `CONTROL_FLOW` extension defined in
-[RFC 0010 — Control Flow](../../../rfcs/0010-control-flow.md).
+[RFC 0011 — Control Flow](../../../rfcs/0011-control-flow.md).
 
 > **Unverified.** These tests were written from the RFC text before any implementation of
 > `CONTROL_FLOW` existed, so none of them has been run. They are meant to be correct
@@ -25,7 +25,7 @@ outputs. `PATH` outputs are reverse-mapped to the submission path context.
 ## RFC rules these tests verify
 
 The filename prefix is the [Template Schemas](../../../wiki/2023-09-Template-Schemas.md)
-section; each file's header comment cites the RFC 0010 section and rule.
+section; each file's header comment cites the RFC 0011 section and rule.
 
 - **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `EXPR`; every new
   field and symbol requires `CONTROL_FLOW`; Environment Templates can't declare

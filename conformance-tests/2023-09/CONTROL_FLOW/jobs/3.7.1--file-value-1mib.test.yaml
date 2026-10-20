@@ -1,4 +1,4 @@
-# RFC 0010 §Limits item 2: a runtime MUST accept at least 1 MiB of output values per Task;
+# RFC 0011 §Limits item 2: a runtime MUST accept at least 1 MiB of output values per Task;
 # this @ file is 1,000,002 bytes.
 template:
   specificationVersion: jobtemplate-2023-09

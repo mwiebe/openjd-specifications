@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: RANGE_EXPR R="1-10:2" gives the range_expr 1-10:2.
+# RFC 0011 Type conversion table: RANGE_EXPR R="1-10:2" gives the range_expr 1-10:2.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

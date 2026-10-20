@@ -1,4 +1,4 @@
-# RFC 0010 §Which Actions may print it / WRAP_ACTIONS: a directive printed by the wrapped
+# RFC 0011 §Which Actions may print it / WRAP_ACTIONS: a directive printed by the wrapped
 # process and forwarded through onWrapTaskRun counts for the Task.
 template:
   specificationVersion: jobtemplate-2023-09

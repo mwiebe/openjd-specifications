@@ -1,4 +1,4 @@
-# RFC 0010 §<StepTemplate> outputVariables constraint 1: if provided, the list has at
+# RFC 0011 §<StepTemplate> outputVariables constraint 1: if provided, the list has at
 # least one element.
 specificationVersion: jobtemplate-2023-09
 extensions:

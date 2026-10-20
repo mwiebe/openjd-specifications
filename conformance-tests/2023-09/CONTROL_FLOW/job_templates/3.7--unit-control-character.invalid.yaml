@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 5: unit may not contain a Unicode Cc
+# RFC 0011 §<OutputVariableDefinition> item 5: unit may not contain a Unicode Cc
 # (control) character. This one contains a TAB.
 specificationVersion: jobtemplate-2023-09
 extensions:

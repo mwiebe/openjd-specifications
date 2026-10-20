@@ -1,4 +1,4 @@
-# RFC 0010 §<Environment> enableIf: the target type is bool and a null result is an error,
+# RFC 0011 §<Environment> enableIf: the target type is bool and a null result is an error,
 # as for a Step's enableIf. A Step Environment's enableIf is a materialization expression
 # (§Materialization groups item 5), so a null from a skipped producer's output fails
 # P before any of its Tasks runs. Q is skipped at Job creation, so the null is concrete then

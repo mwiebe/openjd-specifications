@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: BOOL B=true gives true.
+# RFC 0011 Type conversion table: BOOL B=true gives true.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

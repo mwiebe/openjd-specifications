@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition> item 3: values whose type contains path are read through
+# RFC 0011 §<JobOutputDefinition> item 3: values whose type contains path are read through
 # TaskRawParam, here of a PATH Task parameter. Positive pair for 2.17--path-taskparam.invalid.
 specificationVersion: jobtemplate-2023-09
 extensions:

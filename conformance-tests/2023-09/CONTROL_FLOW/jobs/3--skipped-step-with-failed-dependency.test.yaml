@@ -1,4 +1,4 @@
-# RFC 0010 §Conditional execution, Failure is not skipping: a Step that is SKIPPED but one
+# RFC 0011 §Conditional execution, Failure is not skipping: a Step that is SKIPPED but one
 # of whose own dependencies fails never satisfies dependsOn. Its null symbols are concrete,
 # so C may be bound with them (its let reads one), but C stays blocked behind A's failure.
 template:

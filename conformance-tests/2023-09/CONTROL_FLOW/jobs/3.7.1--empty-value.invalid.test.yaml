@@ -1,4 +1,4 @@
-# RFC 0010 <Directive> grammar: a <Value> is required; 'V=' is invalid.
+# RFC 0011 <Directive> grammar: a <Value> is required; 'V=' is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.
 template:

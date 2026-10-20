@@ -1,4 +1,4 @@
-# RFC 0010 §File values item 1: a relative <FilePath> resolves against the Session's
+# RFC 0011 §File values item 1: a relative <FilePath> resolves against the Session's
 # Working Directory, where the Action starts.
 template:
   specificationVersion: jobtemplate-2023-09

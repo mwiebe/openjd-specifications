@@ -1,4 +1,4 @@
-# RFC 0010 §Chunked Steps items 2 and 4: each directive names its Task with [<value>]; ONCE
+# RFC 0011 §Chunked Steps items 2 and 4: each directive names its Task with [<value>]; ONCE
 # applies per Task; consumers see one element per Task in iteration order.
 template:
   specificationVersion: jobtemplate-2023-09

@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> constraint 3: collect APPEND requires a LIST[...] type.
+# RFC 0011 §<OutputVariableDefinition> constraint 3: collect APPEND requires a LIST[...] type.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

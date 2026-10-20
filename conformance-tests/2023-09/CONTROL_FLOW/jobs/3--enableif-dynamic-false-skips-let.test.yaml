@@ -1,4 +1,4 @@
-# RFC 0010 §How a Step is bound item 1: a Step disabled at binding doesn't evaluate its let,
+# RFC 0011 §How a Step is bound item 1: a Step disabled at binding doesn't evaluate its let,
 # so min() of an empty upstream list is never computed.
 template:
   specificationVersion: jobtemplate-2023-09

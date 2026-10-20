@@ -1,4 +1,4 @@
-# RFC 0010 §Collect modes: under LAST, the last of one or more directives is the value.
+# RFC 0011 §Collect modes: under LAST, the last of one or more directives is the value.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

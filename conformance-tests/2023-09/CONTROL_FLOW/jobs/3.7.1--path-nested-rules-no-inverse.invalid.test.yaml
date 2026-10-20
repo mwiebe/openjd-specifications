@@ -1,4 +1,4 @@
-# RFC 0010 §Path values, reference inverse step 4 example (POSIX form): with /s/p -> /mnt/p
+# RFC 0011 §Path values, reference inverse step 4 example (POSIX form): with /s/p -> /mnt/p
 # and /s/p/x -> /data/x, /mnt/p/x/f's candidate /s/p/x/f maps forward to /data/x/f. The
 # Session has rules, so the stored value MUST be in the submission path context AND MUST
 # forward-map back to the reported path; no submission-context form does both, and "If

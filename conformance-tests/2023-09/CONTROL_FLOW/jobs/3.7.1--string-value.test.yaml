@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: STRING S="a=b" gives "a=b"; only the first '=' ends the name.
+# RFC 0011 Type conversion table: STRING S="a=b" gives "a=b"; only the first '=' ends the name.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition> item 3: may not reference Param.* of a LIST[PATH]
+# RFC 0011 §<JobOutputDefinition> item 3: may not reference Param.* of a LIST[PATH]
 # parameter (RawParam.* is the submission-context form).
 specificationVersion: jobtemplate-2023-09
 extensions:

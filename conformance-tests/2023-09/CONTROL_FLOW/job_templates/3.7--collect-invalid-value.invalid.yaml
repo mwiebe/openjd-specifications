@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition>: collect is an <OutputCollectMode>
+# RFC 0011 §<OutputVariableDefinition>: collect is an <OutputCollectMode>
 # (ONCE | LAST | APPEND).
 specificationVersion: jobtemplate-2023-09
 extensions:

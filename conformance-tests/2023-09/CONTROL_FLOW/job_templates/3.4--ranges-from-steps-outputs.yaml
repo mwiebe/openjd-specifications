@@ -1,4 +1,4 @@
-# RFC 0010 §Task parameter ranges: a format-string range may read the Steps.* symbols of a
+# RFC 0011 §Task parameter ranges: a format-string range may read the Steps.* symbols of a
 # direct dependency: an INT range string, a STRING list, and a computed list[int].
 specificationVersion: jobtemplate-2023-09
 extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: PATH P=7 is invalid; an int does not implicitly coerce
+# RFC 0011 Type conversion table: PATH P=7 is invalid; an int does not implicitly coerce
 # to path.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed. POSIX only, because the valid first

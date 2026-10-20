@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 3: collect APPEND is valid on a LIST[...] type.
+# RFC 0011 §<OutputVariableDefinition> item 3: collect APPEND is valid on a LIST[...] type.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

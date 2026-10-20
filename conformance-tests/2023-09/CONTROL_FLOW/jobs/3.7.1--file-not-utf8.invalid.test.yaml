@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 6: file content that is not valid UTF-8
+# RFC 0011 §Processing a directive, invalid item 6: file content that is not valid UTF-8
 # is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

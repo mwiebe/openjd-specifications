@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: NaN is not JSON and is invalid.
+# RFC 0011 §The openjd_output_var directive: NaN is not JSON and is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.
 template:

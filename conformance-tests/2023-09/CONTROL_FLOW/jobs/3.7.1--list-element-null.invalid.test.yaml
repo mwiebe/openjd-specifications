@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: LIST[INT] L=[1, null] is invalid; null cannot be a list
+# RFC 0011 Type conversion table: LIST[INT] L=[1, null] is invalid; null cannot be a list
 # element.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

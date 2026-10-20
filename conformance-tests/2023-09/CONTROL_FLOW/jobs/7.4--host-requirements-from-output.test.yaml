@@ -1,4 +1,4 @@
-# RFC 0010 §Materialization groups item 3: hostRequirements that read Steps.* are
+# RFC 0011 §Materialization groups item 3: hostRequirements that read Steps.* are
 # evaluated at C's step input binding. The computed requirement is at least 1 vCPU, which
 # every host meets. C's marker shows that binding succeeded and C ran.
 template:

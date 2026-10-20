@@ -1,4 +1,4 @@
-# RFC 0010 §Path values: a worker PATH is stored in the submission path context (RawOutput,
+# RFC 0011 §Path values: a worker PATH is stored in the submission path context (RawOutput,
 # mapping source_path -> destination_path in reverse) and mapped forward again for the
 # consumer (Output). Rule: /mnt/submit (submission) -> /worker/root (worker).
 template:

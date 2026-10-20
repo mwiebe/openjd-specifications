@@ -1,4 +1,4 @@
-# RFC 0010 §Backward compatibility: listing CONTROL_FLOW (with EXPR) and using none of
+# RFC 0011 §Backward compatibility: listing CONTROL_FLOW (with EXPR) and using none of
 # its features is valid; the Steps behave as they do without the extension.
 specificationVersion: jobtemplate-2023-09
 extensions:

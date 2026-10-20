@@ -1,4 +1,4 @@
-# RFC 0010 §Conditional execution: a skipped Step's Steps.*.TaskParam symbols are null too.
+# RFC 0011 §Conditional execution: a skipped Step's Steps.*.TaskParam symbols are null too.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

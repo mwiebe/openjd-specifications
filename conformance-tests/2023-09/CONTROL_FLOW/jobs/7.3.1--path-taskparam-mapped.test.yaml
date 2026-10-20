@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope: Steps.P.TaskParam of a PATH Task parameter has the consuming
+# RFC 0011 §The Steps.* scope: Steps.P.TaskParam of a PATH Task parameter has the consuming
 # Session's rules applied; TaskRawParam is unmapped.
 template:
   specificationVersion: jobtemplate-2023-09

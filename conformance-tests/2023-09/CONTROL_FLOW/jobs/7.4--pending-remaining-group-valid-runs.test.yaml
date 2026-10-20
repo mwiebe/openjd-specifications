@@ -1,4 +1,4 @@
-# RFC 0010 §How a Step is bound: the companion of 7.4--failure-with-pending-remaining-group,
+# RFC 0011 §How a Step is bound: the companion of 7.4--failure-with-pending-remaining-group,
 # with N=1. C's Tasks are known once P finishes, its remaining group (which uses its let)
 # waits for Q, and C's one Task runs with the value Q reported.
 template:

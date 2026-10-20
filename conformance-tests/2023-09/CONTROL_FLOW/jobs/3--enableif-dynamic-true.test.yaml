@@ -1,4 +1,4 @@
-# RFC 0010 §Conditional execution: a dynamic enableIf that is true runs the Step, and its
+# RFC 0011 §Conditional execution: a dynamic enableIf that is true runs the Step, and its
 # outputs reach its dependents.
 template:
   specificationVersion: jobtemplate-2023-09

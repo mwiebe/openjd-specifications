@@ -1,4 +1,4 @@
-# RFC 0010 §Collect modes: under APPEND, no directive gives [].
+# RFC 0011 §Collect modes: under APPEND, no directive gives [].
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

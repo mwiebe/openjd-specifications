@@ -1,4 +1,4 @@
-# RFC 0010 §Chunked Steps item 1: in a Step with outputVariables, a CHUNK[INT] range with a
+# RFC 0011 §Chunked Steps item 1: in a Step with outputVariables, a CHUNK[INT] range with a
 # duplicate value fails the Step when its parameter space is materialized (here at binding),
 # before any of its Tasks runs. The range is a computed list, [1, 1, 2], not a range string.
 # P prints its marker first and no directive, so the marker appears only if a runtime ran

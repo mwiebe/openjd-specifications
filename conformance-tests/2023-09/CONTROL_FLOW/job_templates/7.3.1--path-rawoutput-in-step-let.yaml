@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope: TEMPLATE-scope fields read a PATH output through
+# RFC 0011 §The Steps.* scope: TEMPLATE-scope fields read a PATH output through
 # Steps.P.RawOutput, as they read RawParam for a PATH job parameter.
 specificationVersion: jobtemplate-2023-09
 extensions:

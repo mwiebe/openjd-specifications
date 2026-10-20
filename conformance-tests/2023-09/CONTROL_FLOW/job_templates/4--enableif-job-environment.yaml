@@ -1,4 +1,4 @@
-# RFC 0010 §<Environment> enableIf constraint 1: a Job Environment's enableIf may reference
+# RFC 0011 §<Environment> enableIf constraint 1: a Job Environment's enableIf may reference
 # Param.*, RawParam.*, and Job.Name, and is evaluated at Job creation.
 specificationVersion: jobtemplate-2023-09
 extensions:

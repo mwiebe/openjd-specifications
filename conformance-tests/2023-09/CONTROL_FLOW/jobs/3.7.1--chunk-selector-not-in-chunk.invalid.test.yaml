@@ -1,4 +1,4 @@
-# RFC 0010 §Chunked Steps item 1: the selector must be a value in the chunk being run, and
+# RFC 0011 §Chunked Steps item 1: the selector must be a value in the chunk being run, and
 # the check is against the chunk the runtime was given, not the parameter's whole range.
 # Frames 1-4 run in two chunks of 2. Each chunk reports valid values for its own Tasks,
 # then one value for a Task of the other chunk (a Frame that is in the range). X is

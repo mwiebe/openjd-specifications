@@ -1,4 +1,4 @@
-# RFC 0010 §How a Step is bound item 3 / Design Choice 8: a skipped producer's null where a
+# RFC 0011 §How a Step is bound item 3 / Design Choice 8: a skipped producer's null where a
 # value is required (a range) fails the consumer; none of its Tasks runs. P is skipped at Job
 # creation, so its null is concrete then and C's range is evaluated then (§When groups are
 # evaluated), which fails Job creation; either way the run fails.

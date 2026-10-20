@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 6: a file whose content contains a NUL
+# RFC 0011 §Processing a directive, invalid item 6: a file whose content contains a NUL
 # character is invalid. The rule overlaps "not exactly one JSON value" (a NUL after the
 # value is not JSON whitespace), so a runtime may report either problem; only the failure
 # is checked.

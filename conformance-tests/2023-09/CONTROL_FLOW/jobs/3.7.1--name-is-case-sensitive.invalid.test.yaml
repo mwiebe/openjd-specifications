@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: names are matched case-sensitively, so 'v'
+# RFC 0011 §The openjd_output_var directive: names are matched case-sensitively, so 'v'
 # is an undeclared output of a Step that declares 'V'.
 # V is collect: LAST, so a runtime that matched names case-insensitively would take
 # 'v=1' as a second, valid value of V and let the run succeed, rather than fail it as a

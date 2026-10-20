@@ -1,4 +1,4 @@
-# RFC 0010 §<JobOutputDefinition> item 2: LIST[LIST[INT]] is allowed; here it collects a
+# RFC 0011 §<JobOutputDefinition> item 2: LIST[LIST[INT]] is allowed; here it collects a
 # multi-Task producer's LIST[INT] output.
 specificationVersion: jobtemplate-2023-09
 extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 §<StepTemplate> enableIf: the target type is bool, not bool?; a null result
+# RFC 0011 §<StepTemplate> enableIf: the target type is bool, not bool?; a null result
 # (a skipped producer's output) fails instead of enabling the Step. Q is skipped at Job
 # creation, so P's enableIf is decided then (§When groups are evaluated) and Job creation
 # fails.

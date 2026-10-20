@@ -1,4 +1,4 @@
-# RFC 0010 §Job outputs items 1, 3 and 4: a job output that reads only Steps.P.TaskParam.*
+# RFC 0011 §Job outputs items 1, 3 and 4: a job output that reads only Steps.P.TaskParam.*
 # is evaluated as soon as P's Tasks are known, which can be before P is bound. P's parameter
 # space is static, so its Tasks are known at Job creation, but P is PENDING_INPUTS because
 # its host selection group (hostRequirements, which openjd run accepts locally) reads

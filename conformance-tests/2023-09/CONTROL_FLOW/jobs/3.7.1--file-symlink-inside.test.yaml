@@ -1,4 +1,4 @@
-# RFC 0010 §File values item 2: a symbolic link that resolves to a regular file inside the
+# RFC 0011 §File values item 2: a symbolic link that resolves to a regular file inside the
 # Working Directory is valid.
 template:
   specificationVersion: jobtemplate-2023-09
