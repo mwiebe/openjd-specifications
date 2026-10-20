@@ -8,6 +8,12 @@ Status: investigation note, input to the CONTROL_FLOW RFC draft. Not normative.
 > this note, including its samples, still reflects the earlier file-based design where it mentions emission, and
 > [§9](#9-addendum-path-outputs-and-job-outputs) adds `PATH` outputs and job outputs;
 > [RFC 0011](../../rfcs/0011-control-flow.md) is current.
+>
+> **Split into three RFCs.** RFC 0011 was later split into [RFC 0011, Control Flow](../../rfcs/0011-control-flow.md)
+> (the consumer side), [RFC 0012, Step Output Variables](../../rfcs/0012-step-output-variables.md) (the producer
+> side), and [RFC 0013, Step Loops](../../rfcs/0013-step-loops.md), all parts of the one `CONTROL_FLOW` extension.
+> Design Choice numbers in this note are those before the split: its Design Choice 15 is now RFC 0011 Design
+> Choice 10.
 
 This note synthesizes the three earlier notes into one design for a `CONTROL_FLOW` extension:
 
