@@ -1140,6 +1140,7 @@ New property:
        `RawParam.*`, `Job.Name`, `Step.Name`, and the `Steps.*` symbols of the Step's direct dependencies (see
        [The `Steps.*` scope](#the-steps-scope)).
     2. It may not reference names bound by the Step's own `let`, `Task.*`, or `Session.*`.
+
 Changed semantics of existing properties:
 
 * *dependencies* — A dependency on a `SKIPPED` Step, or on a Step that succeeded with zero Tasks, is satisfied once
@@ -1167,7 +1168,8 @@ Where:
 
 1. *name* — The name by which a caller reads the output. Job outputs are not symbols in any format string of the
    template: nothing in a Job runs after them.
-2. *type* — The output's type, from the same vocabulary as `<OutputVariableDefinition>`, with the same mapping to
+2. *type* — The output's type, from the same vocabulary as
+   [`<OutputVariableDefinition>`](0012-step-output-variables.md#outputvariabledefinition), with the same mapping to
    expression types and the same constraint properties (including `objectType` for `PATH` and `LIST[PATH]`).
    `LIST[LIST[INT]]` is allowed.
 3. *value* — The value, as a format string whose target type is the expression type of *type*, made optional: an
@@ -1347,7 +1349,7 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
 
 | Stage | When | Known Values | Unknown Values | What Happens |
 |---|---|---|---|---|
-| **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every rule of [Validation](#validation) is checked. |
+| **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every template-validation rule of [Validation](#validation) and of [RFC 0012 §Validation](0012-step-output-variables.md#validation) and [RFC 0013 §Validation](0013-step-loops.md#validation) is checked. |
 | **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, every materialization group whose inputs are concrete; a failure fails Job creation. A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
 | **Step input binding** (new, `CONTROL_FLOW` only) | Per materialization group of a Step, once its inputs are concrete (with `TASK_DEPENDENCIES`, the Task graph group also once the Tasks of every Step its subspace dependencies name are known), with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.*`, `Session.*` | The group's expressions are evaluated and checked. *enableIf* `false` makes the Step `SKIPPED`; Task enumeration makes its Tasks known; host selection makes its host requirements known; a failure makes it `FAILED` at once; when every group has evaluated, it is bound and `READY`. See [Step input binding](#step-input-binding). |
 | **Job output evaluation** (new, `CONTROL_FLOW` only) | Per job output, once every `Steps.*` symbol its *value* references is concrete | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted, and checked; a failure fails the Job. See [Job outputs](#job-outputs). |
@@ -1366,10 +1368,11 @@ CONTROL_FLOW adds no types, functions, or operators to EXPR. It adds:
   `"--size "`; a list item (such as an entry of `args`) is dropped; and an optional field is omitted. An
   implementation of template validation MUST emit a warning (not an error) for every interpolated expression in one
   of those three positions whose static type includes `nulltype` and that references, directly or through a `let`
-  binding, a `Steps.*` symbol of a conditional Step. The warning names the expression and suggests a conditional
-  expression or an `or` default. An expression whose type has no `nulltype`, such as
-  `'frames only' if x == null else string(x)`, draws no warning, and neither does *enableIf*, where `null` is an
-  error.
+  binding, a `Steps.*` symbol of a conditional Step, or a `LAST` output of a loop with *while*, whose type is `T?`
+  (see [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)). The warning names
+  the expression and suggests a conditional expression or an `or` default. An expression whose type has no
+  `nulltype`, such as `'frames only' if x == null else string(x)`, draws no warning, and neither does *enableIf*,
+  where `null` is an error.
 
 Symbol collection (RFC 0005) is how an implementation finds a Step's `Steps.*` references, both to check them and to
 decide whether the Step needs step input binding and what the inputs of each of its materialization groups are.
@@ -1719,7 +1722,8 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
 6. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types; *enableIf* has type
    `bool`.
 7. The warning of [Modifications to the Expression Language](#modifications-to-the-expression-language) for an
-   optional-typed expression that reads a conditional Step's `Steps.*` symbol where EXPR discards `null`.
+   optional-typed expression that reads a conditional Step's `Steps.*` symbol, or a `while` loop's `LAST` output (RFC
+   0013), where EXPR discards `null`.
 8. The Step dependency graph is acyclic, as today.
 9. *jobOutputDefinitions*: 1 to 50 elements; names are unique `<Identifier>`s; types and constraint properties as
     for *outputVariables*; each *value* type-checks against its type, made optional, and references only the symbols
