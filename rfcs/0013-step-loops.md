@@ -155,19 +155,27 @@ A loop has the Step states of [RFC 0011 §Step states](0011-control-flow.md#step
                        │
       ┌────────────────┼──────────────────────┐
       ▼                ▼                      ▼
-   SKIPPED      PENDING_INPUTS ──bound──► READY ──► RUNNING ──────────────► SUCCEEDED
-                       │                    │      iteration 0, 1, ...       ▲   ╰► FAILED
-                       │                    └── first while false ───────────┘ (zero iterations)
+   SKIPPED      PENDING_INPUTS ──bound──► READY ──► RUNNING ──loop ends──┬──every minLength holds──► SUCCEEDED
+                       │                    │         │      ▲           │
+                       │                    │   fails │      │ (1)       ├──a minLength violated──► FAILED
+                       │                    │         ▼      │           │
+                       │                    │        FAILED ─┘           │
+                       │                    └── first while false ───────┘
+                       │                        (zero iterations)
                        ├──enableIf false──► SKIPPED
                        ├──a group fails ──► FAILED, at once
                        └──a dependency FAILED ──► (blocked; never runs)
+
+  (1) a retry or requeue of a failed body Task in the current iteration
 ```
 
-A loop is `FAILED` when a body Step instance fails, when one of its own groups or an evaluation at an iteration
-boundary fails, when it exceeds a limit, or when it reaches *maxIterations* while continuing (see
-[Failure](#failure)). Only a failure of a body Step instance's Tasks is recoverable: if the scheduler lets those Tasks
-be retried or requeued and the instance then succeeds, the loop leaves `FAILED` and resumes. Every other loop failure
-is final (see [Failure](#failure)).
+A loop is `RUNNING` while its iterations run. When *until* or *while* ends it, or its first *while* is `false`, the
+`minLength` of each `APPEND` loop output is checked: the loop is `SUCCEEDED` if every one holds and `FAILED` if one
+does not. A loop is also `FAILED` when a body Step instance fails, when one of its own groups or an evaluation at an
+iteration boundary fails, when it exceeds a limit, or when it reaches *maxIterations* while continuing (see
+[Failure](#failure)). Only a failure of the Tasks of a body Step instance of the iteration in progress is recoverable:
+if the scheduler lets those Tasks be retried or requeued and the instance then succeeds, the loop leaves `FAILED` and
+returns to `RUNNING`, edge (1). Every other loop failure is final (see [Failure](#failure)).
 
 ## Basic Examples
 
@@ -1040,7 +1048,7 @@ says for any Step, within its iteration.
 | Stage | When | Known Values | Unknown Values | What Happens |
 |---|---|---|---|---|
 | **Template validation** | as today | as today | as today, and `Loop.*`, `RawLoop.*` | Every rule of [Validation](#validation) is checked, with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. |
-| **Job creation** | as today | as today | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated. |
+| **Job creation** | as today | as today | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated, and the `minLength` check of the loop's `APPEND` outputs is never part of Job creation. |
 | **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011, and for a body Step instance, `Loop.*` | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
 | **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Loop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' values | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
 | **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
@@ -1064,10 +1072,12 @@ order:
 
 An error in any group fails the loop at once, or fails Job creation if the group is evaluated then, as for a Step. A
 loop is bound when *enableIf* is `true` and every group has evaluated, and then is `READY`. A bound loop whose first
-*while* is `false` has zero iterations. When its own dependencies are satisfied, the `minLength` of each `APPEND` loop
-output is checked against `[]`, and if every one holds the loop succeeds, as a Step with zero Tasks does; a violation
-fails the loop. Any other bound loop starts iteration 0 when its dependencies are satisfied, and is `RUNNING` until it
-succeeds or fails.
+*while* is `false` has zero iterations. The `minLength` check of its `APPEND` loop outputs is not a materialization
+group and is never part of Job creation: it runs when the loop would succeed, which for a zero-iteration loop is once
+its own dependencies are satisfied, as a Step with zero Tasks succeeds then under
+[RFC 0011 §Step states](0011-control-flow.md#step-states). The `minLength` of each `APPEND` loop output is checked
+against `[]`, and if every one holds the loop succeeds; a violation fails the loop. Any other bound loop starts
+iteration 0 when its dependencies are satisfied, and is `RUNNING` until it succeeds or fails.
 
 #### Iterations
 
@@ -1136,10 +1146,10 @@ for loop variables.
 
 #### Failure
 
-* A body Step instance that fails, because one of its Tasks fails or one of its groups fails to evaluate, fails the
-  loop at once. No further iteration starts, and the loop does not satisfy the `dependsOn` of the Steps that depend
-  on it, as a failed Step does not. Other instances of the same iteration that do not depend on the failed one may
-  still run, as independent Steps of a Job may today after a Step fails.
+* A body Step instance of the iteration in progress that fails, because one of its Tasks fails or one of its groups
+  fails to evaluate, fails the loop at once. No further iteration starts, and the loop does not satisfy the
+  `dependsOn` of the Steps that depend on it, as a failed Step does not. Other instances of the same iteration that do
+  not depend on the failed one may still run, as independent Steps of a Job may today after a Step fails.
 * An error in one of the loop's own groups (*enableIf*, *maxIterations*, an *initial*, or the first *while*) fails the
   loop at once, or fails Job creation if the group is evaluated then (see [Loop binding](#loop-binding)).
 * Exceeding a limit of [Limits](#limits) items 2 and 4 fails the loop.
@@ -1148,17 +1158,25 @@ for loop variables.
 * Reaching the bound fails the loop (step 5 of the boundary).
 * A loop whose dependency fails, or can never run, never runs, as a Step behind a failed dependency never does.
 
-**Recovery.** Only a failure of a body Step instance's Tasks is recoverable, in the same way as any Step's failure
-under RFC 0011 and RFC 0012: a scheduler that lets a failed Task be retried or requeued may do so for the Tasks of a
-failed instance. If the instance then succeeds, its iteration continues, and when the iteration is complete the loop
-leaves `FAILED` and resumes at that iteration's boundary. Until then the loop is `FAILED` and the Steps that depend on
-it are blocked, exactly as for a failed Step, and a job output that reads it is not evaluated (see
-[RFC 0011 §Job outputs](0011-control-flow.md#job-outputs) item 4). Every other failure of a loop is final: the loop is
-`FAILED` and cannot resume. These are a group of a body Step instance that fails to evaluate; a group of the loop itself that fails
-to evaluate; exceeding a limit of [Limits](#limits), including an instance whose Tasks would take the loop over a Task
-limit; any failure at the iteration boundary (an error in *while*, *until*, *next*, or a loop output *value*, or a
-violated loop variable or loop output constraint); a violated `minLength` after zero iterations; and reaching the
-bound.
+**Recovery.** Only a failure of the Tasks of a body Step instance of the iteration in progress is recoverable, in the
+same way as any Step's failure under RFC 0011 and RFC 0012: a scheduler that lets a failed Task be retried or requeued
+may do so for the Tasks of a failed instance of that iteration. If the instance then succeeds, its iteration
+continues, and when the iteration is complete the loop leaves `FAILED` and resumes at that iteration's boundary. Until
+then the loop is `FAILED` and the Steps that depend on it are blocked, exactly as for a failed Step, and a job output
+that reads it is not evaluated (see [RFC 0011 §Job outputs](0011-control-flow.md#job-outputs) item 4).
+
+A re-run of a Task of an earlier iteration, or after the loop has ended, follows
+[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs) rules 1 to 4 and never changes the
+loop's state, its loop variables, or its loop outputs. A failed re-run commits nothing, and the instance keeps its
+committed values. It does not fail the loop, and it is not a failure that the loop recovers from.
+
+Every other failure of a loop is final: the loop is `FAILED` and cannot resume. These are a group of a body Step
+instance that fails to evaluate; a group of the loop itself that fails to evaluate; exceeding a limit of
+[Limits](#limits), including an instance whose Tasks would take the loop over a Task limit; any failure at the
+iteration boundary (an error in *while*, *until*, *next*, or a loop output *value*, or a violated loop variable or loop
+output constraint); a violated `minLength` when the loop ends, including after zero iterations; and reaching the
+bound. Once any final failure occurs, the loop cannot resume, even if a failed Task of the iteration in progress is
+later retried or requeued and succeeds.
 
 #### Sessions
 
@@ -1176,9 +1194,10 @@ as found by symbol collection, is consumed once that expression has been evaluat
 [RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs). So a re-run of a Task of a
 completed iteration, after the loop has gone past its boundary, that succeeds with different values fails, as for any
 consumed output, because the next iteration was built from them. Loop variables and loop outputs are never
-re-evaluated, and an iteration is never run again. A failed attempt of a body Task may be retried as any Task's may;
-if the instance still fails, the loop stays `FAILED`, and if it later succeeds the loop resumes (see
-[Failure](#failure)).
+re-evaluated, and an iteration is never run again. A failed attempt of a Task of the iteration in progress may be
+retried as any Task's may; if the instance still fails, the loop stays `FAILED`, and if it later succeeds the loop
+resumes, unless a final failure has occurred (see [Failure](#failure)). A re-run of a Task of an earlier iteration, or
+after the loop has ended, never changes the loop's state, variables, or outputs (see [Failure](#failure)).
 
 #### Limits
 
@@ -1193,7 +1212,10 @@ if the instance still fails, the loop stays `FAILED`, and if it later succeeds t
    of a Job Template. Its instances are not Steps of the template.
 4. A scheduler MUST accept loop variable and loop output values totaling at least 1 MiB per loop at any moment,
    measured as their JSON serialization, with every element of an `APPEND` output counted, and MAY accept more.
-   Exceeding its limit fails the loop.
+   The total is checked after the *initial* values are evaluated, at loop binding (at Job creation if the start group
+   is evaluated then, where exceeding the limit fails Job creation), and at each iteration boundary after step 1 (loop
+   outputs) and after step 3 (*next*) of [The iteration boundary](#the-iteration-boundary). Exceeding its limit fails
+   the loop.
 5. Expressions in a loop are evaluated under EXPR's existing memory and operation limits.
 
 #### Composition with other extensions
@@ -1214,11 +1236,13 @@ if the instance still fails, the loop stays `FAILED`, and if it later succeeds t
 Add a section, *Step Loops*: a loop runs its body Steps once per iteration, one iteration after another; each
 iteration has its own instance of every body Step, with its own Tasks; at the end of each iteration the scheduler
 evaluates the loop's outputs and decides, from `until` or `while`, whether another iteration runs; a loop that would
-exceed `maxIterations` fails; and a failure in any body Step fails the loop. Only a failure of a body Step
-instance's Tasks is recoverable: if a retry or requeue makes that instance succeed, its iteration continues and the
-loop resumes. Every other loop failure, including an expression or constraint error in the loop or at an iteration
-boundary, a binding error of a body Step instance, exceeding a limit, and reaching `maxIterations`, is final. See
-[Running a loop](#running-a-loop).
+exceed `maxIterations` fails; and a failure in any body Step fails the loop. Only a failure of the Tasks of a body
+Step instance of the iteration in progress is recoverable: if a retry or requeue makes that instance succeed, its
+iteration continues and the loop resumes. A re-run of a Task of an earlier iteration, or after the loop has ended,
+follows the re-run rules of Step outputs and never changes the loop's state, variables, or outputs; a failed re-run
+commits nothing. Every other loop failure, including an expression or constraint error in the loop or at an iteration
+boundary, a binding error of a body Step instance, exceeding a limit, a violated `minLength` when the loop ends, and
+reaching `maxIterations`, is final, and once one occurs the loop cannot resume. See [Running a loop](#running-a-loop).
 
 ### Validation
 
@@ -1250,9 +1274,14 @@ Every rule this RFC adds, and when it is checked, in the form of
     output's type, or under `APPEND` its element type.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
-every *initial*, and the first *while*, evaluate, convert, and satisfy their constraints; and, when the first
-*while* is `false`, the `minLength` of each `APPEND` loop output holds for `[]` once the loop's dependencies are
-satisfied. A failure fails the loop at once, finally, or Job creation if the group is evaluated then.
+every *initial*, and the first *while*, evaluate, convert, and satisfy their constraints; and the size limit of
+[Limits](#limits) item 4 holds for the *initial* values. A failure fails the loop at once, finally, or Job creation if
+the group is evaluated then.
+
+**When a zero-iteration loop would succeed** (by the scheduler): when the first *while* is `false`, the `minLength` of
+each `APPEND` loop output holds for `[]`. This check is not a materialization group and is never part of Job
+creation; it runs once the loop's dependencies are satisfied, as a Step with zero Tasks succeeds then under
+[RFC 0011 §Step states](0011-control-flow.md#step-states). A violation fails the loop, finally.
 
 **At iteration start and body Step binding** (by the scheduler): every rule of RFC 0011 and RFC 0012 for each body
 Step instance, and the limits of [Limits](#limits) item 2. A failure fails the loop; only a failure of an
@@ -1310,9 +1339,15 @@ What this RFC does differently:
 - **CLI (`openjd run`)**: Runs a loop's iterations in order, each iteration's body Steps in dependency order, prints
   each iteration's index, loop variable values, and loop outputs, and fails the run as the loop fails. `openjd run
   --step` accepts a loop's name and runs the whole loop. `--tasks`, `--task-param`, and `--maximum-tasks` choose which
-  Tasks of the Step run, and a loop has no Task parameters or Tasks of its own, so the CLI rejects each of them with a
-  loop. `--step` naming a body Step is rejected with an error that names its loop, because a body Step runs only
-  within its loop's iterations. `openjd summary` reports a loop's bound and body.
+  Tasks of the selected Step run, and a loop has no Task parameters or Tasks of its own, so the CLI rejects the run
+  with an error when the selected Step is a loop, whether selected by `--step` or by the CLI's selection of the only
+  top-level Step of the Job, and any of these options was given explicitly. In a full run, with no Step selected,
+  `--maximum-tasks` applies to each body Step instance as it does to any Step. With `--step L` for a loop `L`,
+  `--step-inputs` supplies the values of the outputs of `L`'s dependencies that the loop and its body read. For a
+  Step that depends on a loop, `--step-inputs` supplies each loop output it reads in that output's declared type, a
+  single value under `LAST` or the whole list under `APPEND`, not one value per Task, since a loop has no Tasks.
+  `--step` naming a body Step is rejected with an error that names its loop, because a body Step runs only within its
+  loop's iterations. `openjd summary` reports a loop's bound and body.
 - **Schedulers**: Creating body Step instances as iterations start, running iterations in order, evaluating the
   boundary, storing the loop variables and outputs, and showing iterations. A scheduler whose Jobs have a fixed set
   of Steps from submission must add the ability to create Steps while a Job runs, or represent each iteration's
