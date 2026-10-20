@@ -12,8 +12,6 @@ Status: investigation note, input to the CONTROL_FLOW RFC draft. Not normative.
 > **Split into three RFCs.** RFC 0011 was later split into [RFC 0011, Control Flow](../../rfcs/0011-control-flow.md)
 > (the consumer side), [RFC 0012, Step Output Variables](../../rfcs/0012-step-output-variables.md) (the producer
 > side), and [RFC 0013, Step Loops](../../rfcs/0013-step-loops.md), all parts of the one `CONTROL_FLOW` extension.
-> Design Choice numbers in this note are those before the split: its Design Choice 15 is now RFC 0011 Design
-> Choice 10.
 
 This note synthesizes the three earlier notes into one design for a `CONTROL_FLOW` extension:
 
@@ -1228,4 +1226,4 @@ tasks are known, which can be before `P` is bound. The state machine of
 §2.2 is unchanged: these are facts, not states. The first error in any group fails the step at once. Dispatch stays
 atomic: no task runs until every group has evaluated. The motivation is visibility and capacity planning (showing a
 step's tasks and choosing fleets before slower producers finish), not earlier dispatch, which the direct-dependency
-rule already rules out. See RFC 0011, *Step input binding* and Design Choice 15.
+rule already rules out. See RFC 0011, *Step input binding* and Design Choice 10.
