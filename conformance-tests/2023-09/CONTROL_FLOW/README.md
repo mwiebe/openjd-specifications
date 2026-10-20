@@ -1,7 +1,8 @@
 # CONTROL_FLOW Conformance Tests
 
 Conformance tests for the draft `CONTROL_FLOW` extension defined in
-[RFC 0011 — Control Flow](../../../rfcs/0011-control-flow.md).
+[RFC 0011 — Control Flow](../../../rfcs/0011-control-flow.md) and
+[RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md).
 
 > **Unverified.** These tests were written from the RFC text before any implementation of
 > `CONTROL_FLOW` existed, so none of them has been run. They are meant to be correct
@@ -25,7 +26,8 @@ outputs. `PATH` outputs are reverse-mapped to the submission path context.
 ## RFC rules these tests verify
 
 The filename prefix is the [Template Schemas](../../../wiki/2023-09-Template-Schemas.md)
-section; each file's header comment cites the RFC 0011 section and rule.
+section; each file's header comment cites the RFC (0011 or 0012) that holds the rule, and its
+section.
 
 - **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `EXPR`; every new
   field and symbol requires `CONTROL_FLOW`; Environment Templates can't declare
@@ -66,7 +68,7 @@ section; each file's header comment cites the RFC 0011 section and rule.
   outputs and Task parameters; a Step whose name isn't an `<Identifier>` is still valid;
   not in the Job name or `jobEnvironments`; `PATH`-typed `Output`/`TaskParam` only on the worker host, `RawOutput`/
   `TaskRawParam` elsewhere; scalar vs. list shape; type errors; `T?` accepted where `T` is
-  required (Design Choice 8).
+  required (RFC 0011 Design Choice 5).
 - **Data flow, reductions, and parameter spaces** (`jobs/7.3.1--*`, `jobs/3.4--*`,
   `job_templates/3.4--*`): iteration order with `combination`, literal-list order,
   `TaskParam` alignment, Step Environment variables from outputs, dynamic fan-out from lists and range strings, empty spaces as
@@ -171,11 +173,11 @@ section; each file's header comment cites the RFC 0011 section and rule.
 - A directive in a Job Environment's `onExit`, because whether a failed `onExit` fails a
   run whose Tasks succeeded is base-spec behavior the RFC doesn't settle.
 - `"1-{{N}}"` with `N = 0`: the RFC notes implementations disagree on `1-0`.
-- `combination` may not reference `Steps.*` (§Task parameter ranges): `combination` is not
+- `combination` may not reference `Steps.*` (RFC 0011 §Task parameter ranges): `combination` is not
   a format string, so `{{Steps.P.Output.X}}` there is a syntax error like any other
   malformed `combination`. A template can't fail this rule without failing an existing
   base-spec rule first, so a test would not show the rule is enforced.
-- A referenced Step must have an `<Identifier>` name (§Validation item 3): EXPR parses
+- A referenced Step must have an `<Identifier>` name (RFC 0011 §Validation item 2): EXPR parses
   `Steps.Find-Frames.Output.N` as `Steps.Find - Frames.Output.N`, which fails as an unknown
   Step `Find` and an unknown root `Frames`, rules that are already tested. No reference can
   name a non-`<Identifier>` Step, so the rule can't be violated distinctly.
@@ -183,7 +185,7 @@ section; each file's header comment cites the RFC 0011 section and rule.
 
 ## Ambiguities found while writing these tests
 
-1. **Path reverse mapping (§Path values).** When the Session has rules, there are two
+1. **Path reverse mapping (RFC 0012 §Path values).** When the Session has rules, there are two
    MUSTs: the stored value MUST be in the submission path context, and forward mapping it
    MUST give back the reported path; "If the runtime can find no such form, the value is
    invalid." A worker-only path under no rule's `destination_path` round-trips if stored

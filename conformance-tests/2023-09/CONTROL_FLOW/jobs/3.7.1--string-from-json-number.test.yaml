@@ -1,5 +1,5 @@
-# RFC 0011 Type conversion table: STRING S=123 gives the string "123" (EXPR implicit
-# coercion; see Open Question 16).
+# RFC 0012 Type conversion table: STRING S=123 gives the string "123" (EXPR implicit
+# coercion; see RFC 0012 Open Question 7).
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

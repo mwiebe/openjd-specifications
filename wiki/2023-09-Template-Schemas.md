@@ -59,7 +59,8 @@ Where:
          [EXPR](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0005-expression-language.md),
          [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md),
          [ENV_PARAMS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-environment-parameters.md),
-         [CONTROL_FLOW](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) (draft)
+         [CONTROL_FLOW](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) (draft;
+         specified in RFCs 0011, [0012](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md), and [0013](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0013-step-loops.md))
       * A document that lists `ENV_PARAMS` without `EXPR` must be rejected.
       * A template that lists `CONTROL_FLOW` must also list `EXPR`. Schedulers must reject templates that list
         `CONTROL_FLOW` without `EXPR`.
@@ -2156,7 +2157,7 @@ no enclosing Step exists.
 
 Defines a value that every Task of a Step reports, for the Steps that depend on it to read and for the render
 management system to store and display. A metric, such as an error score or a frame rate, is an output variable that
-no Step reads. Introduced in [RFC 0011](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) (draft).
+no Step reads. Introduced in [RFC 0012](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md) (draft).
 
 An `<OutputVariableDefinition>` is the object:
 
