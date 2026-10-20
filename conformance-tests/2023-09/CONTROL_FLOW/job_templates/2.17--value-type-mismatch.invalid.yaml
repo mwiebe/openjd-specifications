@@ -1,4 +1,4 @@
-# RFC 0010 §Validation item 10: each value type-checks against its type; a list[int] has
+# RFC 0011 §Validation item 10: each value type-checks against its type; a list[int] has
 # no conversion to int.
 specificationVersion: jobtemplate-2023-09
 extensions:

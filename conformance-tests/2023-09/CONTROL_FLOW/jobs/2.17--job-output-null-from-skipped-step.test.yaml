@@ -1,4 +1,4 @@
-# RFC 0010 §Job outputs item 4: a skipped Step's symbols are null, and a null job output
+# RFC 0011 §Job outputs item 4: a skipped Step's symbols are null, and a null job output
 # means no value, which is not an error. P's marker shows it really was skipped.
 template:
   specificationVersion: jobtemplate-2023-09

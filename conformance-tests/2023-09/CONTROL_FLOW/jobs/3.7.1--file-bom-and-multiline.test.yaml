@@ -1,4 +1,4 @@
-# RFC 0010 §File values item 4: the file holds one UTF-8 JSON value, optionally preceded by
+# RFC 0011 §File values item 4: the file holds one UTF-8 JSON value, optionally preceded by
 # a byte order mark and surrounded by whitespace, and may span lines.
 template:
   specificationVersion: jobtemplate-2023-09

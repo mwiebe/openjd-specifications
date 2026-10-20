@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope: for a PATH Task parameter, Steps.P.TaskParam is available
+# RFC 0011 §The Steps.* scope: for a PATH Task parameter, Steps.P.TaskParam is available
 # only on the worker host; a step-level let must use TaskRawParam.
 specificationVersion: jobtemplate-2023-09
 extensions:

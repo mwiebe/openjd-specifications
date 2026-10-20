@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: INT N=12.5 is invalid; 12.5 is not exactly an int.
+# RFC 0011 Type conversion table: INT N=12.5 is invalid; 12.5 is not exactly an int.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.
 template:

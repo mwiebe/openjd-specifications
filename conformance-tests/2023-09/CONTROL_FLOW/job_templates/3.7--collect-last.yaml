@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 3: collect LAST is valid on a scalar type.
+# RFC 0011 §<OutputVariableDefinition> item 3: collect LAST is valid on a scalar type.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

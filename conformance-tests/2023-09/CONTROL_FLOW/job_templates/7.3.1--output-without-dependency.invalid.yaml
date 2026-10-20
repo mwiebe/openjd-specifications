@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope, Where available item 1 / Validation item 4: a Step may
+# RFC 0011 §The Steps.* scope, Where available item 1 / Validation item 4: a Step may
 # read Steps.P.* only if it lists P in its own dependencies. A reference creates no edge.
 specificationVersion: jobtemplate-2023-09
 extensions:

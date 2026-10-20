@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope: Steps.P.TaskRawParam reads a PATH Task parameter's values
+# RFC 0011 §The Steps.* scope: Steps.P.TaskRawParam reads a PATH Task parameter's values
 # unmapped and is available in TEMPLATE-scope fields.
 specificationVersion: jobtemplate-2023-09
 extensions:

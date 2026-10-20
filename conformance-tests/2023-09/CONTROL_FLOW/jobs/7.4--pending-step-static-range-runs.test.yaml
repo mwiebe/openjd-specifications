@@ -1,4 +1,4 @@
-# RFC 0010 §When groups are evaluated: the companion of
+# RFC 0011 §When groups are evaluated: the companion of
 # 7.4--static-group-fails-job-creation, with a valid N. C's range reads only a job parameter
 # and is evaluated at Job creation; its let, used by its remaining group, waits for P. P runs,
 # then C's two Tasks run with the value P reported.

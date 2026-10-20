@@ -1,4 +1,4 @@
-# RFC 0010 §Chunked Steps item 1: the distinct-values rule applies only to a Step that
+# RFC 0011 §Chunked Steps item 1: the distinct-values rule applies only to a Step that
 # declares outputVariables. Positive control for
 # 3.7.1--chunk-literal-range-duplicates-with-outputs.invalid: the same Step without
 # outputVariables is valid.

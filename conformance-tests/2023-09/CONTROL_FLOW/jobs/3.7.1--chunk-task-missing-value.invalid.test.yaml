@@ -1,4 +1,4 @@
-# RFC 0010 §Chunked Steps items 2-3: when the Action exits every Task of the chunk must
+# RFC 0011 §Chunked Steps items 2-3: when the Action exits every Task of the chunk must
 # have its ONCE outputs; one missing value fails the whole chunk.
 template:
   specificationVersion: jobtemplate-2023-09

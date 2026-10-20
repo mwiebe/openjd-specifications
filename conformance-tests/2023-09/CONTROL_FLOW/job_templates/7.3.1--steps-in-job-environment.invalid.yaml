@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope: Steps.* is not available in jobEnvironments.
+# RFC 0011 §The Steps.* scope: Steps.* is not available in jobEnvironments.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

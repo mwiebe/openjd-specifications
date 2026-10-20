@@ -1,4 +1,4 @@
-# RFC 0010 §File values item 2: a relative path that escapes the Working Directory with
+# RFC 0011 §File values item 2: a relative path that escapes the Working Directory with
 # '..' is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed. POSIX only: on Windows the temp

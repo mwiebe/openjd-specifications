@@ -1,4 +1,4 @@
-# RFC 0010 Design Choice 7: a producer with a parameterSpace gives list[T], whatever its
+# RFC 0011 Design Choice 7: a producer with a parameterSpace gives list[T], whatever its
 # Task count, so integer arithmetic on Steps.P.Output.N is a type error.
 specificationVersion: jobtemplate-2023-09
 extensions:

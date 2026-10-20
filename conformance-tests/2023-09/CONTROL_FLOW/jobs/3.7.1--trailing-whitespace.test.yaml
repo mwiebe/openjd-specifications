@@ -1,4 +1,4 @@
-# RFC 0010 <Directive> grammar: trailing <WS>* after the value is allowed.
+# RFC 0011 <Directive> grammar: trailing <WS>* after the value is allowed.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

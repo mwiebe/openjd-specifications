@@ -1,4 +1,4 @@
-# RFC 0010 §Range length: with CONTROL_FLOW the 1024-element maximum still applies to a
+# RFC 0011 §Range length: with CONTROL_FLOW the 1024-element maximum still applies to a
 # range written as a YAML list literal, counted as written.
 specificationVersion: jobtemplate-2023-09
 extensions:

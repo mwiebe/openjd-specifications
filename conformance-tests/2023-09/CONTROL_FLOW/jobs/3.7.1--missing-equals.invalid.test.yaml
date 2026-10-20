@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 1: text after openjd_output_var: that
+# RFC 0011 §Processing a directive, invalid item 1: text after openjd_output_var: that
 # doesn't match <Directive> (here, no '=') is invalid.
 template:
   specificationVersion: jobtemplate-2023-09

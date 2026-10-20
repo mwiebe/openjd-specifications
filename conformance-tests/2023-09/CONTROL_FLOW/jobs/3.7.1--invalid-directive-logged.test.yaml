@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: an invalid directive always stays in the log
+# RFC 0011 §The openjd_output_var directive: an invalid directive always stays in the log
 # (with the error) and fails the Task.
 template:
   specificationVersion: jobtemplate-2023-09

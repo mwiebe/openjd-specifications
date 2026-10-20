@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope (Concreteness): the companion of
+# RFC 0011 §The Steps.* scope (Concreteness): the companion of
 # 7.4--taskparam-concrete-before-bound-fails-job-creation, with a guard that never holds.
 # P's Tasks are known at Job creation while its hostRequirements wait for Q, C's range is
 # Steps.P.TaskParam.X, and everything runs: C has one Task per value of X.

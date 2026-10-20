@@ -1,4 +1,4 @@
-# RFC 0010 §Job Template, jobOutputDefinitions constraint 1: at least one element if provided.
+# RFC 0011 §Job Template, jobOutputDefinitions constraint 1: at least one element if provided.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
