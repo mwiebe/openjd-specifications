@@ -760,7 +760,8 @@ Output values are stored, logged, and may be displayed, so they are not redacted
     3. If the output has been consumed and the re-run succeeds with a different value, the re-run attempt is
        reported as failed, with a message that names the output and a consumer that has consumed it. The Task keeps
        its earlier succeeded state and all of its committed values, so the Step and its consumers are unaffected.
-    4. If the re-run fails, it commits nothing, as any failed attempt, and the committed values are unchanged.
+    4. If the re-run fails, it commits nothing, as any failed attempt, and the committed values are unchanged. The
+       Task keeps its earlier succeeded state and all of its committed values, as in rule 3.
 
   The check is all or nothing: if any output falls under rule 3, nothing from the re-run is committed, and in a
   chunked Step the check covers every Task of the re-run chunk. Values are the
