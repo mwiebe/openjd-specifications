@@ -1,4 +1,4 @@
-# RFC 0010 §Validation item 4: references are checked statically, so a reference to a
+# RFC 0011 §Validation item 4: references are checked statically, so a reference to a
 # non-dependency is invalid even in a conditional branch that is never taken.
 specificationVersion: jobtemplate-2023-09
 extensions:

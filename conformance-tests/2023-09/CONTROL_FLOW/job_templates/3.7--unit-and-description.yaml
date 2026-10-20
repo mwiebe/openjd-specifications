@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> items 4-5: description and unit are display-only
+# RFC 0011 §<OutputVariableDefinition> items 4-5: description and unit are display-only
 # strings; unit may hold any non-Cc characters, such as '%', '/', and non-ASCII.
 specificationVersion: jobtemplate-2023-09
 extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 2: LIST[BOOL] is an <OutputVariableType>.
+# RFC 0011 §<OutputVariableDefinition> item 2: LIST[BOOL] is an <OutputVariableType>.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

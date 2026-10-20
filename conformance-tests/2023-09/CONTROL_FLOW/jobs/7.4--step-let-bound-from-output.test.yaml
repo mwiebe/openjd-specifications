@@ -1,4 +1,4 @@
-# RFC 0010 §Materialization groups: a step-level let that reads Steps.* is evaluated at binding.
+# RFC 0011 §Materialization groups: a step-level let that reads Steps.* is evaluated at binding.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

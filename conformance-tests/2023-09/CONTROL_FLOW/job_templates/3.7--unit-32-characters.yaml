@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 5: unit is 1 to 32 characters; 32 is valid.
+# RFC 0011 §<OutputVariableDefinition> item 5: unit is 1 to 32 characters; 32 is valid.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

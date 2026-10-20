@@ -1,4 +1,4 @@
-# RFC 0010 §Job outputs items 1 and 3: a job output is evaluated when the Step it reads
+# RFC 0011 §Job outputs items 1 and 3: a job output is evaluated when the Step it reads
 # succeeds; if it fails then, the Job fails.
 template:
   specificationVersion: jobtemplate-2023-09

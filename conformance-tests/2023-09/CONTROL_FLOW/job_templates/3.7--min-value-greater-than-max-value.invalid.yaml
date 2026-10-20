@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> constraint 2: same validity rules as the job
+# RFC 0011 §<OutputVariableDefinition> constraint 2: same validity rules as the job
 # parameter definition, so minValue may not exceed maxValue.
 specificationVersion: jobtemplate-2023-09
 extensions:

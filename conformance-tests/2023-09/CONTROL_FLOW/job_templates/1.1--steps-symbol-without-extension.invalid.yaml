@@ -1,4 +1,4 @@
-# RFC 0010 Technical Requirement 2: the Steps.* symbols exist only with CONTROL_FLOW.
+# RFC 0011 Technical Requirement 2: the Steps.* symbols exist only with CONTROL_FLOW.
 # With EXPR alone, Steps.P.TaskParam.F is an unknown symbol.
 specificationVersion: jobtemplate-2023-09
 extensions:

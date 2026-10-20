@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: LIST[FLOAT] with APPEND, E=[1] is invalid; each directive
+# RFC 0011 Type conversion table: LIST[FLOAT] with APPEND, E=[1] is invalid; each directive
 # supplies one float.
 template:
   specificationVersion: jobtemplate-2023-09

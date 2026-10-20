@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> constraint 2: a constraint property must be valid
+# RFC 0011 §<OutputVariableDefinition> constraint 2: a constraint property must be valid
 # for the declared type; minValue is not a STRING constraint.
 specificationVersion: jobtemplate-2023-09
 extensions:

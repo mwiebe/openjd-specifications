@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: the line terminator (\n or \r\n) is not part
+# RFC 0011 §The openjd_output_var directive: the line terminator (\n or \r\n) is not part
 # of the directive. Written as bytes so Python's newline translation doesn't interfere.
 template:
   specificationVersion: jobtemplate-2023-09

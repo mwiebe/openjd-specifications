@@ -1,4 +1,4 @@
-# RFC 0010 §Validation item 5: the host-only rule applies to any Output whose type is or
+# RFC 0011 §Validation item 5: the host-only rule applies to any Output whose type is or
 # contains path, so a LIST[PATH] output is not available in a step-level let either.
 specificationVersion: jobtemplate-2023-09
 extensions:

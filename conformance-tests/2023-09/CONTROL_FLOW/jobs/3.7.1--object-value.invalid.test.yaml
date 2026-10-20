@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 3: a JSON object is invalid anywhere in a
+# RFC 0011 §Processing a directive, invalid item 3: a JSON object is invalid anywhere in a
 # value, even for a STRING output.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

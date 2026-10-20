@@ -1,4 +1,4 @@
-# RFC 0010 §<StepDependency>: a dependency on a SKIPPED Step is satisfied only once that
+# RFC 0011 §<StepDependency>: a dependency on a SKIPPED Step is satisfied only once that
 # Step's own dependencies are, so in A -> B(skipped) -> C, C starts after A finishes.
 # Observed through a file in the temp dir, so this needs A and C on one host. It only has
 # value for a scheduler that can run Steps in parallel: one that runs Steps one at a time in

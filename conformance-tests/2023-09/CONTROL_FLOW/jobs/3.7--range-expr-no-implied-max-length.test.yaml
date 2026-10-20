@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 6: only declared constraints are checked; the
+# RFC 0011 §<OutputVariableDefinition> item 6: only declared constraints are checked; the
 # 1024-character default maxLength of a RANGE_EXPR parameter does not apply.
 template:
   specificationVersion: jobtemplate-2023-09

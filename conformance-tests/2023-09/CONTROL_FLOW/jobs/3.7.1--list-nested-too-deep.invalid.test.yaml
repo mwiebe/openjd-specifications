@@ -1,4 +1,4 @@
-# RFC 0010 §Type conversion: nesting deeper than the target type is an error; LIST[INT]
+# RFC 0011 §Type conversion: nesting deeper than the target type is an error; LIST[INT]
 # L=[[1]] is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope (Concreteness) and §When groups are evaluated: a producer's
+# RFC 0011 §The Steps.* scope (Concreteness) and §When groups are evaluated: a producer's
 # Steps.P.TaskParam.* symbols are concrete once P's Tasks are known, which can be before P
 # is bound. P's parameter space is static, so its Tasks are known at Job creation, but P is
 # PENDING_INPUTS because its host selection group (hostRequirements, which openjd run

@@ -1,4 +1,4 @@
-# RFC 0010 §When groups are evaluated: at Job creation, for a Step whose enableIf is absent,
+# RFC 0011 §When groups are evaluated: at Job creation, for a Step whose enableIf is absent,
 # every materialization group whose inputs are concrete MUST be evaluated, and a failure
 # fails Job creation. C's range reads only a job parameter and fails, while its let (used by
 # its remaining group, which uses every let) waits for P. Job creation fails, so no Step runs:

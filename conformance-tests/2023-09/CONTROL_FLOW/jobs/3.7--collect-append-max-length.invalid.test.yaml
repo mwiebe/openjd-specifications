@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive step 5: under APPEND, a directive that makes the list
+# RFC 0011 §Processing a directive step 5: under APPEND, a directive that makes the list
 # exceed maxLength is invalid.
 template:
   specificationVersion: jobtemplate-2023-09

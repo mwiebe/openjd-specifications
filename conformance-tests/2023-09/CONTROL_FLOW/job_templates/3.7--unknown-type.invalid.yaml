@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition>: type must be an <OutputVariableType>.
+# RFC 0011 §<OutputVariableDefinition>: type must be an <OutputVariableType>.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

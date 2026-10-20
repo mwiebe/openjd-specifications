@@ -1,4 +1,4 @@
-# RFC 0010 §Limits item 1: a runtime MUST accept a directive line of at least 64 KiB. This
+# RFC 0011 §Limits item 1: a runtime MUST accept a directive line of at least 64 KiB. This
 # line is 65,023 bytes.
 template:
   specificationVersion: jobtemplate-2023-09

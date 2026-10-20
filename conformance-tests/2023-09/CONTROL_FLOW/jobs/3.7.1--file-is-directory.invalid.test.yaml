@@ -1,4 +1,4 @@
-# RFC 0010 §File values item 2: the file opened must be a regular file, not a directory.
+# RFC 0011 §File values item 2: the file opened must be a regular file, not a directory.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.
 template:

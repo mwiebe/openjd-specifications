@@ -1,4 +1,4 @@
-# RFC 0010 §When groups are evaluated: a Step whose enableIf reads Steps.* evaluates nothing
+# RFC 0011 §When groups are evaluated: a Step whose enableIf reads Steps.* evaluates nothing
 # else at Job creation. C's range reads only a job parameter and would fail(...), but C's
 # enableIf waits for Q, so Job creation succeeds; when Q reports Go=false, C is SKIPPED and
 # its range is never evaluated. An implementation that evaluated C's range at Job creation

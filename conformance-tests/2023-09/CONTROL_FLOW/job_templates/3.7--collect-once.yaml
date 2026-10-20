@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition> item 3: collect ONCE is valid (and the default).
+# RFC 0011 §<OutputVariableDefinition> item 3: collect ONCE is valid (and the default).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

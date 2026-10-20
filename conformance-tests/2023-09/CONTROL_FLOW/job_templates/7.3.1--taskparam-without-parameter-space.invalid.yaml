@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope, Types table: a producer with no parameterSpace has no Task
+# RFC 0011 §The Steps.* scope, Types table: a producer with no parameterSpace has no Task
 # parameters, so Steps.P.TaskParam.* is a validation error.
 specificationVersion: jobtemplate-2023-09
 extensions:

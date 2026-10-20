@@ -1,4 +1,4 @@
-# RFC 0010 §Empty parameter spaces / Design Choice 9: "{{range(1, N + 1)}}" with N = 0 is
+# RFC 0011 §Empty parameter spaces / Design Choice 9: "{{range(1, N + 1)}}" with N = 0 is
 # an empty space; its Steps.*.Output and TaskParam lists are [] and sum([]) is 0.
 template:
   specificationVersion: jobtemplate-2023-09

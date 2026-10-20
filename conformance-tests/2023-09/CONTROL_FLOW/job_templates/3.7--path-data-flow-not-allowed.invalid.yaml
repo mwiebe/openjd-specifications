@@ -1,4 +1,4 @@
-# RFC 0010 §<OutputVariableDefinition>: dataFlow is not available on a PATH output.
+# RFC 0011 §<OutputVariableDefinition>: dataFlow is not available on a PATH output.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

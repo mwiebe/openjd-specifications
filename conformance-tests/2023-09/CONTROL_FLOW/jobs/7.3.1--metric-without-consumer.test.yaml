@@ -1,4 +1,4 @@
-# RFC 0010 Design Choice 4: a metric is an output variable that no Step reads; a Step that
+# RFC 0011 Design Choice 4: a metric is an output variable that no Step reads; a Step that
 # reports metrics alongside a consumed output runs normally. C reads only N, and runs only
 # after P succeeded, so its GOT line shows that the unread metrics didn't fail P.
 template:

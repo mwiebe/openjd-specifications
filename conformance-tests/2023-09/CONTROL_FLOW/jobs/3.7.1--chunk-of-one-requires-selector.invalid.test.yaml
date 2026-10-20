@@ -1,4 +1,4 @@
-# RFC 0010 §Chunked Steps item 3: the selector is required whatever the chunk's size,
+# RFC 0011 §Chunked Steps item 3: the selector is required whatever the chunk's size,
 # including chunks of one Task.
 # X is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

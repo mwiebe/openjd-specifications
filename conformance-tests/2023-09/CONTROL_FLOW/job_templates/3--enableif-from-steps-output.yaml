@@ -1,4 +1,4 @@
-# RFC 0010 §<StepTemplate> enableIf constraint 1: may reference the Steps.* symbols of a
+# RFC 0011 §<StepTemplate> enableIf constraint 1: may reference the Steps.* symbols of a
 # direct dependency (dynamic enableIf, decided at step input binding).
 specificationVersion: jobtemplate-2023-09
 extensions:

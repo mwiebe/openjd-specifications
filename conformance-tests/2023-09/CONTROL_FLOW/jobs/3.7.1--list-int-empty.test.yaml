@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table: LIST[INT] L=[] gives [].
+# RFC 0011 Type conversion table: LIST[INT] L=[] gives [].
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

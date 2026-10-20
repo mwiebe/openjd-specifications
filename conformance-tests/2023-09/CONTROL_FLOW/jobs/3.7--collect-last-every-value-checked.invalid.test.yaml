@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive step 5: under LAST every reported value must satisfy
+# RFC 0011 §Processing a directive step 5: under LAST every reported value must satisfy
 # the constraints, not only the last. 50 violates maxValue 10 even though 5 follows.
 template:
   specificationVersion: jobtemplate-2023-09

@@ -1,6 +1,6 @@
 * Feature Name: control_flow
 * Author(s): Mark Wiebe <[mwiebe](https://github.com/mwiebe)>
-* RFC Tracking Issue: (pending). The number `0010` is a placeholder assigned before a tracking issue exists, and may
+* RFC Tracking Issue: (pending). The number `0011` is a placeholder assigned before a tracking issue exists, and may
   change when one is created.
 * Start Date: 2026-10-15
 * Specification Version: 2023-09 extension CONTROL_FLOW

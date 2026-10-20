@@ -1,4 +1,4 @@
-# RFC 0010 §File values item 2: the file must be inside the Working Directory after
+# RFC 0011 §File values item 2: the file must be inside the Working Directory after
 # following symbolic links; a link inside it to a file outside is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

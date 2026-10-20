@@ -1,4 +1,4 @@
-# RFC 0010 §Which Actions may print it: a directive from an Action of an Environment
+# RFC 0011 §Which Actions may print it: a directive from an Action of an Environment
 # Template is ordinary output: the run succeeds, the line is logged, and P's ONCE value
 # is unaffected.
 template:

@@ -1,4 +1,4 @@
-# RFC 0010 §Range length: with CONTROL_FLOW the 1024-element cap does not apply to the
+# RFC 0011 §Range length: with CONTROL_FLOW the 1024-element cap does not apply to the
 # values a format-string range evaluates to (here 1025). See Open Question 10.
 specificationVersion: jobtemplate-2023-09
 extensions:

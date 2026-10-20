@@ -1,4 +1,4 @@
-# RFC 0010 §<Environment> enableIf constraint 2: a Step Environment's enableIf may read
+# RFC 0011 §<Environment> enableIf constraint 2: a Step Environment's enableIf may read
 # Steps.*; when false the environment is not entered but the Step's Tasks still run.
 template:
   specificationVersion: jobtemplate-2023-09

@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: a directive is a line that BEGINS with
+# RFC 0011 §The openjd_output_var directive: a directive is a line that BEGINS with
 # openjd_output_var:. An indented line is ordinary output, so the ONCE output V is missing.
 template:
   specificationVersion: jobtemplate-2023-09

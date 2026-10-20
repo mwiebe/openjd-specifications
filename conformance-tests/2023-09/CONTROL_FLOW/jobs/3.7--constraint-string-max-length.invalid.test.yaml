@@ -1,4 +1,4 @@
-# RFC 0010 Design Choice 11: a STRING longer than maxLength fails the producer.
+# RFC 0011 Design Choice 11: a STRING longer than maxLength fails the producer.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

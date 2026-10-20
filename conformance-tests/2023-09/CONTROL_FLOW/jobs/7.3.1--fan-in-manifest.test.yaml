@@ -1,4 +1,4 @@
-# RFC 0010 S3 prefix example / §Reductions: a fan-in Step reads a producer's TaskParam and
+# RFC 0011 S3 prefix example / §Reductions: a fan-in Step reads a producer's TaskParam and
 # Output lists, aligned element for element, and reduces them with sum().
 template:
   specificationVersion: jobtemplate-2023-09

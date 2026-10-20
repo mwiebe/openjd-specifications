@@ -1,4 +1,4 @@
-# RFC 0010 §Type conversion: a JSON array is a list; LIST[INT] keeps the order printed.
+# RFC 0011 §Type conversion: a JSON array is a list; LIST[INT] keeps the order printed.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

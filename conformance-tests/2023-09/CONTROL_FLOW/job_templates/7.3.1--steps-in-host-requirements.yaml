@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope, Where available item 3, and §Materialization groups
+# RFC 0011 §The Steps.* scope, Where available item 3, and §Materialization groups
 # item 3: a direct dependent's hostRequirements may read Steps.P.*, in an amount's min
 # (a format string with FEATURE_BUNDLE_1) and an attribute's anyOf.
 specificationVersion: jobtemplate-2023-09

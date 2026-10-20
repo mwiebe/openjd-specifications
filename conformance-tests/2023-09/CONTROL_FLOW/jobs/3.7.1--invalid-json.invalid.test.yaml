@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive, invalid item 1: a value that is not valid JSON (a
+# RFC 0011 §Processing a directive, invalid item 1: a value that is not valid JSON (a
 # single-quoted string) is invalid.
 # V is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

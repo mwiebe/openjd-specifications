@@ -1,4 +1,4 @@
-# RFC 0010 Type conversion table / Design Choice 3: under APPEND a list value is one
+# RFC 0011 Type conversion table / Design Choice 3: under APPEND a list value is one
 # element of a LIST[LIST[INT]], never a batch: G=[1] then G=[] gives [[1], []].
 template:
   specificationVersion: jobtemplate-2023-09

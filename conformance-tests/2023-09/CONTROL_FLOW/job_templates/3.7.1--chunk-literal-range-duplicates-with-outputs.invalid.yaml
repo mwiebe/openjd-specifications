@@ -1,4 +1,4 @@
-# RFC 0010 §Validation item 2 / §Chunked Steps item 1: in a Step that declares
+# RFC 0011 §Validation item 2 / §Chunked Steps item 1: in a Step that declares
 # outputVariables, a CHUNK[INT] range written as a literal list must have distinct values.
 specificationVersion: jobtemplate-2023-09
 extensions:

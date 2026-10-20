@@ -1,4 +1,4 @@
-# RFC 0010 §File values items 1-2: an absolute <FilePath> is used as written, and is valid
+# RFC 0011 §File values items 1-2: an absolute <FilePath> is used as written, and is valid
 # when it names a regular file inside the Session's Working Directory.
 template:
   specificationVersion: jobtemplate-2023-09

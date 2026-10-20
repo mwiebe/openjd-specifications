@@ -1,4 +1,4 @@
-# RFC 0010 §Collect modes: under ONCE, a Task that prints no directive fails.
+# RFC 0011 §Collect modes: under ONCE, a Task that prints no directive fails.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

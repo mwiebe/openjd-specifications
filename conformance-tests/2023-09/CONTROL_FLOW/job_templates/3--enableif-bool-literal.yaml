@@ -1,4 +1,4 @@
-# RFC 0010 §<StepTemplate> enableIf: <bool> | <FormatString>; a YAML bool literal is valid.
+# RFC 0011 §<StepTemplate> enableIf: <bool> | <FormatString>; a YAML bool literal is valid.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

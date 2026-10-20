@@ -1,4 +1,4 @@
-# RFC 0010 <Directive> grammar: whitespace after the colon is optional, so
+# RFC 0011 <Directive> grammar: whitespace after the colon is optional, so
 # 'openjd_output_var:V=7' is a directive.
 template:
   specificationVersion: jobtemplate-2023-09

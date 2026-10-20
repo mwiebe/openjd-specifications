@@ -1,4 +1,4 @@
-# RFC 0010 Video frame count example: range "1-{{Steps.P.Output.FrameCount}}" gives one
+# RFC 0011 Video frame count example: range "1-{{Steps.P.Output.FrameCount}}" gives one
 # Task per frame.
 template:
   specificationVersion: jobtemplate-2023-09

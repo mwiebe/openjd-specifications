@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: like the other messages, a directive line
+# RFC 0011 §The openjd_output_var directive: like the other messages, a directive line
 # appears in the Action's log by default. The line is built at run time so the expected
 # text never appears in the template itself. C prints the consumed value only after P
 # succeeded, so the run also shows the directive was accepted, not just echoed.

@@ -1,4 +1,4 @@
-# RFC 0010 §Job outputs items 1 and 4: the companion of
+# RFC 0011 §Job outputs items 1 and 4: the companion of
 # 2.17--job-output-taskparam-before-bound-fails-job-creation, with a guard that never holds.
 # The job output reads Steps.P.TaskParam.X while P's hostRequirements wait for Q, and
 # everything runs.

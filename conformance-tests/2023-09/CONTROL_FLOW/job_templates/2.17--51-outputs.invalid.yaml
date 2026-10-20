@@ -1,4 +1,4 @@
-# RFC 0010 §Job Template, jobOutputDefinitions constraint 2: at most 50 elements.
+# RFC 0011 §Job Template, jobOutputDefinitions constraint 2: at most 50 elements.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

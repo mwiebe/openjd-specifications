@@ -1,4 +1,4 @@
-# RFC 0010 §Path values: a relative PATH value is invalid (it would be relative to a
+# RFC 0011 §Path values: a relative PATH value is invalid (it would be relative to a
 # Working Directory no consumer can see).
 # F is collect: LAST and gets a valid value first, so a runtime that ignored
 # the line under test would let the run succeed.

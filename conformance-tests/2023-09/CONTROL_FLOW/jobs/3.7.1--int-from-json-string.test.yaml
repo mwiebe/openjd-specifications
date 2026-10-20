@@ -1,4 +1,4 @@
-# RFC 0010 §Type conversion: values convert with EXPR implicit coercion (§1.2.3), which
+# RFC 0011 §Type conversion: values convert with EXPR implicit coercion (§1.2.3), which
 # includes string -> int, so INT N="12" gives 12.
 template:
   specificationVersion: jobtemplate-2023-09

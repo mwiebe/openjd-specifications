@@ -1,4 +1,4 @@
-# RFC 0010 §<StepTemplate> outputVariables constraint 2: at most 32 elements. 32 is valid.
+# RFC 0011 §<StepTemplate> outputVariables constraint 2: at most 32 elements. 32 is valid.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

@@ -1,4 +1,4 @@
-# RFC 0010 Design Choice 6 / §The Steps.* scope item 1: a transitive dependency is not
+# RFC 0011 Design Choice 6 / §The Steps.* scope item 1: a transitive dependency is not
 # enough; C depends on M, which depends on P, and C reads Steps.P.
 specificationVersion: jobtemplate-2023-09
 extensions:

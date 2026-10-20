@@ -1,4 +1,4 @@
-# RFC 0010 §Chunked Steps item 2: ONCE applies per Task; reporting X[1] twice is invalid.
+# RFC 0011 §Chunked Steps item 2: ONCE applies per Task; reporting X[1] twice is invalid.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

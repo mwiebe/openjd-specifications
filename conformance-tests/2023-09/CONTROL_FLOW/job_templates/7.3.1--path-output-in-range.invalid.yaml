@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope: a parameterSpace range is a materialization expression,
+# RFC 0011 §The Steps.* scope: a parameterSpace range is a materialization expression,
 # not resolved on the worker host, so it may not read a LIST[PATH] Steps.P.Output.
 specificationVersion: jobtemplate-2023-09
 extensions:

@@ -1,4 +1,4 @@
-# RFC 0010 §How a Step is bound items 1 and 3: no other group of a Step is evaluated until
+# RFC 0011 §How a Step is bound items 1 and 3: no other group of a Step is evaluated until
 # its enableIf is decided. C's range reads P, and its enableIf reads Q, which depends on P
 # and so finishes after it. When P finishes, C's range would fail(...), but C's enableIf is
 # still undecided, so the range is not evaluated; when Q finishes, enableIf is false and C is

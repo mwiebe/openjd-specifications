@@ -1,4 +1,4 @@
-# RFC 0010 §Processing a directive: the runtime MUST cancel the Action as soon as it reads
+# RFC 0011 §Processing a directive: the runtime MUST cancel the Action as soon as it reads
 # an invalid directive, so the line printed after a 30 s sleep never appears. A runner
 # should apply a timeout well under 30 s to catch a runtime that waits for exit.
 template:

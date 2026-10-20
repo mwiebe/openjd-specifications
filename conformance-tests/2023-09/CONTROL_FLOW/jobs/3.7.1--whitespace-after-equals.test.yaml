@@ -1,4 +1,4 @@
-# RFC 0010 <Directive> grammar: <WS>* is allowed between '=' and the value.
+# RFC 0011 <Directive> grammar: <WS>* is allowed between '=' and the value.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

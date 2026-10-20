@@ -1,4 +1,4 @@
-# RFC 0010 §Extension name and dependencies: CONTROL_FLOW applies to Job Templates; an
+# RFC 0011 §Extension name and dependencies: CONTROL_FLOW applies to Job Templates; an
 # Environment Template cannot declare it.
 specificationVersion: environment-2023-09
 extensions:

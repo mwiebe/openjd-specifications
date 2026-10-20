@@ -1,4 +1,4 @@
-# RFC 0010 Technical Requirement 2: outputVariables is available only when CONTROL_FLOW
+# RFC 0011 Technical Requirement 2: outputVariables is available only when CONTROL_FLOW
 # is listed in extensions. EXPR alone is not enough.
 specificationVersion: jobtemplate-2023-09
 extensions:

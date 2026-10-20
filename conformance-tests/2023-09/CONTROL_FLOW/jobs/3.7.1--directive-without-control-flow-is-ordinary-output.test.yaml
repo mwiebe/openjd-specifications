@@ -1,4 +1,4 @@
-# RFC 0010 §The openjd_output_var directive: in a Session of a Job whose template does not
+# RFC 0011 §The openjd_output_var directive: in a Session of a Job whose template does not
 # list CONTROL_FLOW, the line is ordinary output. S prints it, and T, which runs only after
 # S succeeded, prints a marker built at run time.
 template:

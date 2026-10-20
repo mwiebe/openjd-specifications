@@ -1,4 +1,4 @@
-# RFC 0010 §Job outputs item 4: a Step with zero Tasks gives empty lists, so
+# RFC 0011 §Job outputs item 4: a Step with zero Tasks gives empty lists, so
 # min(Steps.P.Output.X) fails the Job.
 template:
   specificationVersion: jobtemplate-2023-09

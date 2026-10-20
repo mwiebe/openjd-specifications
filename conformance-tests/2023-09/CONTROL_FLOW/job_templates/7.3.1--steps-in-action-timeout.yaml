@@ -1,4 +1,4 @@
-# RFC 0010 §The Steps.* scope, Where available item 3, and §Materialization groups
+# RFC 0011 §The Steps.* scope, Where available item 3, and §Materialization groups
 # item 5: an action's timeout (a TEMPLATE-scope format string of the script, with
 # FEATURE_BUNDLE_1) may read Steps.P.*; it is evaluated at C's step input binding.
 specificationVersion: jobtemplate-2023-09
