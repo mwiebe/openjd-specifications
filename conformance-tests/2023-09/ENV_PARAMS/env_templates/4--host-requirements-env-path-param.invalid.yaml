@@ -1,0 +1,23 @@
+# Template Schemas §4 item 5.1 (RFC 0010): an Environment's hostRequirements may not reference its
+# Env.Param.* of type PATH.
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+parameterDefinitions:
+- name: Dir
+  type: PATH
+environment:
+  name: Gpu
+  parameterDefinitions:
+  - name: CacheDir
+    type: PATH
+    default: "{{RawParam.Dir}}"
+  hostRequirements:
+    attributes:
+    - name: conformance:attr.flavor
+      anyOf: ["{{Env.Param.CacheDir}}"]
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]

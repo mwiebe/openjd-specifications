@@ -1,0 +1,19 @@
+# Template Schemas §4 item 4 (RFC 0010): runScope is available only with the ENV_PARAMS extension.
+# This Job Template lists no extensions, so runScope on its Job Environment is rejected.
+specificationVersion: jobtemplate-2023-09
+name: TestJob
+jobEnvironments:
+- name: Conda
+  runScope: ONLY_REQUESTED
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
+steps:
+- name: Render
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

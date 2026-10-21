@@ -1,0 +1,17 @@
+# Template Schemas §4.5 item 2 (RFC 0010): userInterface is not permitted on an Environment parameter.
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+environment:
+  name: Conda
+  parameterDefinitions:
+  - name: Packages
+    type: STRING
+    default: numpy
+    userInterface:
+      control: LINE_EDIT
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]

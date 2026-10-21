@@ -1,0 +1,19 @@
+# Template Schemas §4.5 item 3 (RFC 0010): objectType is not permitted on a PATH Environment parameter.
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+parameterDefinitions:
+- name: Dir
+  type: PATH
+environment:
+  name: Conda
+  parameterDefinitions:
+  - name: CacheDir
+    type: PATH
+    default: "{{RawParam.Dir}}"
+    objectType: DIRECTORY
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]

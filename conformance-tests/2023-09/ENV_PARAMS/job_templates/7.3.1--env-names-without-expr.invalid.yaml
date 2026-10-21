@@ -1,0 +1,14 @@
+# Template Schemas §7.3.1 Job.EnvNames (RFC 0010): Job.EnvNames requires both the ENV_PARAMS and EXPR
+# extensions. This Job Template lists ENV_PARAMS but not EXPR, so a reference to Job.EnvNames is
+# rejected.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+steps:
+- name: Render
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["{{Job.EnvNames}}"]

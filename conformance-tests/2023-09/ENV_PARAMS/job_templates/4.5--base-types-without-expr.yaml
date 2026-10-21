@@ -1,0 +1,36 @@
+# Template Schemas §4.5 item 1 (RFC 0010): STRING, INT, FLOAT, and PATH Environment parameters do not
+# require the EXPR extension. ENV_PARAMS does not depend on EXPR.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+parameterDefinitions:
+- name: Dir
+  type: PATH
+jobEnvironments:
+- name: Tool
+  parameterDefinitions:
+  - name: Packages
+    type: STRING
+    default: numpy
+  - name: Threads
+    type: INT
+    default: 2
+  - name: Scale
+    type: FLOAT
+    default: 1.5
+  - name: CacheDir
+    type: PATH
+    default: "{{RawParam.Dir}}"
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["{{Env.Param.Packages}}", "{{Env.Param.Threads}}", "{{Env.Param.Scale}}", "{{Env.Param.CacheDir}}"]
+steps:
+- name: Render
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

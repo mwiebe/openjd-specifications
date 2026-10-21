@@ -1,0 +1,20 @@
+# Template Schemas §4.5 item 4 (RFC 0010): a default may reference Param.* of a Job Parameter defined in
+# the top-level parameterDefinitions of the same document, here the Environment Template.
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+parameterDefinitions:
+- name: CondaPackages
+  type: STRING
+  default: numpy
+environment:
+  name: Conda
+  parameterDefinitions:
+  - name: Packages
+    type: STRING
+    default: "{{Param.CondaPackages}}"
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]

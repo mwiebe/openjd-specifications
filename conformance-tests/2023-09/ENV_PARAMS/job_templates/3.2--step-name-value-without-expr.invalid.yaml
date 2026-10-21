@@ -1,0 +1,29 @@
+# Template Schemas §3.2 <EnvironmentParameterValue> and §7.3.1 (RFC 0010): Step.Name is available in a
+# parameters value only with the EXPR extension. This Job Template lists ENV_PARAMS but not EXPR, so a
+# value reading Step.Name is rejected.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+jobEnvironments:
+- name: Conda
+  parameterDefinitions:
+  - name: Tag
+    type: STRING
+    default: none
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
+steps:
+- name: Render
+  dependencies:
+  - environment: Conda
+    parameters:
+      Tag: "{{Step.Name}}"
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

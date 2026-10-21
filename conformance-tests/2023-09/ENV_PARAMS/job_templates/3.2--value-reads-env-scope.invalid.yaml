@@ -1,0 +1,28 @@
+# Template Schemas §3.2 <EnvironmentParameterValue> (RFC 0010): Env.* is not available in a parameters
+# value, so a value reading Env.File.* is rejected.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+jobEnvironments:
+- name: Conda
+  parameterDefinitions:
+  - name: Tag
+    type: STRING
+    default: none
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
+steps:
+- name: Render
+  dependencies:
+  - environment: Conda
+    parameters:
+      Tag: "{{Env.File.Spec}}"
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

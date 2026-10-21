@@ -1,0 +1,16 @@
+# Template Schemas §4 item 5.1 (RFC 0010): Session.* is not available in an Environment's
+# hostRequirements.
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+environment:
+  name: Gpu
+  hostRequirements:
+    attributes:
+    - name: conformance:attr.flavor
+      anyOf: ["{{Session.WorkingDirectory}}"]
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
