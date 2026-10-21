@@ -1,5 +1,7 @@
-# RFC 0010 / Template Schemas §3.2 constraint 6 ("values follow the requesting
-# document's extensions"): a Job Template that does not list EXPR must not
+# RFC 0010 / Template Schemas §3.2 constraint 6 and §3.2 ("that document's
+# extensions, not the Environment's, decide which forms a value may take";
+# RFC §Values follow the requesting document's extensions): a Job Template
+# that does not list EXPR must not
 # supply a LIST[PATH] parameter, even though the attached Environment Template
 # lists EXPR. Rejected at job creation. The string value is also not one
 # {{ }} expression, which §3.2 requires of a list-typed value; a document

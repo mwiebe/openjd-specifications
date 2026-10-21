@@ -1,5 +1,6 @@
 # Template Schemas §3.2 <EnvironmentParameterValue> (RFC 0010): Env.* is not available in a parameters
-# value, so a value reading Env.File.* is rejected.
+# value, so a value reading Env.File.* is rejected, even naming an embedded file (Spec) that the requested
+# Environment Conda defines.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - ENV_PARAMS
@@ -11,6 +12,10 @@ jobEnvironments:
     type: STRING
     default: none
   script:
+    embeddedFiles:
+    - name: Spec
+      type: TEXT
+      data: "spec"
     actions:
       onEnter:
         command: echo
