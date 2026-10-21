@@ -1,0 +1,25 @@
+# Template Schemas §4.5 item 1 (RFC 0010): as for Job Parameters, Environment parameter types other than
+# STRING, INT, FLOAT, and PATH require the EXPR extension. This Job Template lists ENV_PARAMS but not
+# EXPR, so a LIST[STRING] Environment parameter is rejected.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+jobEnvironments:
+- name: Conda
+  parameterDefinitions:
+  - name: Channels
+    type: LIST[STRING]
+    default: [conda-forge]
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
+steps:
+- name: Render
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

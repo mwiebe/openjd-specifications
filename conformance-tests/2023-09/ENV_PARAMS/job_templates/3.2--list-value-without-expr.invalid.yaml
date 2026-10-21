@@ -1,0 +1,19 @@
+# Template Schemas §3.2 <EnvironmentParameterValue> (RFC 0010): a list literal is a value form only
+# with the EXPR extension, and the requesting document's extensions decide the forms. This Job Template
+# lists ENV_PARAMS but not EXPR, so a list literal is rejected, even in an entry that names an external
+# Environment whose parameter types template validation cannot know.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+steps:
+- name: Render
+  dependencies:
+  - environment: Docker
+    parameters:
+      Mounts: [a]
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

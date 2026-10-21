@@ -1,0 +1,22 @@
+# Template Schemas §4 item 4 (RFC 0010): runScope: ONLY_REQUESTED on a Job Environment is valid.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+jobEnvironments:
+- name: Conda
+  runScope: ONLY_REQUESTED
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
+steps:
+- name: Render
+  dependencies:
+  - environment: Conda
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

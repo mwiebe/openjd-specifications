@@ -1,0 +1,12 @@
+# Template Schemas §7.3.1 Job.EnvNames (RFC 0010): Job.EnvNames requires both ENV_PARAMS and EXPR in the
+# document. This Environment Template lists ENV_PARAMS but not EXPR.
+specificationVersion: environment-2023-09
+extensions:
+- ENV_PARAMS
+environment:
+  name: Conda
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["{{Job.EnvNames}}"]

@@ -1,0 +1,23 @@
+# Template Schemas §3.2 constraint 9 (RFC 0010): enableIf is permitted only in a document that lists
+# EXPR. This Job Template lists ENV_PARAMS but not EXPR, so even the literal enableIf: true is rejected.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+name: TestJob
+jobEnvironments:
+- name: Conda
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
+steps:
+- name: Render
+  dependencies:
+  - environment: Conda
+    enableIf: true
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]
