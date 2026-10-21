@@ -1,0 +1,37 @@
+# RFC 0010 / Template Schemas §3.2 constraint 6 ("values follow the requesting
+# document's extensions"): a Job Template that does not list EXPR must not
+# supply a LIST[PATH] parameter, even though the attached Environment Template
+# lists EXPR. Rejected at job creation. The string value is also not one
+# {{ }} expression, which §3.2 requires of a list-typed value; a document
+# without EXPR has no other way to write a list, so the two rules cannot be
+# separated. runOn is posix so that /data is absolute and §4.5 does not apply.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions: [ENV_PARAMS]
+  name: NonExprSuppliesList
+  steps:
+  - name: A
+    dependencies:
+    - environment: Docker
+      parameters:
+        Mounts: "/data"
+    script:
+      actions:
+        onRun:
+          command: echo
+          args: [TASK, A]
+environments:
+- specificationVersion: environment-2023-09
+  extensions: [ENV_PARAMS, EXPR]
+  environment:
+    name: Docker
+    parameterDefinitions:
+    - name: Mounts
+      type: LIST[PATH]
+      default: []
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, Docker, "Mounts={{ Env.RawParam.Mounts.join(',') }}"]
+runOn: [posix]

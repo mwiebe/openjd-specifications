@@ -1,0 +1,43 @@
+# RFC 0010 / Template Schemas §7.3.1 Job.EnvNames: the list includes attached
+# Environments. Where they fall relative to jobEnvironments is unspecified (see
+# README ambiguity 1), so either placement is accepted; the relative order of
+# J1 and J2 is fixed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions: [ENV_PARAMS, EXPR]
+  name: EnvNamesIncludesAttached
+  jobEnvironments:
+  - name: J1
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, J1]
+  - name: J2
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, J2]
+  steps:
+  - name: A
+    script:
+      actions:
+        onRun:
+          command: echo
+          args: [TASK, A, "NAMES=[{{ Job.EnvNames.join(',') }}]"]
+environments:
+- specificationVersion: environment-2023-09
+  environment:
+    name: Q
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, Q]
+runOn: [posix, windows]
+expected:
+  output:
+  - anyOf:
+    - TASK A NAMES=[Q,J1,J2]
+    - TASK A NAMES=[J1,J2,Q]
