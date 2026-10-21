@@ -1,0 +1,60 @@
+# RFC 0010 §Basic Examples, "Choosing between Environments a queue provides"
+# (Template Schemas §3.2 item 5, §7.3.1 Job.EnvNames): with Conda and Docker
+# both attached as ONLY_REQUESTED, the Conda entry's enableIf
+# "'Docker' not in Job.EnvNames" is false, so the Step enters Docker only.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions: [ENV_PARAMS, EXPR]
+  name: VideoToCompositeChoose
+  steps:
+  - name: SolveSfM
+    dependencies:
+    - environment: Conda
+      required: false
+      enableIf: "{{ 'Docker' not in Job.EnvNames }}"
+      parameters:
+        Packages: colmap=3.11
+    - environment: Docker
+      required: false
+      parameters:
+        Image: docker.io/colmap/colmap:latest
+    script:
+      actions:
+        onRun:
+          command: echo
+          args: [TASK, SolveSfM]
+environments:
+- specificationVersion: environment-2023-09
+  extensions: [ENV_PARAMS]
+  environment:
+    name: Conda
+    runScope: ONLY_REQUESTED
+    parameterDefinitions:
+    - name: Packages
+      type: STRING
+      default: ""
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, Conda, "Packages={{Env.Param.Packages}}"]
+- specificationVersion: environment-2023-09
+  extensions: [ENV_PARAMS]
+  environment:
+    name: Docker
+    runScope: ONLY_REQUESTED
+    parameterDefinitions:
+    - name: Image
+      type: STRING
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, Docker, "Image={{Env.Param.Image}}"]
+runOn: [posix, windows]
+expected:
+  output:
+  - ENTER Docker Image=docker.io/colmap/colmap:latest
+  - TASK SolveSfM
+  forbidden:
+  - ENTER Conda

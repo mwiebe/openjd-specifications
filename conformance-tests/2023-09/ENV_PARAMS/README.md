@@ -100,8 +100,12 @@ when its Step requests it.
 
 The RFC motivates the extension with Conda, Docker, and license Environments, but none of them is needed to test the
 mechanism. The tests use Environments whose `onEnter` and `onExit` print sentinel lines built from their parameters
-(`ENTER:Conda:Packages=ffmpeg=7`), and Steps whose Tasks print a marker. A value reached an action when its sentinel
-appears; an Environment was not entered when a sentinel it would print with its `default` is `forbidden`.
+(`ENTER Conda Packages=ffmpeg=7`), and Steps whose Tasks print a marker (`TASK A`). A value reached an action when its
+sentinel appears; an Environment was not entered when a sentinel it would print with its `default` is `forbidden`.
+Each sentinel is `echo` with several arguments (`args: [ENTER, Conda, "Packages={{Env.Param.Packages}}"]`), so the
+line that `echo` prints never appears in the template text, and a forbidden line cannot match a template that a
+runner happens to log. A Task that reports an environment variable builds its line by concatenation
+(`print('TASK_PKG='+os.environ['PKG'])`) for the same reason.
 
 `openjd run` runs each Step of the Job in its own Session, one after another, so a test with two Steps observes each
 Step's Environment entry separately, and the output of both Steps is in one log. Output assertions are substring
@@ -372,11 +376,11 @@ Attached Environment Templates are given in the test's `environments` list.
 | JB-07 | `4.5--default-reads-submitted-job-parameter.test.yaml` | EP | As JB-06 with `parameters: {CondaPackages: ...}`; `onEnter` sees the submitted value. |
 | JB-08 | `1.2.1--env-parameters-not-merged.test.yaml` | EP | A Job Parameter `Packages` and two Environments' `Packages` parameters keep three distinct values. |
 | JB-09 | `3.2.2--format-string-value-converted-to-int.test.yaml` | EP | `"{{Param.N}}"` for an INT parameter with `minValue: 1`, `N=3`, prints `3`. |
-| JB-10 | `3.2.2--int-one-and-string-one-both-accepted.test.yaml` | EP | One Step supplies INT `1`, another `"1"`; both run and both print `1`. |
+| JB-10 | `3.2.2--int-one-and-string-one-both-accepted.test.yaml` | EP | One Step supplies INT `1`, another `"1"`; both run and both print `1` (a second parameter `Tag` tells the two lines apart). |
 | JB-11 | `4.5--resolved-default-unused-violates-constraint.test.yaml` | EP | A `default` reading a Job Parameter that resolves outside `allowedValues` is not an error when every Step supplies the parameter. |
 | JB-12 | `4.5--resolved-default-taken-violates-constraint.invalid.test.yaml` | EP | The same `default` is rejected when one Step takes it. |
 | JB-13 | `3.2--format-string-value-violates-constraint.invalid.test.yaml` | EP | A Job Environment value `"{{Param.N}}"` that resolves below `minValue` is rejected at job creation. |
-| JB-14 | `3.2--value-from-step-let-and-step-name.test.yaml` | EP, EX | Two Steps supply `"{{ Step.Name + '-' + Tag }}"` from a Step `let`; each `onEnter` prints its own Step's value. |
+| JB-14 | `3.2--value-from-step-let-and-step-name.test.yaml` | EP, EX | Two Steps supply `"{{ Step.Name + '-' + tag }}"` from a Step `let`; each `onEnter` prints its own Step's value. |
 
 #### External resolution (§3.2.1)
 
@@ -384,7 +388,7 @@ Attached Environment Templates are given in the test's `environments` list.
 |---|---|---|---|
 | JB-15 | `3.2.1--external-environment-receives-values.test.yaml` | EP | An entry naming an attached Environment supplies its value to that Environment's `onEnter`. |
 | JB-16 | `3.2.1--external-required-missing.invalid.test.yaml` | EP | An entry (default `required: true`) naming an Environment nothing attaches is rejected. |
-| JB-17 | `3.2.1--external-required-false-missing-ignored.test.yaml` | EP | The same entry with `required: false` is ignored; the Step's Task runs. |
+| JB-17 | `3.2.1--external-required-false-missing-ignored.test.yaml` | EP, EX | The same entry with `required: false` is ignored; the Step's Task runs, and `Job.EnvNames` lists only the Job Environment `J`. |
 | JB-18 | `3.2.1--external-lacks-parameter.invalid.test.yaml` | EP | A `required: false` entry supplying a parameter the attached Environment does not declare is rejected. |
 | JB-19 | `3.2.1--external-without-env-params-supplied.invalid.test.yaml` | EP | Attached Environment Template without `ENV_PARAMS` (the pre-extension `Conda` case); a `required: false` entry with `parameters` is rejected. |
 | JB-20 | `3.2.1--external-without-env-params-no-parameters.test.yaml` | EP | Attached Environment Template without `ENV_PARAMS`; an entry without `parameters` is valid, and the Environment is entered. |
@@ -394,7 +398,7 @@ Attached Environment Templates are given in the test's `environments` list.
 | JB-24 | `3.2.1--external-value-wrong-type.invalid.test.yaml` | EP | A STRING `"abc"` for an attached INT parameter is rejected. |
 | JB-25 | `3.2.1--external-value-not-allowed.invalid.test.yaml` | EP | A value outside the attached parameter's `allowedValues` is rejected. |
 | JB-26 | `3.2.1--external-list-literal-for-string.invalid.test.yaml` | EP, EX | A list literal for an attached STRING parameter is rejected. |
-| JB-27 | `3.2.1--non-expr-document-supplies-list-parameter.invalid.test.yaml` | EP | A Job Template without `EXPR` supplies a string to an attached LIST[PATH] parameter (the Environment Template lists `EXPR`); rejected. |
+| JB-27 | `3.2.1--non-expr-document-supplies-list-parameter.invalid.test.yaml` | EP | A Job Template without `EXPR` supplies a string to an attached LIST[PATH] parameter (the Environment Template lists `EXPR`); rejected. `runOn: [posix]`, so the value is absolute. The value also breaks the single-`{{ }}` rule for list values, which a document without `EXPR` cannot avoid. |
 | JB-28 | `3.2.1--non-expr-document-supplies-bool-parameter.invalid.test.yaml` | EP | A Job Template without `EXPR` supplies `"true"` to an attached BOOL parameter; rejected. |
 | JB-29 | `3.2.1--external-list-value-not-single-expression.invalid.test.yaml` | EP, EX | A format string other than one `{{ }}` expression for an attached LIST[STRING] parameter is rejected. |
 | JB-30 | `3.2.1--several-attached-each-own-values.test.yaml` | EP | One Step requests two attached Environments; each `onEnter` prints the value of its own entry. |
@@ -441,6 +445,7 @@ Attached Environment Templates are given in the test's `environments` list.
 | JB-51 | `7.3.1--env-names-repeats-shared-attached-name.test.yaml` | EP, EX | Two attached Environments named `X` and no entry naming `X`; the line is `X,X`. |
 | JB-52 | `7.3.1--env-names-in-environment-script.test.yaml` | EP, EX | An attached Environment's `onEnter` prints `Job.EnvNames`, including the Job Template's Environments. |
 | JB-53 | `7.3.1--env-names-in-step-let-feeds-value.test.yaml` | EP, EX | A Step `let` reading `Job.EnvNames` feeds a `parameters` value that `onEnter` prints. |
+| JB-86 | `7.3.1--env-names-expands-to-argv.test.yaml` | EP, EX | `runOn: [posix]`. An `args` item `"{{Job.EnvNames}}"` in a Step script expands to one argv element per name (Expression Language §1.3.2 flattens a list result in an `args` item). |
 
 #### Path values (§4.5)
 
@@ -448,12 +453,12 @@ Attached Environment Templates are given in the test's `environments` list.
 |---|---|---|---|
 | JB-54 | `4.5--path-value-mapped-in-env-param-posix.test.yaml` | EP | `runOn: [posix]`. A PATH value from `"{{RawParam.Dir}}"` is path-mapped in `Env.Param.Dir`. |
 | JB-55 | `4.5--path-value-mapped-in-env-param-windows.test.yaml` | EP | `runOn: [windows]`. As JB-54 with Windows paths. |
-| JB-56 | `4.5--path-value-unmapped-in-env-raw-param-posix.test.yaml` | EP | `runOn: [posix]`. The same value is unmapped in `Env.RawParam.Dir`. |
+| JB-56 | `4.5--path-value-unmapped-in-env-raw-param-posix.test.yaml` | EP | `runOn: [posix]`. A PATH parameter whose `default` is `"{{RawParam.Dir}}"`, taken by a Step with no entry, is unmapped in `Env.RawParam.Dir`. |
 | JB-57 | `4.5--path-value-unmapped-in-env-raw-param-windows.test.yaml` | EP | `runOn: [windows]`. As JB-56 with Windows paths. |
 | JB-58 | `4.5--list-path-elements-mapped-posix.test.yaml` | EP, EX | `runOn: [posix]`. Each element of a LIST[PATH] value is mapped in `Env.Param.*`. |
 | JB-59 | `4.5--list-path-elements-mapped-windows.test.yaml` | EP, EX | `runOn: [windows]`. As JB-58 with Windows paths. |
-| JB-60 | `4.5--relative-path-value.invalid.test.yaml` | EP | A supplied PATH value `relative/dir` is rejected at job creation. |
-| JB-61 | `4.5--relative-literal-path-default-unused.invalid.test.yaml` | EP | A literal PATH `default: relative/dir` is rejected even though every Step supplies an absolute value. |
+| JB-60 | `4.5--relative-path-value.invalid.test.yaml` | EP | A supplied PATH value `relative/dir` for an attached Environment's parameter is rejected at job creation. The Environment is attached so that template validation cannot know the parameter is a PATH. |
+| JB-61 | `4.5--relative-literal-path-default-unused.invalid.test.yaml` | EP | A literal PATH `default: relative/dir` is rejected even though every Step supplies an absolute value (from a PATH Job Parameter whose relative `default` is joined with the template directory, so it is absolute on every host). The Environment Template may already fail `openjd check` (ambiguity 2); the run is rejected either way. |
 | JB-62 | `4.5--path-allowed-values-checked-unmapped-posix.test.yaml` | EP | `runOn: [posix]`. `allowedValues` lists the unmapped path; a mapping rule changes it on the host; the Job runs and `Env.Param` prints the mapped path. |
 | JB-63 | `4.5--path-uri-value.test.yaml` | EP, EX | A PATH value `s3://bucket/key` is accepted, and `Env.RawParam` prints it unchanged. Both documents list `EXPR` (see ambiguity 10). |
 
@@ -473,7 +478,7 @@ matches them against the local host.
 | JB-70 | `3.3.3--same-capability-in-step-and-environment.test.yaml` | EP | Step and Environment each require amount `min: 1` of the same capability; not a duplicate-name error; the Job runs. |
 | JB-71 | `3.3.3--any-of-and-all-of-not-combined.test.yaml` | EP | Step `anyOf` and Environment `allOf` on one attribute; not an error; the Job runs. |
 | JB-72 | `3.3.3--only-requested-requirements-not-applied.test.yaml` | EP | An `ONLY_REQUESTED` Environment's requirements conflict with a non-requesting Step's own; the Job runs. |
-| JB-73 | `4--resolved-host-requirements-duplicate-name.invalid.test.yaml` | EP | Two attribute names `"{{Env.Param.A}}"` and `"{{Env.Param.B}}"` resolve to the same name for a Step; rejected (§3.3.2 within one source, per Step). |
+| JB-73 | `4--resolved-host-requirements-duplicate-name.invalid.test.yaml` | EP | Two attribute names `"{{Env.Param.A}}"` and `"{{Env.Param.B}}"` resolve to the same name for a Step; rejected (§3.3 constraint 4, within one source, per Step). |
 
 #### Extensions per document and backward compatibility (§1.2, RFC §Backward compatibility)
 
@@ -486,8 +491,8 @@ matches them against the local host.
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| JB-76 | `7.3.1--wrap-hook-reads-wrapper-env-param.test.yaml` | EP, WA, EX | `runOn: [posix]`. A wrapping Environment's `onWrapTaskRun` prints its own `Env.Param.Image` supplied by the Step. |
-| JB-77 | `4--only-requested-wrapper-not-applied-to-other-step.test.yaml` | EP, WA, EX | `runOn: [posix]`. An `ONLY_REQUESTED` wrapping Environment wraps the requesting Step's Task and not the other Step's (the wrap sentinel is absent from the other Step's output). |
+| JB-76 | `7.3.1--wrap-hook-reads-wrapper-env-param.test.yaml` | EP, WA, EX | A wrapping Environment's `onWrapTaskRun` prints its own `Env.Param.Image` supplied by the Step. |
+| JB-77 | `4--only-requested-wrapper-not-applied-to-other-step.test.yaml` | EP, WA, EX | An `ONLY_REQUESTED` wrapping Environment wraps the requesting Step's Task and not the other Step's (the wrap sentinel is absent from the other Step's output). |
 
 #### Basic Examples (RFC §Basic Examples)
 
@@ -524,7 +529,7 @@ order.
 | V10 | `Env.Param.*` / `Env.RawParam.*` name a parameter of the enclosing Environment, and appear only inside it | Template validation | JT-55–JT-64, ET-27, ET-28, ET-31; run time: JB-01–JB-04, JB-76 |
 | V11 | A `parameters` value or `enableIf` references only `RawParam.*`, non-PATH `Param.*`, and with `EXPR` `Job.Name`, `Job.EnvNames`, `Step.Name`, Step `let`; never `Task.*`, `Session.*`, `Env.*` | Template validation | JT-08, JT-105–JT-116; run time: JB-14, JB-53 |
 | V12 | An Environment's `hostRequirements` reference only its document's `RawParam.*`, non-PATH `Param.*`, with `EXPR` `Job.Name`, `Job.EnvNames`, and its own non-PATH `Env.*` | Template validation | JT-45–JT-47, JT-49–JT-53, ET-15–ET-17, ET-38 |
-| V13 | `Job.EnvNames` only with `EXPR`, inside `{{ }}`, not in an Environment parameter `default` | Template validation | JT-09, JT-10, JT-33, JT-65–JT-68, ET-22, ET-29, ET-30; contents: JB-47–JB-53 (see ambiguity 7 for "inside `{{ }}`") |
+| V13 | `Job.EnvNames` only with `EXPR`, inside `{{ }}`, not in an Environment parameter `default` | Template validation | JT-09, JT-10, JT-33, JT-65–JT-68, ET-22, ET-29, ET-30; contents: JB-47–JB-53, JB-86 (see ambiguity 7 for "inside `{{ }}`") |
 | V14 | `<StepDependency>` has exactly one of `dependsOn` / `environment`; `required`, `enableIf`, `parameters` only with `environment` (constraint 1) | Template validation | JT-69–JT-74 |
 | V15 | `enableIf` only with `EXPR`; a `bool` literal or single `bool` expression (constraint 9) | Template validation | JT-05, JT-95–JT-98 |
 | V16 | `enableIf` does not resolve to `null` | Job creation | JB-46 |
@@ -548,7 +553,7 @@ scheduling rule with no Validation row. Its observable parts are JB-10 and JB-85
 
 Runtime behaviors in the suite's scope that are not Validation rows are covered as follows: values in `onEnter`,
 `onExit`, and `variables` (JB-01–JB-04); defaults from merged Job Parameters (JB-05–JB-08); `ONLY_REQUESTED` entry
-(JB-36–JB-41); entry `enableIf` true, false, and `null` (JB-42–JB-46); `Job.EnvNames` contents and order (JB-47–JB-53);
+(JB-36–JB-41); entry `enableIf` true, false, and `null` (JB-42–JB-46); `Job.EnvNames` contents and order (JB-47–JB-53, JB-86);
 path mapping in `Env.Param.*` and not `Env.RawParam.*` (JB-54–JB-59); INT `1` vs `"1"` (JB-10); per-document
 extensions (JB-74, JB-75); wrap hooks (JB-76, JB-77). The Basic Examples are JB-78–JB-85, and the pre-extension
 `Conda` rejection in the second example is JB-19.
@@ -612,9 +617,10 @@ These rules, or parts of rules, have no planned test with a definite expected ou
    case is tested at job creation (JB-26).
 7. **"`Job.EnvNames` ... inside a `{{ }}` expression".** The Validation row requires `Job.EnvNames` to appear inside a
    `{{ }}` expression, and §7.3.1 says it is "usable only within a `{{ }}` expression". Every value reference is
-   inside `{{ }}`, so the intended invalid case is presumably interpolating the list into a string, as in
-   `args: ["{{Job.EnvNames}}"]`. Whether that is an error is a question for the Expression Language's rules on
-   converting a list to a string, which do not name `Job.EnvNames`. No test is planned for it.
+   inside `{{ }}`, so the rule forbids nothing that the base format-string grammar allows, and no invalid test is
+   planned for it. The `args` case is definite: Expression Language §1.3.2 flattens a list result in an `args` item,
+   so `args: ["{{Job.EnvNames}}"]` passes one argument per name (JB-86). Interpolating the list into surrounding text
+   (`"x{{Job.EnvNames}}"`) is also defined (§1.3.2 converts it to its string form), so it is valid, not an error.
 8. **`runScope` case.** "An implementation MUST reject a `<RunScope>` it does not recognize" does not say whether
    `all` or `Only_Requested` is recognized. Enum values elsewhere in the 2023-09 schema are case-sensitive, but the
    section does not say so. Only an unrelated value (`SOMETIMES`) is tested (JT-42, ET-14).
@@ -638,6 +644,12 @@ These rules, or parts of rules, have no planned test with a definite expected ou
     *attributes* "if this object is provided in a Job Template", and §4 item 5 gives an Environment's
     *hostRequirements* "the same shape and constraints as on a `<StepTemplate>`". Whether `hostRequirements: {}` in an
     Environment Template is rejected depends on whether "in a Job Template" carries over, so no test is written for it.
+13. **An `enableIf` that can resolve to `null`.** §3.2 item 5 says "a `null` result is an error" at job creation, which
+    requires an `enableIf` whose static type admits `null` (such as `bool?`, from `null if ... else true`) to pass
+    template validation. Constraint 9 says the expression must be "of type `bool`", which a strict reading would apply
+    to `bool?` and reject at template validation. JB-46 uses `{{ null if Param.Mode == 'off' else true }}` and is an
+    `.invalid` test, so it passes under both readings, but under the strict reading the rejection comes from
+    template validation, not job creation, and the test does not then exercise the job-creation rule.
 
 Out of scope by the suite's charter, not for lack of definiteness: every rule under the RFC's *Composition with
 SERVICE* and *Composition with CONTROL_FLOW* sections (Validation rows V7, V28, V29 for Service Sessions, V30, and the

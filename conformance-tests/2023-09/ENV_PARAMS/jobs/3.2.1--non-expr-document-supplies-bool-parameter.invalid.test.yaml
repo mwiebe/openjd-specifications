@@ -1,0 +1,33 @@
+# RFC 0010 / Template Schemas §3.2 constraint 6: a Job Template that does not
+# list EXPR must not supply a BOOL parameter of an attached Environment (whose
+# document lists EXPR), even as the string "true". Rejected at job creation.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions: [ENV_PARAMS]
+  name: NonExprSuppliesBool
+  steps:
+  - name: A
+    dependencies:
+    - environment: Docker
+      parameters:
+        Privileged: "true"
+    script:
+      actions:
+        onRun:
+          command: echo
+          args: [TASK, A]
+environments:
+- specificationVersion: environment-2023-09
+  extensions: [ENV_PARAMS, EXPR]
+  environment:
+    name: Docker
+    parameterDefinitions:
+    - name: Privileged
+      type: BOOL
+      default: false
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, Docker, "Privileged={{Env.Param.Privileged}}"]
+runOn: [posix, windows]
