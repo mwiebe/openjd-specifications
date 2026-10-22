@@ -9,9 +9,10 @@
 # template-level CondaPackages and CondaChannels Job Parameters, so a Job
 # Template that knows nothing about ENV_PARAMS keeps working: every Session
 # gets the job-wide packages, as before. For the same reason the Environment
-# keeps the default activation of ALWAYS, so every Session enters it; to offer
-# conda only to Steps that ask for it, set activation: ON_REQUEST
-# and drop the "no packages requested" branch below.
+# keeps the default activation of ALWAYS. Its enableIf (which needs EXPR) is
+# decided per Step from that Step's Packages, so a Step that ends up with no
+# packages does not enter the Environment at all. To offer conda only to Steps
+# that ask for it, set activation: ON_REQUEST.
 #
 # A Step that lists this Environment in its dependencies supplies its own
 # values instead:
@@ -37,6 +38,7 @@
 specificationVersion: environment-2023-09
 extensions:
 - ENV_PARAMS
+- EXPR
 parameterDefinitions:
 - name: CondaPackages
   type: STRING
@@ -61,6 +63,7 @@ environment:
   - name: Channels
     type: STRING
     default: "{{Param.CondaChannels}}"
+  enableIf: "Env.Param.Packages != ''"
   script:
     actions:
       onEnter:
@@ -80,11 +83,6 @@ environment:
         # argv: <packages> <channels>
         PACKAGES="$1"
         CHANNELS="$2"
-
-        if [ -z "$PACKAGES" ]; then
-          echo "No conda packages requested; using the host's software."
-          exit 0
-        fi
 
         CHANNEL_ARGS=()
         for c in $CHANNELS; do

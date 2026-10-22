@@ -22,7 +22,7 @@ steps:
   - heavy = len(Job.Name) > 3
   dependencies:
   - environment: Conda
-    enableIf: "{{ heavy and Step.Name == 'Render' }}"
+    enableIf: "heavy and Step.Name == 'Render'"
   script:
     actions:
       onRun:

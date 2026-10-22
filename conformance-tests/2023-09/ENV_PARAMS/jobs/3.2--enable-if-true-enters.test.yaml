@@ -25,7 +25,7 @@ template:
   - name: A
     dependencies:
     - environment: Lic
-      enableIf: "{{ Param.Mode == 'on' }}"
+      enableIf: "Param.Mode == 'on'"
       parameters:
         Product: arnold
     script:

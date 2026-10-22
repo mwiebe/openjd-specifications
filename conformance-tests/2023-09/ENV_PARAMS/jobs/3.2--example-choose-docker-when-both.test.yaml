@@ -11,7 +11,7 @@ template:
     dependencies:
     - environment: Conda
       required: false
-      enableIf: "{{ 'Docker' not in Job.EnvNames }}"
+      enableIf: "'Docker' not in Job.EnvNames"
       parameters:
         Packages: colmap=3.11
     - environment: Docker

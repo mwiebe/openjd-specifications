@@ -11,7 +11,7 @@ template:
   - name: A
     dependencies:
     - environment: Lic
-      enableIf: "{{ 'Nope' in Job.EnvNames }}"
+      enableIf: "'Nope' in Job.EnvNames"
       parameters:
         Product: arnold
     script:

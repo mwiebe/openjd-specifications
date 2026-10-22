@@ -25,7 +25,7 @@ steps:
       range: "1-2"
   dependencies:
   - environment: Conda
-    enableIf: "{{ Task.Param.Frame > 1 }}"
+    enableIf: "Task.Param.Frame > 1"
   script:
     actions:
       onRun:

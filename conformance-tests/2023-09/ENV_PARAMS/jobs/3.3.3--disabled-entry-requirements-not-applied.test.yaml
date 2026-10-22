@@ -24,7 +24,7 @@ template:
   - name: A
     dependencies:
     - environment: Gpu
-      enableIf: "{{ 'Nope' in Job.EnvNames }}"
+      enableIf: "'Nope' in Job.EnvNames"
     hostRequirements:
       attributes:
       - name: conformance:attr.flavor

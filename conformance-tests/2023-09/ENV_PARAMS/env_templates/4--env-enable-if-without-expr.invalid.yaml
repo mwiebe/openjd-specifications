@@ -1,0 +1,20 @@
+# Template Schemas §4 item 6 constraint 4 (RFC 0010): an Environment's enableIf requires EXPR, so it is
+# rejected in an Environment Template that lists only ENV_PARAMS.
+specificationVersion: environment-2023-09
+extensions: [ENV_PARAMS]
+parameterDefinitions:
+- name: CondaPackages
+  type: STRING
+  default: ""
+environment:
+  name: Conda
+  envParameterDefinitions:
+  - name: Packages
+    type: STRING
+    default: "{{Param.CondaPackages}}"
+  enableIf: true
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: [ENTER, Conda, "Packages={{Env.Param.Packages}}"]
