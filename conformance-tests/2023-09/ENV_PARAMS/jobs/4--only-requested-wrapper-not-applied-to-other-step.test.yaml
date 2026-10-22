@@ -30,7 +30,7 @@ environments:
   environment:
     name: Docker
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Image
       type: STRING
       default: imgdefault

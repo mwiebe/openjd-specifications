@@ -3,14 +3,14 @@
 # ----
 # Demonstrates
 # ----
-# A queue Docker Environment that each Step of a Job configures, combining
+# An external Docker Environment that each Step of a Job configures, combining
 # the ENV_PARAMS extension (RFC 0010) with WRAP_ACTIONS (RFC 0008). The
 # container starts in onEnter, and every inner Environment action and Task of
 # the Session runs inside it via the wrap hooks.
 #
 # The Environment has runScope: ONLY_REQUESTED, so only the Sessions of Steps
 # that request it through an `environment: Docker` dependency enter it. A
-# queue can attach it alongside a Conda Environment and let each Step choose;
+# scheduler can attach it alongside a Conda Environment and let each Step choose;
 # Steps that ask for neither run directly on the host. The Environment also
 # declares hostRequirements: a Linux host (docker), and at least one GPU for
 # exactly the Steps whose Gpus value is non-empty. Those combine with each
@@ -72,7 +72,7 @@ environment:
     Runs the Session's actions inside a container started from the image the
     Session's Step asked for.
   runScope: ONLY_REQUESTED
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Image
     type: STRING
     minLength: 1

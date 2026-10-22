@@ -6,7 +6,7 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: License
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Renderer
     type: STRING
     maxLength: 4

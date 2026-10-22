@@ -23,7 +23,7 @@ environments:
   environment:
     name: Docker
     runScope: ALL
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Image
       type: STRING
       default: imgdefault

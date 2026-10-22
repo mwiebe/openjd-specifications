@@ -9,7 +9,7 @@ parameterDefinitions:
   type: PATH
 jobEnvironments:
 - name: Tool
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: numpy

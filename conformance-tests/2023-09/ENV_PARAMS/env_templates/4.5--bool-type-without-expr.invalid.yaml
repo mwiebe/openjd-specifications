@@ -5,7 +5,7 @@ extensions:
 - ENV_PARAMS
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Verbose
     type: BOOL
     default: false

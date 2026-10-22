@@ -8,7 +8,7 @@ template:
   name: EnvNamesInStepLet
   jobEnvironments:
   - name: Lic
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Label
       type: STRING
     script:

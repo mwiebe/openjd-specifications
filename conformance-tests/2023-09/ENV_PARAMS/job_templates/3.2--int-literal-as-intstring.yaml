@@ -6,7 +6,7 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: License
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Seats
     type: INT
     default: 1

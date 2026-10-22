@@ -5,7 +5,7 @@ extensions:
 - ENV_PARAMS
 environment:
   name: License
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Renderer
     type: STRING
     allowedValues: [arnold, redshift]

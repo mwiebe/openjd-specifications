@@ -10,7 +10,7 @@ template:
   jobEnvironments:
   - name: RenderLicense
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Product
       type: STRING
       allowedValues: [arnold, redshift, vray]

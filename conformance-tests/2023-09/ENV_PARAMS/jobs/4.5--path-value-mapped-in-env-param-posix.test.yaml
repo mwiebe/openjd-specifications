@@ -10,7 +10,7 @@ template:
     type: PATH
   jobEnvironments:
   - name: Mnt
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Dir
       type: PATH
     script:

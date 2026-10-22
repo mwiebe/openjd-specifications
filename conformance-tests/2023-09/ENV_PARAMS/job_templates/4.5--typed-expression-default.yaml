@@ -11,7 +11,7 @@ parameterDefinitions:
   default: 1
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Threads
     type: INT
     default: "{{ Param.N + 1 }}"

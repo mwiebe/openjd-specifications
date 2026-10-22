@@ -21,7 +21,7 @@ environments:
   extensions: [ENV_PARAMS, EXPR]
   environment:
     name: Docker
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Privileged
       type: BOOL
       default: false

@@ -1,4 +1,4 @@
-# RFC 0010 §Basic Examples, "Choosing between Environments a queue provides"
+# RFC 0010 §Basic Examples, "Choosing between attached Environments"
 # (Template Schemas §3.2 item 5, §7.3.1 Job.EnvNames): with Conda and Docker
 # both attached as ONLY_REQUESTED, the Conda entry's enableIf
 # "'Docker' not in Job.EnvNames" is false, so the Step enters Docker only.
@@ -29,7 +29,7 @@ environments:
   environment:
     name: Conda
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: ""
@@ -43,7 +43,7 @@ environments:
   environment:
     name: Docker
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Image
       type: STRING
     script:

@@ -11,7 +11,7 @@ parameterDefinitions:
   default: numpy
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Channels
     type: LIST[STRING]
     default: "{{ [Param.Pkg, 'extra'] }}"

@@ -7,7 +7,7 @@ name: TestJob
 jobEnvironments:
 - name: Conda
   runScope: ONLY_REQUESTED
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
   script:

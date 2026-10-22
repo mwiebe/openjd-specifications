@@ -7,7 +7,7 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Channels
     type: LIST[STRING]
     default: [conda-forge]

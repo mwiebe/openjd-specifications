@@ -7,7 +7,7 @@ extensions:
 - EXPR
 environment:
   name: Docker
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Image
     type: STRING
     default: ubuntu

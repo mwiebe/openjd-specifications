@@ -9,7 +9,7 @@ parameterDefinitions:
   type: PATH
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Tag
     type: STRING
     default: none

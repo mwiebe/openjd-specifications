@@ -7,7 +7,7 @@ template:
   name: ValueFromStepLet
   jobEnvironments:
   - name: Tagger
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Label
       type: STRING
     script:

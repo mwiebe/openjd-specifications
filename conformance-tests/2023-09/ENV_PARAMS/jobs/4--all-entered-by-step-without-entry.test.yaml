@@ -7,7 +7,7 @@ template:
   jobEnvironments:
   - name: Lic
     runScope: ALL
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Product
       type: STRING
       default: pdefault

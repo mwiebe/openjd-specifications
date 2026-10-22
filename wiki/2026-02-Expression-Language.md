@@ -857,7 +857,7 @@ representation of frame ranges. Use `list(Task.Param.Frame)` to convert to a lis
 
 ##### Environment Parameter Symbols
 
-With the `ENV_PARAMS` extension, an Environment that declares *parameterDefinitions* (see
+With the `ENV_PARAMS` extension, an Environment that declares *envParameterDefinitions* (see
 [Template Schemas](2023-09-Template-Schemas#45-environmentparameterdefinition-extension-env_params)) can read their
 values within that Environment only:
 

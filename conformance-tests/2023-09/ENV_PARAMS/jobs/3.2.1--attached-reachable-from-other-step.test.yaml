@@ -36,7 +36,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: X
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: P
       type: STRING
       default: pdefault

@@ -9,7 +9,7 @@ template:
   jobEnvironments:
   - name: Hw
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Flavor
       type: STRING
       default: a

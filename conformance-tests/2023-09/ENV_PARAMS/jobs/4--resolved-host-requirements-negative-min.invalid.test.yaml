@@ -24,7 +24,7 @@ environments:
   environment:
     name: Gpu
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: N
       type: INT
       default: 1

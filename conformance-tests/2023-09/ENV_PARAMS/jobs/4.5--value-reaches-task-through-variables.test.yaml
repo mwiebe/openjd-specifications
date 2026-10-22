@@ -6,7 +6,7 @@ template:
   name: ValueThroughVariables
   jobEnvironments:
   - name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
     variables:

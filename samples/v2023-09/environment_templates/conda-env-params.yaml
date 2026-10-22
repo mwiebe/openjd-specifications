@@ -3,14 +3,14 @@
 # ----
 # Demonstrates
 # ----
-# A queue Conda Environment that each Step of a Job can configure, using the
+# An external Conda Environment that each Step of a Job can configure, using the
 # ENV_PARAMS extension (RFC 0010). The Environment declares its own parameters,
 # Packages and Channels, read as {{Env.Param.*}}. Their defaults are the
 # template-level CondaPackages and CondaChannels Job Parameters, so a Job
 # Template that knows nothing about ENV_PARAMS keeps working: every Session
 # gets the job-wide packages, as before. For the same reason the Environment
-# keeps the default runScope of ALL, so every Session enters it; a queue that
-# offers conda only to Steps that ask for it would set runScope: ONLY_REQUESTED
+# keeps the default runScope of ALL, so every Session enters it; to offer
+# conda only to Steps that ask for it, set runScope: ONLY_REQUESTED
 # and drop the "no packages requested" branch below.
 #
 # A Step that lists this Environment in its dependencies supplies its own
@@ -54,7 +54,7 @@ environment:
     Creates a conda environment in the Session Working Directory with the
     packages the Session's Step asked for, and activates it for the rest of
     the Session.
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: "{{Param.CondaPackages}}"

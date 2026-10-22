@@ -9,7 +9,7 @@ parameterDefinitions:
   default: numpy
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: "{{Param.CondaPackages}}"

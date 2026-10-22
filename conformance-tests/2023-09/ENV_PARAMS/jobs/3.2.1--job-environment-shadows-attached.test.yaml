@@ -9,7 +9,7 @@ template:
   name: JobEnvironmentShadowsAttached
   jobEnvironments:
   - name: X
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: P
       type: STRING
     script:

@@ -11,7 +11,7 @@ parameterDefinitions:
   default: []
 jobEnvironments:
 - name: Docker
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Mounts
     type: LIST[PATH]
     default: "{{ Param.Dirs }}"

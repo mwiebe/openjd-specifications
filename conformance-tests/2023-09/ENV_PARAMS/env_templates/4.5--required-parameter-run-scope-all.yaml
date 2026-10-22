@@ -6,7 +6,7 @@ extensions:
 - ENV_PARAMS
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
   script:

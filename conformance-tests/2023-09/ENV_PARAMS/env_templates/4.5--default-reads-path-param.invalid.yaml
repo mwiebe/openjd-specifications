@@ -8,7 +8,7 @@ parameterDefinitions:
   type: PATH
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: CacheDir
     type: PATH
     default: "{{Param.Dir}}"

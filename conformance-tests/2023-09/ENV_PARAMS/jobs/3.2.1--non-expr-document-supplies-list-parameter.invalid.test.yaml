@@ -27,7 +27,7 @@ environments:
   extensions: [ENV_PARAMS, EXPR]
   environment:
     name: Docker
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Mounts
       type: LIST[PATH]
       default: []

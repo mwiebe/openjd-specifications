@@ -18,7 +18,7 @@ environments:
   environment:
     name: Conda
     runScope: ALL
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: pkgdefault

@@ -25,7 +25,7 @@ environments:
   environment:
     name: Conda
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
     script:
@@ -38,7 +38,7 @@ environments:
   environment:
     name: Docker
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Image
       type: STRING
     script:

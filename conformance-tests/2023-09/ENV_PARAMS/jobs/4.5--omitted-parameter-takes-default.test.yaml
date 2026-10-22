@@ -6,7 +6,7 @@ template:
   name: OmittedTakesDefault
   jobEnvironments:
   - name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: pkgdefault

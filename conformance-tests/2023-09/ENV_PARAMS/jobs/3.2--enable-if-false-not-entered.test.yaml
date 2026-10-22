@@ -12,7 +12,7 @@ template:
   jobEnvironments:
   - name: Lic
     runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Product
       type: STRING
       default: pdefault

@@ -20,7 +20,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: first
@@ -33,7 +33,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: second

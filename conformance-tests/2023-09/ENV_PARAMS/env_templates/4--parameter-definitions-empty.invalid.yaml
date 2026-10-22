@@ -1,11 +1,11 @@
-# Template Schemas §4 item 3 constraint 1 (RFC 0010): if provided, an Environment's parameterDefinitions
+# Template Schemas §4 item 3 constraint 1 (RFC 0010): if provided, an Environment's envParameterDefinitions
 # must contain at least one element.
 specificationVersion: environment-2023-09
 extensions:
 - ENV_PARAMS
 environment:
   name: Conda
-  parameterDefinitions: []
+  envParameterDefinitions: []
   script:
     actions:
       onEnter:
