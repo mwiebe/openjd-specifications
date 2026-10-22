@@ -1,17 +1,13 @@
-# RFC 0010 / Template Schemas §3.2 item 5: a disabled entry for an ALL
-# Environment supplies nothing; the Session still enters the Environment, with
-# every parameter at its default.
+# RFC 0010 / Template Schemas §4 activation ON_REQUEST, §3.2 item 2: the
+# Session of a Step that requests an ON_REQUEST Job Environment enters it
+# with the Step's value.
 template:
   specificationVersion: jobtemplate-2023-09
-  extensions: [ENV_PARAMS, EXPR]
-  name: EnableIfFalseAllTakesDefaults
-  parameterDefinitions:
-  - name: Mode
-    type: STRING
-    allowedValues: ["on", "off"]
+  extensions: [ENV_PARAMS]
+  name: OnRequestEnteredByRequester
   jobEnvironments:
   - name: Lic
-    runScope: ALL
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Product
       type: STRING
@@ -25,7 +21,6 @@ template:
   - name: A
     dependencies:
     - environment: Lic
-      enableIf: "{{ Param.Mode == 'on' }}"
       parameters:
         Product: arnold
     script:
@@ -33,11 +28,8 @@ template:
         onRun:
           command: echo
           args: [TASK, A]
-parameters:
-  Mode: "off"
 runOn: [posix, windows]
 expected:
   output:
-  - ENTER Lic Product=pdefault
-  forbidden:
   - ENTER Lic Product=arnold
+  - TASK A

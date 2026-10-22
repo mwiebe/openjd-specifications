@@ -1,10 +1,10 @@
-# RFC 0010 / Template Schemas §3.2 constraint 7, §4 runScope: an attached
-# ONLY_REQUESTED Environment with a required parameter that no Step requests is
+# RFC 0010 / Template Schemas §3.2 constraint 7, §4 activation: an attached
+# ON_REQUEST Environment with a required parameter that no Step requests is
 # entered by no Session, so no Step must supply the parameter; the Job runs.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]
-  name: AttachedOnlyRequestedNotRequested
+  name: AttachedOnRequestNotRequested
   steps:
   - name: A
     script:
@@ -17,7 +17,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Lic
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Product
       type: STRING

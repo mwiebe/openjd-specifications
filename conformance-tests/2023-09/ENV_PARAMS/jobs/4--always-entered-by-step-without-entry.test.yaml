@@ -1,13 +1,12 @@
-# RFC 0010 / Template Schemas §4 runScope ONLY_REQUESTED: a Step (B) that does
-# not request an ONLY_REQUESTED Job Environment never enters it, so its onEnter
-# never runs with the default value.
+# RFC 0010 / Template Schemas §4 activation ALWAYS (the default), §3.2.2 item 2: a
+# Step with no entry still enters an ALWAYS Job Environment, with its default.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]
-  name: OnlyRequestedNotEnteredByOther
+  name: AllEnteredWithoutEntry
   jobEnvironments:
   - name: Lic
-    runScope: ONLY_REQUESTED
+    activation: ALWAYS
     envParameterDefinitions:
     - name: Product
       type: STRING
@@ -40,6 +39,5 @@ runOn: [posix, windows]
 expected:
   output:
   - ENTER Lic Product=arnold
-  - TASK B
-  forbidden:
   - ENTER Lic Product=pdefault
+  - TASK B

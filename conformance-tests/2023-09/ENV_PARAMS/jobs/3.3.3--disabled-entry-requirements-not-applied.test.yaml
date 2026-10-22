@@ -1,6 +1,6 @@
 # RFC 0010 / Template Schemas §3.3.3 ("A Step whose Sessions do not enter an
 # Environment ... because the entry is disabled, gets none of that
-# Environment's requirements"): the Step's only entry for an ONLY_REQUESTED
+# Environment's requirements"): the Step's only entry for an ON_REQUEST
 # Environment whose anyOf conflicts with the Step's own has an enableIf that
 # resolves to false, so there is no conflict and the Job runs without
 # entering the Environment.
@@ -10,7 +10,7 @@ template:
   name: DisabledEntryRequirementsNotApplied
   jobEnvironments:
   - name: Gpu
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     hostRequirements:
       attributes:
       - name: conformance:attr.flavor

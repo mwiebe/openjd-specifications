@@ -24,7 +24,7 @@ extensions: [ <ExtensionName>, ... ]                  # NEW — per document; ma
 
 # <Environment> (§4), on jobEnvironments and an Environment Template's environment only
 envParameterDefinitions: [ <EnvironmentParameterDefinition>, ... ]  # NEW — 1–50, unique names (§4.5)
-runScope: ALL | ONLY_REQUESTED                         # NEW — default ALL
+activation: ALWAYS | ON_REQUEST                         # NEW — default ALWAYS
 hostRequirements: <HostRequirements>                   # NEW — may read Env.Param.* (§3.3.3)
 
 # <StepDependency> (§3.2), in a Step's dependencies
@@ -57,22 +57,22 @@ parameters:                        # optional, 1–50 keys
 
 Values are fixed per Step when the Job is created. For each Step and each Environment its Sessions enter, a parameter's
 **effective value** is the value the Step's enabled entry supplies, or else the parameter's resolved `default`
-(§3.2.2). A Session enters an Environment with `runScope: ALL` always, and one with `runScope: ONLY_REQUESTED` only
+(§3.2.2). A Session enters an Environment with `activation: ALWAYS` always, and one with `activation: ON_REQUEST` only
 when its Step requests it.
 
 ## RFC rules these tests verify
 
 - **Extension gating** (RFC §Backward compatibility, §4, §3.2, §7.3.1): Environment `envParameterDefinitions`,
-  `runScope`, `hostRequirements`, and `environment:` and `step:` entries require `ENV_PARAMS` in the document that uses them;
+  `activation`, `hostRequirements`, and `environment:` and `step:` entries require `ENV_PARAMS` in the document that uses them;
   `enableIf`, BOOL and LIST values and types, `Step.Name`, and `Job.EnvNames` also require `EXPR`; `Job.EnvNames`
   requires `ENV_PARAMS` too. `ENV_PARAMS` does not require `EXPR`.
 - **Extensions are per document** (§1.2 item 3): a Job Template without `ENV_PARAMS` runs with an Environment
-  Template that lists it, taking every default and never entering its `ONLY_REQUESTED` Environments; an Environment
-  Template without `ENV_PARAMS` is an `ALL` Environment with no parameters.
+  Template that lists it, taking every default and never entering its `ON_REQUEST` Environments; an Environment
+  Template without `ENV_PARAMS` is an `ALWAYS` Environment with no parameters.
 - **Environment `envParameterDefinitions`** (§4 item 3, §4.5): 1–50 entries, unique names that may coincide with Job
   Parameters and other Environments' parameters, not on `stepEnvironments`; permitted types and fields; `default`
   scope; a literal `default` checked at template validation, a non-literal one only where a Step takes it.
-- **`runScope`** (§4 item 4): `ALL` or `ONLY_REQUESTED`, not on `stepEnvironments`; an `ONLY_REQUESTED` Environment
+- **`activation`** (§4 item 4): `ALWAYS` or `ON_REQUEST`, not on `stepEnvironments`; an `ON_REQUEST` Environment
   is entered, and its `variables` set, only in the Sessions of Steps that request it, and entered Environments keep
   their order.
 - **Environment `hostRequirements`** (§4 item 5, §3.3.3): §3.3 shape per source, restricted scope, resolved per Step
@@ -95,10 +95,10 @@ when its Step requests it.
   Parameters; values reach `onEnter`, Tasks (through `variables`), and `onExit` unchanged.
 - **Path values** (§4.5): PATH and LIST[PATH] values are absolute in the submission path format (or URIs with
   `EXPR`), never joined with a directory, checked unmapped, path-mapped in `Env.Param.*` and not in `Env.RawParam.*`.
-- **`Job.EnvNames`** (§7.3.1): the names of every Job Environment, own and attached, whatever its `runScope`, in
+- **`Job.EnvNames`** (§7.3.1): the names of every Job Environment, own and attached, whatever its `activation`, in
   entry order, excluding Step Environments, with a name repeated when two attached Environments share it.
 - **`enableIf` on the entry** (§3.2 item 5): resolved before the name, so a disabled entry is as if absent: nothing
-  is requested or supplied, a missing `required: true` Environment is not an error, and an `ALL` Environment is still
+  is requested or supplied, a missing `required: true` Environment is not an error, and an `ALWAYS` Environment is still
   entered with its defaults.
 
 ## How these tests are designed
@@ -154,7 +154,7 @@ ENV_PARAMS/
 Filenames follow `<section>--<description>[.invalid][.test].yaml`, where `<section>` is a section of
 [2023-09-Template-Schemas](../../../wiki/2023-09-Template-Schemas.md): `1.1`/`1.2` (document roots and per-document
 extensions), `1.2.1` (merging), `3.2`/`3.2.1`/`3.2.2` (`<StepDependency>`, resolution, effective values), `3.3.3`
-(combined host requirements), `4` (`<Environment>` `envParameterDefinitions`, `runScope`, `hostRequirements`), `4.5`
+(combined host requirements), `4` (`<Environment>` `envParameterDefinitions`, `activation`, `hostRequirements`), `4.5`
 (`<EnvironmentParameterDefinition>`), and `7.3.1` (`Env.Param.*`, `Env.RawParam.*`, `Job.EnvNames`).
 
 ## Coverage matrix
@@ -171,7 +171,7 @@ lists the extensions the document under test declares, where it matters (`EP` = 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
 | JT-01 | `4--parameter-definitions-without-extension.invalid.yaml` | — | A `jobEnvironments` entry with `envParameterDefinitions` is rejected without `ENV_PARAMS`. |
-| JT-02 | `4--run-scope-without-extension.invalid.yaml` | — | `runScope` is rejected without `ENV_PARAMS`. |
+| JT-02 | `4--activation-without-extension.invalid.yaml` | — | `activation` is rejected without `ENV_PARAMS`. |
 | JT-03 | `4--host-requirements-without-extension.invalid.yaml` | — | `hostRequirements` on an Environment is rejected without `ENV_PARAMS`. |
 | JT-04 | `3.2--environment-entry-without-extension.invalid.yaml` | — | An `environment:` entry is rejected without `ENV_PARAMS`. |
 | JT-05 | `3.2--enable-if-without-expr.invalid.yaml` | EP | `enableIf: true` (a literal) is rejected without `EXPR` (constraint 9). |
@@ -217,14 +217,14 @@ lists the extensions the document under test declares, where it matters (`EP` = 
 | JT-120 | `4.5--list-path-object-type.invalid.yaml` | EP, EX | `objectType` on a LIST[PATH] Environment parameter is rejected. |
 | JT-121 | `4.5--default-reads-list-path-param.invalid.yaml` | EP, EX | A `default: "{{ Param.Dirs }}"` reading a LIST[PATH] Job Parameter is rejected. |
 
-#### `runScope` (§4 item 4)
+#### `activation` (§4 item 4)
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| JT-40 | `4--run-scope-all.yaml` | EP | `runScope: ALL` on a Job Environment is valid. |
-| JT-41 | `4--run-scope-only-requested.yaml` | EP | `runScope: ONLY_REQUESTED` on a Job Environment is valid. |
-| JT-42 | `4--run-scope-unknown.invalid.yaml` | EP | `runScope: SOMETIMES` is rejected. |
-| JT-43 | `4--run-scope-on-step-environment.invalid.yaml` | EP | `runScope` on a `stepEnvironments` entry is rejected. |
+| JT-40 | `4--activation-always.yaml` | EP | `activation: ALWAYS` on a Job Environment is valid. |
+| JT-41 | `4--activation-on-request.yaml` | EP | `activation: ON_REQUEST` on a Job Environment is valid. |
+| JT-42 | `4--activation-unknown.invalid.yaml` | EP | `activation: SOMETIMES` is rejected. |
+| JT-43 | `4--activation-on-step-environment.invalid.yaml` | EP | `activation` on a `stepEnvironments` entry is rejected. |
 
 #### Environment `hostRequirements` (§4 item 5)
 
@@ -320,12 +320,12 @@ lists the extensions the document under test declares, where it matters (`EP` = 
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| JT-99 | `3.2--all-required-param-not-supplied.invalid.yaml` | EP | A Step with no entry for an `ALL` Job Environment with a parameter without `default` is rejected. |
-| JT-100 | `3.2--all-required-param-supplied-by-every-step.yaml` | EP | The same Environment is valid when every Step supplies the parameter. |
-| JT-101 | `3.2--only-requested-required-param-non-requesting-step.yaml` | EP | A Step that does not request an `ONLY_REQUESTED` Job Environment need not supply its required parameter. |
-| JT-102 | `3.2--only-requested-required-param-not-supplied.invalid.yaml` | EP | A Step that requests an `ONLY_REQUESTED` Job Environment without supplying its required parameter is rejected. |
-| JT-103 | `3.2--all-required-param-entry-disabled-literal.invalid.yaml` | EP, EX | An entry with `enableIf: false` for an `ALL` Job Environment does not supply its required parameter, and is rejected at validation. |
-| JT-104 | `3.2--only-requested-entry-disabled-literal.yaml` | EP, EX | An entry with `enableIf: false` for an `ONLY_REQUESTED` Job Environment requests nothing, so its required parameter is not needed. |
+| JT-99 | `3.2--always-required-param-not-supplied.invalid.yaml` | EP | A Step with no entry for an `ALWAYS` Job Environment with a parameter without `default` is rejected. |
+| JT-100 | `3.2--always-required-param-supplied-by-every-step.yaml` | EP | The same Environment is valid when every Step supplies the parameter. |
+| JT-101 | `3.2--on-request-required-param-non-requesting-step.yaml` | EP | A Step that does not request an `ON_REQUEST` Job Environment need not supply its required parameter. |
+| JT-102 | `3.2--on-request-required-param-not-supplied.invalid.yaml` | EP | A Step that requests an `ON_REQUEST` Job Environment without supplying its required parameter is rejected. |
+| JT-103 | `3.2--always-required-param-entry-disabled-literal.invalid.yaml` | EP, EX | An entry with `enableIf: false` for an `ALWAYS` Job Environment does not supply its required parameter, and is rejected at validation. |
+| JT-104 | `3.2--on-request-entry-disabled-literal.yaml` | EP, EX | An entry with `enableIf: false` for an `ON_REQUEST` Job Environment requests nothing, so its required parameter is not needed. |
 
 #### Value and `enableIf` scope (§3.2)
 
@@ -352,7 +352,7 @@ lists the extensions the document under test declares, where it matters (`EP` = 
 | ET-01 | `1.2--extensions-env-params.yaml` | EP | An Environment Template with `extensions: [ENV_PARAMS]` and Environment parameters is valid. |
 | ET-02 | `1.2--extensions-empty.invalid.yaml` | — | `extensions: []` is rejected (§1.2 item 3, non-empty). |
 | ET-03 | `4--parameter-definitions-without-extension.invalid.yaml` | — | `envParameterDefinitions` on the `environment` is rejected without `ENV_PARAMS`. |
-| ET-04 | `4--run-scope-without-extension.invalid.yaml` | — | `runScope` is rejected without `ENV_PARAMS`. |
+| ET-04 | `4--activation-without-extension.invalid.yaml` | — | `activation` is rejected without `ENV_PARAMS`. |
 | ET-05 | `4--host-requirements-without-extension.invalid.yaml` | — | `hostRequirements` is rejected without `ENV_PARAMS`. |
 | ET-06 | `4.5--bool-type-without-expr.invalid.yaml` | EP | A BOOL Environment parameter is rejected without `EXPR`. |
 | ET-07 | `4--parameter-definitions-empty.invalid.yaml` | EP | An empty `envParameterDefinitions` list is rejected. |
@@ -361,8 +361,8 @@ lists the extensions the document under test declares, where it matters (`EP` = 
 | ET-10 | `4--parameter-name-same-as-job-parameter.yaml` | EP | A parameter may share its name with the template's own Job Parameter. |
 | ET-11 | `4.5--range-expr-type.invalid.yaml` | EP, EX | Type RANGE_EXPR is rejected. |
 | ET-12 | `4.5--user-interface.invalid.yaml` | EP | `userInterface` is rejected. |
-| ET-13 | `4--run-scope-only-requested.yaml` | EP | `runScope: ONLY_REQUESTED` is valid. |
-| ET-14 | `4--run-scope-unknown.invalid.yaml` | EP | An unknown `runScope` value is rejected. |
+| ET-13 | `4--activation-on-request.yaml` | EP | `activation: ON_REQUEST` is valid. |
+| ET-14 | `4--activation-unknown.invalid.yaml` | EP | An unknown `activation` value is rejected. |
 | ET-15 | `4--host-requirements-read-env-param.yaml` | EP | `hostRequirements` reading the Environment's STRING parameter are valid. |
 | ET-16 | `4--host-requirements-env-path-param.invalid.yaml` | EP | `hostRequirements` reading `Env.Param.<PATH>` are rejected. |
 | ET-17 | `4--host-requirements-step-name.invalid.yaml` | EP, EX | `hostRequirements` reading `Step.Name` are rejected. |
@@ -374,7 +374,7 @@ lists the extensions the document under test declares, where it matters (`EP` = 
 | ET-23 | `4.5--literal-default-violates-constraint.invalid.yaml` | EP | A literal `default` outside `allowedValues` is rejected. |
 | ET-24 | `4.5--list-default-not-single-expression.invalid.yaml` | EP, EX | A list `default` that is a format string other than one `{{ }}` expression is rejected. |
 | ET-25 | `4.5--list-path-default-empty.yaml` | EP, EX | `type: LIST[PATH]` with `default: []` is valid, as in the Docker sample. |
-| ET-26 | `4.5--required-parameter-run-scope-all.yaml` | EP | A parameter without `default` on an `ALL` Environment is valid in the template alone; constraint 7 is a job-creation check (JB-32). |
+| ET-26 | `4.5--required-parameter-activation-always.yaml` | EP | A parameter without `default` on an `ALWAYS` Environment is valid in the template alone; constraint 7 is a job-creation check (JB-32). |
 | ET-27 | `7.3.1--env-param-undeclared.invalid.yaml` | EP | `Env.Param.Y` for an undeclared `Y` is rejected. |
 | ET-28 | `7.3.1--env-param-in-variables-let-and-files.yaml` | EP, EX | `Env.Param.X` in `variables`, script `let`, and embedded files is valid. |
 | ET-29 | `7.3.1--env-names-in-on-enter.yaml` | EP, EX | `Job.EnvNames` in `onEnter` args is valid. |
@@ -431,37 +431,37 @@ Attached Environment Templates are given in the test's `environments` list.
 | JB-28 | `3.2.1--non-expr-document-supplies-bool-parameter.invalid.test.yaml` | EP | A Job Template without `EXPR` supplies `"true"` to an attached BOOL parameter; rejected. |
 | JB-29 | `3.2.1--external-list-value-not-single-expression.invalid.test.yaml` | EP, EX | A format string other than one `{{ }}` expression for an attached LIST[STRING] parameter is rejected. |
 | JB-30 | `3.2.1--several-attached-each-own-values.test.yaml` | EP | One Step requests two attached Environments; each `onEnter` prints the value of its own entry. |
-| JB-87 | `3.2.1--external-required-false-present-receives-values.test.yaml` | EP | A `required: false` entry that resolves to an attached `ONLY_REQUESTED` Environment enters it with the entry's value. |
+| JB-87 | `3.2.1--external-required-false-present-receives-values.test.yaml` | EP | A `required: false` entry that resolves to an attached `ON_REQUEST` Environment enters it with the entry's value. |
 
 #### Constraint 7 over the combined Job (§3.2, §3.2.1)
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| JB-31 | `3.2.1--attached-all-required-supplied-by-every-step.test.yaml` | EP | An attached `ALL` Environment with a parameter without `default`, supplied by every Step, runs. |
-| JB-32 | `3.2.1--attached-all-required-not-supplied.invalid.test.yaml` | EP | The same Environment with one Step not supplying it is rejected. |
-| JB-33 | `3.2.1--attached-only-requested-required-not-requested.test.yaml` | EP | An attached `ONLY_REQUESTED` Environment with a required parameter, requested by no Step, runs. |
-| JB-34 | `3.2.1--attached-only-requested-required-not-supplied.invalid.test.yaml` | EP | The same Environment requested without the parameter is rejected. |
-| JB-35 | `3.2--required-param-entry-disabled-by-expression.invalid.test.yaml` | EP, EX | An `ALL` Job Environment's only supplying entry has `enableIf: "{{ 'Nope' in Job.EnvNames }}"`, which resolves `false`; constraint 7 fails at job creation. |
-| JB-92 | `3.2.1--attached-all-required-entry-disabled.invalid.test.yaml` | EP, EX | The same for an attached `ALL` Environment: the disabled entry supplies nothing, and constraint 7 fails at job creation. |
+| JB-31 | `3.2.1--attached-always-required-supplied-by-every-step.test.yaml` | EP | An attached `ALWAYS` Environment with a parameter without `default`, supplied by every Step, runs. |
+| JB-32 | `3.2.1--attached-always-required-not-supplied.invalid.test.yaml` | EP | The same Environment with one Step not supplying it is rejected. |
+| JB-33 | `3.2.1--attached-on-request-required-not-requested.test.yaml` | EP | An attached `ON_REQUEST` Environment with a required parameter, requested by no Step, runs. |
+| JB-34 | `3.2.1--attached-on-request-required-not-supplied.invalid.test.yaml` | EP | The same Environment requested without the parameter is rejected. |
+| JB-35 | `3.2--required-param-entry-disabled-by-expression.invalid.test.yaml` | EP, EX | An `ALWAYS` Job Environment's only supplying entry has `enableIf: "{{ 'Nope' in Job.EnvNames }}"`, which resolves `false`; constraint 7 fails at job creation. |
+| JB-92 | `3.2.1--attached-always-required-entry-disabled.invalid.test.yaml` | EP, EX | The same for an attached `ALWAYS` Environment: the disabled entry supplies nothing, and constraint 7 fails at job creation. |
 
-#### `runScope` at run time (§4 item 4)
+#### `activation` at run time (§4 item 4)
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| JB-36 | `4--only-requested-entered-by-requesting-step.test.yaml` | EP | The requesting Step's Session prints the `ONLY_REQUESTED` Environment's `onEnter` sentinel with its value. |
-| JB-37 | `4--only-requested-not-entered-by-other-step.test.yaml` | EP | A second Step that does not request it never prints the sentinel with the `default` value (`forbidden`). |
-| JB-38 | `4--only-requested-variables-not-set-for-other-step.test.yaml` | EP | The Environment's `variables` are not set in the non-requesting Step's Task. |
-| JB-39 | `4--all-entered-by-step-without-entry.test.yaml` | EP | A Step with no entry still enters an `ALL` Environment, with its `default`. |
-| JB-40 | `4--attached-only-requested-not-entered-without-request.test.yaml` | EP | An attached `ONLY_REQUESTED` Environment that no Step requests is never entered. |
-| JB-41 | `4--only-requested-keeps-order.test.yaml` | EP | `runOn: [posix]`. `ALL` J1, `ONLY_REQUESTED` J2, `ALL` J3; a requesting Step's Task prints `J1J2J3`, built by each `onEnter` appending to a variable. |
+| JB-36 | `4--on-request-entered-by-requesting-step.test.yaml` | EP | The requesting Step's Session prints the `ON_REQUEST` Environment's `onEnter` sentinel with its value. |
+| JB-37 | `4--on-request-not-entered-by-other-step.test.yaml` | EP | A second Step that does not request it never prints the sentinel with the `default` value (`forbidden`). |
+| JB-38 | `4--on-request-variables-not-set-for-other-step.test.yaml` | EP | The Environment's `variables` are not set in the non-requesting Step's Task. |
+| JB-39 | `4--always-entered-by-step-without-entry.test.yaml` | EP | A Step with no entry still enters an `ALWAYS` Environment, with its `default`. |
+| JB-40 | `4--attached-on-request-not-entered-without-request.test.yaml` | EP | An attached `ON_REQUEST` Environment that no Step requests is never entered. |
+| JB-41 | `4--on-request-keeps-order.test.yaml` | EP | `runOn: [posix]`. `ALWAYS` J1, `ON_REQUEST` J2, `ALWAYS` J3; a requesting Step's Task prints `J1J2J3`, built by each `onEnter` appending to a variable. |
 
 #### `enableIf` on the entry (§3.2 item 5)
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| JB-42 | `3.2--enable-if-true-enters.test.yaml` | EP, EX | An entry whose `enableIf` resolves `true` causes its `ONLY_REQUESTED` Environment to be entered with the value. |
-| JB-43 | `3.2--enable-if-false-not-entered.test.yaml` | EP, EX | An entry whose `enableIf` resolves `false` leaves its `ONLY_REQUESTED` Environment unentered. |
-| JB-44 | `3.2--enable-if-false-all-takes-defaults.test.yaml` | EP, EX | A disabled entry for an `ALL` Environment supplies nothing; `onEnter` prints the `default`, not the entry's value. |
+| JB-42 | `3.2--enable-if-true-enters.test.yaml` | EP, EX | An entry whose `enableIf` resolves `true` causes its `ON_REQUEST` Environment to be entered with the value. |
+| JB-43 | `3.2--enable-if-false-not-entered.test.yaml` | EP, EX | An entry whose `enableIf` resolves `false` leaves its `ON_REQUEST` Environment unentered. |
+| JB-44 | `3.2--enable-if-false-always-takes-defaults.test.yaml` | EP, EX | A disabled entry for an `ALWAYS` Environment supplies nothing; `onEnter` prints the `default`, not the entry's value. |
 | JB-45 | `3.2--enable-if-false-skips-missing-required.test.yaml` | EP, EX | A disabled `required: true` entry naming an Environment nothing attaches is not an error; the Task runs. |
 | JB-46 | `3.2--enable-if-null.invalid.test.yaml` | EP, EX | An `enableIf` that resolves to `null` at job creation is rejected. |
 
@@ -472,7 +472,7 @@ Attached Environment Templates are given in the test's `environments` list.
 | JB-47 | `7.3.1--env-names-job-environments-in-order.test.yaml` | EP, EX | No attached Environments; Job Environments `B`, `A`; the Task prints `B,A`. |
 | JB-48 | `7.3.1--env-names-excludes-step-environments.test.yaml` | EP, EX | A Step Environment's name does not appear. |
 | JB-49 | `7.3.1--env-names-includes-attached.test.yaml` | EP, EX | Attached `Q` and Job Environments `J1`, `J2`; the line is `anyOf` `Q,J1,J2` or `J1,J2,Q` (see [ambiguity 1](#rules-without-a-definite-test)). |
-| JB-50 | `7.3.1--env-names-includes-unrequested-only-requested.test.yaml` | EP, EX | An `ONLY_REQUESTED` Environment the Step does not request is listed. |
+| JB-50 | `7.3.1--env-names-includes-unrequested-on-request.test.yaml` | EP, EX | An `ON_REQUEST` Environment the Step does not request is listed. |
 | JB-51 | `7.3.1--env-names-repeats-shared-attached-name.test.yaml` | EP, EX | Two attached Environments named `X` and no entry naming `X`; the line is `X,X`. |
 | JB-52 | `7.3.1--env-names-in-environment-script.test.yaml` | EP, EX | An attached Environment's `onEnter` prints `Job.EnvNames`, including the Job Template's Environments. |
 | JB-53 | `7.3.1--env-names-in-step-let-feeds-value.test.yaml` | EP, EX | A Step `let` reading `Job.EnvNames` feeds a `parameters` value that `onEnter` prints. |
@@ -508,26 +508,26 @@ matches them against the local host.
 | JB-69 | `3.3.3--attached-environment-conflict.invalid.test.yaml` | EP | An attached Environment's requirements conflict with the Step's; rejected. |
 | JB-70 | `3.3.3--same-capability-in-step-and-environment.test.yaml` | EP | Step and Environment each require amount `min: 1` of the same capability; not a duplicate-name error; the Job runs. |
 | JB-71 | `3.3.3--any-of-and-all-of-not-combined.test.yaml` | EP | Step `anyOf` and Environment `allOf` on one attribute; not an error; the Job runs. |
-| JB-72 | `3.3.3--only-requested-requirements-not-applied.test.yaml` | EP | An `ONLY_REQUESTED` Environment's requirements conflict with a non-requesting Step's own; the Job runs. |
+| JB-72 | `3.3.3--on-request-requirements-not-applied.test.yaml` | EP | An `ON_REQUEST` Environment's requirements conflict with a non-requesting Step's own; the Job runs. |
 | JB-73 | `4--resolved-host-requirements-duplicate-name.invalid.test.yaml` | EP | Two attribute names `"{{Env.Param.First}}"` and `"{{Env.Param.Second}}"` resolve to the same name for a Step; rejected (§3.3 constraint 4, within one source, per Step). |
 | JB-88 | `3.3.3--any-of-intersection-ignores-case.test.yaml` | EP | Step `anyOf: [A]` and Environment `anyOf: [a]` intersect, since values compare ignoring case; the Job runs. |
 | JB-89 | `3.3.3--capability-name-compared-ignoring-case.invalid.test.yaml` | EP | Step `conformance:attr.Flavor` `anyOf: [a]` and Environment `conformance:attr.flavor` `anyOf: [b]` are one capability; rejected. |
-| JB-90 | `3.3.3--disabled-entry-requirements-not-applied.test.yaml` | EP, EX | A disabled entry for an `ONLY_REQUESTED` Environment whose requirements conflict with the Step's; no conflict, the Job runs, the Environment is not entered. |
+| JB-90 | `3.3.3--disabled-entry-requirements-not-applied.test.yaml` | EP, EX | A disabled entry for an `ON_REQUEST` Environment whose requirements conflict with the Step's; no conflict, the Job runs, the Environment is not entered. |
 | JB-91 | `4--resolved-host-requirements-negative-min.invalid.test.yaml` | EP; env EP, FB1 | An attached Environment's amount `min: "{{Env.Param.N}}"` resolves to `-1` for the Step; rejected (§3.3.1). |
 
 #### Extensions per document and backward compatibility (§1.2, RFC §Backward compatibility)
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| JB-74 | `1.2--job-template-without-extension-takes-defaults.test.yaml` | — | A Job Template without `ENV_PARAMS` runs with an attached `ALL` Environment that lists it; `onEnter` prints the `default`. |
-| JB-75 | `1.2--job-template-without-extension-skips-only-requested.test.yaml` | — | The same with `ONLY_REQUESTED`; the Environment is never entered. |
+| JB-74 | `1.2--job-template-without-extension-takes-defaults.test.yaml` | — | A Job Template without `ENV_PARAMS` runs with an attached `ALWAYS` Environment that lists it; `onEnter` prints the `default`. |
+| JB-75 | `1.2--job-template-without-extension-skips-on-request.test.yaml` | — | The same with `ON_REQUEST`; the Environment is never entered. |
 
 #### With `WRAP_ACTIONS` (§4, §7.3.1; RFC Composition with SERVICE item 9 for the non-SERVICE case)
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
 | JB-76 | `7.3.1--wrap-hook-reads-wrapper-env-param.test.yaml` | EP, WA, EX | A wrapping Environment's `onWrapTaskRun` prints its own `Env.Param.Image` supplied by the Step. |
-| JB-77 | `4--only-requested-wrapper-not-applied-to-other-step.test.yaml` | EP, WA, EX | An `ONLY_REQUESTED` wrapping Environment wraps the requesting Step's Task and not the other Step's (the wrap sentinel is absent from the other Step's output). |
+| JB-77 | `4--on-request-wrapper-not-applied-to-other-step.test.yaml` | EP, WA, EX | An `ON_REQUEST` wrapping Environment wraps the requesting Step's Task and not the other Step's (the wrap sentinel is absent from the other Step's output). |
 
 #### Basic Examples (RFC §Basic Examples)
 
@@ -540,7 +540,7 @@ sentinels.
 | JB-79 | `3.2.1--example-steps-own-software-conda-queue.test.yaml` | EP | *A Job Template whose Steps each ask for their own software*, with only `Conda` attached: each Step's `onEnter` prints its own `Packages`; the `Docker` entries are ignored. |
 | JB-80 | `3.2.1--example-steps-own-software-no-queue-environment.test.yaml` | EP | The same Job Template with nothing attached runs unchanged. |
 | JB-81 | `4--example-parameterized-job-environment.test.yaml` | EP | *One parameterized Job Environment serving several Steps*: `BeautyPass` prints `arnold 1`, `VolumePass` prints `redshift 2`, `Composite` never enters `RenderLicense`. |
-| JB-82 | `3.2--example-choose-docker-when-both.test.yaml` | EP, EX | *Choosing between Environments*: with `Conda` and `Docker` attached (both `ONLY_REQUESTED`), the `Conda` entry is disabled and `Conda` is not entered. |
+| JB-82 | `3.2--example-choose-docker-when-both.test.yaml` | EP, EX | *Choosing between Environments*: with `Conda` and `Docker` attached (both `ON_REQUEST`), the `Conda` entry is disabled and `Conda` is not entered. |
 | JB-83 | `3.2--example-choose-conda-when-alone.test.yaml` | EP, EX | The same Job Template with only `Conda` attached enters it with `colmap=3.11`. |
 | JB-84 | `3.3.3--example-environment-host-requirements.test.yaml` | EP; env EP, EX, FB1 | *An Environment that states what hosts it needs*: one Step requests `Docker` with `Gpus: all` and one without; both run (requirements resolve per Step without conflict). |
 | JB-85 | `3.2.2--example-execution-per-step-values.test.yaml` | EP | *Execution*: `DecodeFrames` and `SolveSfM` each enter `Conda` once with their own `Packages`, and `onExit` follows each. |
@@ -552,9 +552,9 @@ order.
 
 | # | Validation rule (abridged) | Checked at | Tests |
 |---|---|---|---|
-| V1 | `ENV_PARAMS` listed by any document using Environment `envParameterDefinitions`, `runScope`, `hostRequirements`, or `environment:` or `step:` entries | Template validation | JT-01–JT-04, JT-125, ET-03–ET-05; per-document: ET-01, JB-74, JB-75, JB-19, JB-20; Environment Template `extensions` and `$schema` keys: ET-01, ET-02, ET-32, ET-33 |
+| V1 | `ENV_PARAMS` listed by any document using Environment `envParameterDefinitions`, `activation`, `hostRequirements`, or `environment:` or `step:` entries | Template validation | JT-01–JT-04, JT-125, ET-03–ET-05; per-document: ET-01, JB-74, JB-75, JB-19, JB-20; Environment Template `extensions` and `$schema` keys: ET-01, ET-02, ET-32, ET-33 |
 | V2 | Environment `envParameterDefinitions`: 1–50, unique names, not on `stepEnvironments`, permitted types and fields | Template validation | JT-11, JT-12, JT-14–JT-26, JT-120, ET-06–ET-12, ET-34–ET-37 |
-| V3 | `runScope` is `ALL` or `ONLY_REQUESTED`, not on `stepEnvironments` | Template validation | JT-40–JT-43, ET-13, ET-14; run time: JB-36–JB-41 |
+| V3 | `activation` is `ALWAYS` or `ON_REQUEST`, not on `stepEnvironments` | Template validation | JT-40–JT-43, ET-13, ET-14; run time: JB-36–JB-41 |
 | V4 | Environment `hostRequirements`: §3.3 shape, not on `stepEnvironments`, `Env.*` only of the enclosing Environment's non-PATH parameters | Template validation | JT-44, JT-45, JT-48, JT-49, JT-53, JT-54, JT-117–JT-119, ET-15, ET-16 |
 | V5 | An Environment's resolved `hostRequirements` satisfy §3.3.1 and §3.3.2 per Step | Job creation | JB-73, JB-91 |
 | V6 | Combined host requirements have no empty intersection (§3.3.3 items 1, 2) | Job creation | JB-65–JB-69, JB-89; non-conflicts: JB-64, JB-70–JB-72, JB-84, JB-88, JB-90 |
@@ -571,16 +571,16 @@ order.
 | V17 | Not the Step's own Step Environment; no duplicates; 1–50 `parameters` (constraints 2–4) | Template validation | JT-75–JT-80 |
 | V18 | `required: false` not on an entry naming a Job Environment (constraint 8) | Template validation | JT-92–JT-94 |
 | V19 | Keys and literal values of `parameters` for a Job Environment (constraints 5, 6) | Template validation | JT-81–JT-91; resolved format strings at job creation: JB-13 |
-| V20 | Required parameters of `ALL` Job Environments supplied by every Step, of `ONLY_REQUESTED` ones by every requester (constraint 7) | Template validation for literal or absent `enableIf`; job creation otherwise | JT-99–JT-104, JB-35 |
+| V20 | Required parameters of `ALWAYS` Job Environments supplied by every Step, of `ON_REQUEST` ones by every requester (constraint 7) | Template validation for literal or absent `enableIf`; job creation otherwise | JT-99–JT-104, JB-35 |
 | V21 | External resolution: missing with `required: true`, or ambiguous (§3.2.1) | Job creation | JB-16, JB-21; accepted forms: JB-15, JB-17, JB-22, JB-23, JB-30, JB-45, JB-87 |
 | V22 | Keys and values for an external Environment; a key the resolved Environment lacks is an error even with `required: false` | Job creation | JB-18, JB-19, JB-24–JB-26; accepted: JB-20 |
 | V23 | A document without `EXPR` supplies no BOOL or LIST parameter (constraint 6) | Job creation | JB-27, JB-28; literal forms at validation: JT-06, JT-07 |
 | V24 | A format-string value or `default` for a list-typed parameter is one `{{ }}` expression | Template validation for `default`s and Job Environment entries; job creation for external | JT-37, JT-38, JT-91, ET-24, JB-29 |
 | V25 | A resolved, non-literal `default` satisfies its type and constraints for each Step that takes it | Job creation | JB-11, JB-12 |
 | V26 | PATH / LIST[PATH] values absolute in the submission path format or URIs; string constraints on the unmapped value; including an unused literal `default` | Job creation | JB-60–JB-63; mapping: JB-54–JB-59 |
-| V27 | Required parameters of attached `ALL` Environments supplied by every Step, of attached `ONLY_REQUESTED` ones by every requester (constraint 7, §3.2.1) | Job creation | JB-31–JB-34, JB-92 |
+| V27 | Required parameters of attached `ALWAYS` Environments supplied by every Step, of attached `ON_REQUEST` ones by every requester (constraint 7, §3.2.1) | Job creation | JB-31–JB-34, JB-92 |
 | V28 | With `SERVICE`: the dependency graph with Environment edges is acyclic | Template validation / job creation | Out of scope (`SERVICE` is not on mainline) |
-| V29 | With `SERVICE` and `WRAP_ACTIONS`: every action inside a wrapping Environment has a wrap hook, per kind of Session | Template validation / job creation | Out of scope for the Service-Session case. The Task-Session case is RFC 0008's existing rule, covered by the `WRAP_ACTIONS` suite; its interaction with `runScope` is JB-77 |
+| V29 | With `SERVICE` and `WRAP_ACTIONS`: every action inside a wrapping Environment has a wrap hook, per kind of Session | Template validation / job creation | Out of scope for the Service-Session case. The Task-Session case is RFC 0008's existing rule, covered by the `WRAP_ACTIONS` suite; its interaction with `activation` is JB-77 |
 | V30 | With `CONTROL_FLOW`: an Environment's `enableIf` reads only its own `Env.*` | Template validation | Out of scope (`CONTROL_FLOW` is not on mainline) |
 | V31 | A `step:` entry obeys every rule of the `dependsOn:` entry it is a synonym of; a `step:` and a `dependsOn:` entry naming one Step are duplicates (§3.2 item 1). Listed after V30 so that existing row numbers are stable; in the RFC table it follows V14 | Template validation | JT-124, JT-130–JT-133 |
 
@@ -588,7 +588,7 @@ The RFC's closing note, that a Session runs Tasks of a Step only when its Enviro
 scheduling rule with no Validation row. Its observable parts are JB-10 and JB-85.
 
 Runtime behaviors in the suite's scope that are not Validation rows are covered as follows: values in `onEnter`,
-`onExit`, and `variables` (JB-01–JB-04); defaults from merged Job Parameters (JB-05–JB-08); `ONLY_REQUESTED` entry
+`onExit`, and `variables` (JB-01–JB-04); defaults from merged Job Parameters (JB-05–JB-08); `ON_REQUEST` entry
 (JB-36–JB-41); entry `enableIf` true, false, and `null` (JB-42–JB-46); `Job.EnvNames` contents and order (JB-47–JB-53, JB-86);
 path mapping in `Env.Param.*` and not `Env.RawParam.*` (JB-54–JB-59); INT `1` vs `"1"` (JB-10); per-document
 extensions (JB-74, JB-75); wrap hooks (JB-76, JB-77); host requirements of a disabled entry and case-insensitive combination (JB-88–JB-90). The Basic Examples are JB-78–JB-85, and the pre-extension
@@ -657,8 +657,8 @@ These rules, or parts of rules, have no planned test with a definite expected ou
    planned for it. The `args` case is definite: Expression Language §1.3.2 flattens a list result in an `args` item,
    so `args: ["{{Job.EnvNames}}"]` passes one argument per name (JB-86). Interpolating the list into surrounding text
    (`"x{{Job.EnvNames}}"`) is also defined (§1.3.2 converts it to its string form), so it is valid, not an error.
-8. **`runScope` case.** "An implementation MUST reject a `<RunScope>` it does not recognize" does not say whether
-   `all` or `Only_Requested` is recognized. Enum values elsewhere in the 2023-09 schema are case-sensitive, but the
+8. **`activation` case.** "An implementation MUST reject an `<EnvironmentActivation>` it does not recognize" does not say whether
+   `always` or `On_Request` is recognized. Enum values elsewhere in the 2023-09 schema are case-sensitive, but the
    section does not say so. Only an unrelated value (`SOMETIMES`) is tested (JT-42, ET-14).
 9. **Two attached Environment Templates with one Environment name.** §3.2.1 item 3 (ambiguous names) and the
    `Job.EnvNames` row ("it appears twice if two attached Environments share it") imply a submission may attach two

@@ -1,5 +1,5 @@
 # RFC 0010 / Template Schemas §3.2 constraint 7, §3.2.1 (after resolution): an
-# attached ALL Environment with a parameter that has no default runs when every
+# attached ALWAYS Environment with a parameter that has no default runs when every
 # Step of the Job supplies it.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -32,7 +32,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Lic
-    runScope: ALL
+    activation: ALWAYS
     envParameterDefinitions:
     - name: Product
       type: STRING

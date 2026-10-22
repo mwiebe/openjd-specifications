@@ -1,10 +1,10 @@
-# RFC 0010 / Template Schemas §4 runScope ONLY_REQUESTED with RFC 0008 wrap
-# hooks: an ONLY_REQUESTED wrapping Environment wraps the Task of the Step that
+# RFC 0010 / Template Schemas §4 activation ON_REQUEST with RFC 0008 wrap
+# hooks: an ON_REQUEST wrapping Environment wraps the Task of the Step that
 # requests it (A) and not that of a Step that does not (B), whose onRun runs.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]
-  name: OnlyRequestedWrapper
+  name: OnRequestWrapper
   steps:
   - name: A
     dependencies:
@@ -29,7 +29,7 @@ environments:
   extensions: [ENV_PARAMS, WRAP_ACTIONS, EXPR]
   environment:
     name: Docker
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Image
       type: STRING

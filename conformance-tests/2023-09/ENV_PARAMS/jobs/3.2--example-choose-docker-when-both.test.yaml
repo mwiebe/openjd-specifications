@@ -1,6 +1,6 @@
 # RFC 0010 §Basic Examples, "Choosing between attached Environments"
 # (Template Schemas §3.2 item 5, §7.3.1 Job.EnvNames): with Conda and Docker
-# both attached as ONLY_REQUESTED, the Conda entry's enableIf
+# both attached as ON_REQUEST, the Conda entry's enableIf
 # "'Docker' not in Job.EnvNames" is false, so the Step enters Docker only.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -28,7 +28,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Conda
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Packages
       type: STRING
@@ -42,7 +42,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Docker
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Image
       type: STRING

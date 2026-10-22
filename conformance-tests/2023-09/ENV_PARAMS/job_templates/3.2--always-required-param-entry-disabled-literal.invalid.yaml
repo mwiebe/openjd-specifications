@@ -1,13 +1,13 @@
-# Template Schemas §3.2 constraint 7 (RFC 0010): only the Steps that request an ONLY_REQUESTED Environment
-# enter it, so only they must supply its parameters without a default. Step Other does not request
-# Conda.
+# Template Schemas §3.2 item 5 and constraint 7 (RFC 0010): a disabled entry supplies nothing, and a Step
+# still enters an ALWAYS Environment. The only entry for Conda has enableIf: false, a literal, so the check
+# is made at template validation and Packages is not supplied.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - ENV_PARAMS
+- EXPR
 name: TestJob
 jobEnvironments:
 - name: Conda
-  runScope: ONLY_REQUESTED
   envParameterDefinitions:
   - name: Packages
     type: STRING
@@ -20,6 +20,7 @@ steps:
 - name: Render
   dependencies:
   - environment: Conda
+    enableIf: false
     parameters:
       Packages: ffmpeg
   script:
@@ -27,9 +28,3 @@ steps:
       onRun:
         command: echo
         args: ["render"]
-- name: Other
-  script:
-    actions:
-      onRun:
-        command: echo
-        args: ["other"]

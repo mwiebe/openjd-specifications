@@ -1,9 +1,9 @@
-# RFC 0010 / Template Schemas §4 runScope ONLY_REQUESTED, §3.2.1: an attached
-# ONLY_REQUESTED Environment that no Step requests is never entered.
+# RFC 0010 / Template Schemas §4 activation ON_REQUEST, §3.2.1: an attached
+# ON_REQUEST Environment that no Step requests is never entered.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]
-  name: AttachedOnlyRequestedNotEntered
+  name: AttachedOnRequestNotEntered
   steps:
   - name: A
     script:
@@ -16,7 +16,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Lic
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Product
       type: STRING

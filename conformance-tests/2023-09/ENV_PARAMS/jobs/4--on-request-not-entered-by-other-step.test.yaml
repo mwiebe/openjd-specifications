@@ -1,12 +1,13 @@
-# RFC 0010 / Template Schemas §4 runScope ALL (the default), §3.2.2 item 2: a
-# Step with no entry still enters an ALL Job Environment, with its default.
+# RFC 0010 / Template Schemas §4 activation ON_REQUEST: a Step (B) that does
+# not request an ON_REQUEST Job Environment never enters it, so its onEnter
+# never runs with the default value.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]
-  name: AllEnteredWithoutEntry
+  name: OnRequestNotEnteredByOther
   jobEnvironments:
   - name: Lic
-    runScope: ALL
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Product
       type: STRING
@@ -39,5 +40,6 @@ runOn: [posix, windows]
 expected:
   output:
   - ENTER Lic Product=arnold
-  - ENTER Lic Product=pdefault
   - TASK B
+  forbidden:
+  - ENTER Lic Product=pdefault

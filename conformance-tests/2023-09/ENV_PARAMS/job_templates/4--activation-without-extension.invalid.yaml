@@ -1,12 +1,10 @@
-# Template Schemas §4 item 4 constraint 1 (RFC 0010): an implementation MUST reject a <RunScope> it does
-# not recognize, so runScope: SOMETIMES is rejected.
+# Template Schemas §4 item 4 (RFC 0010): activation is available only with the ENV_PARAMS extension.
+# This Job Template lists no extensions, so activation on its Job Environment is rejected.
 specificationVersion: jobtemplate-2023-09
-extensions:
-- ENV_PARAMS
 name: TestJob
 jobEnvironments:
 - name: Conda
-  runScope: SOMETIMES
+  activation: ON_REQUEST
   script:
     actions:
       onEnter:

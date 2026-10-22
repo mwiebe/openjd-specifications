@@ -1,5 +1,5 @@
 # RFC 0010 / Template Schemas §3.2 constraint 7 and §3.2.1 (constraint 7 over
-# the combined Job): an attached ALL Environment's parameter without a default
+# the combined Job): an attached ALWAYS Environment's parameter without a default
 # is supplied only by an entry whose enableIf resolves to false. A disabled
 # entry supplies nothing, so the Step enters the Environment without the
 # parameter and the submission is rejected at job creation.
@@ -24,7 +24,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Lic
-    runScope: ALL
+    activation: ALWAYS
     envParameterDefinitions:
     - name: Product
       type: STRING

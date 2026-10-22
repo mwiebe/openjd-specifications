@@ -1,6 +1,6 @@
 # RFC 0010 / Template Schemas §3.2 constraint 5 (RFC §Backward compatibility):
 # an entry without parameters may name an attached Environment from a document
-# that does not list ENV_PARAMS; the Environment is entered as an ALL Environment.
+# that does not list ENV_PARAMS; the Environment is entered as an ALWAYS Environment.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]

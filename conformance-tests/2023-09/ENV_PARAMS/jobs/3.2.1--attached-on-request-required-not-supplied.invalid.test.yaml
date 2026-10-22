@@ -1,33 +1,25 @@
-# RFC 0010 / Template Schemas §3.2 constraint 7, §3.2.1 (after resolution): an
-# attached ALL Environment is entered by every Session, so a Step (B) that does
-# not supply its parameter without a default is rejected at job creation.
+# RFC 0010 / Template Schemas §3.2 constraint 7: a Step that requests an
+# attached ON_REQUEST Environment must supply its parameter without a
+# default; requesting it without the parameter is rejected at job creation.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]
-  name: AttachedAllRequiredNotSupplied
+  name: AttachedOnRequestNotSupplied
   steps:
   - name: A
     dependencies:
     - environment: Lic
-      parameters:
-        Product: arnold
     script:
       actions:
         onRun:
           command: echo
           args: [TASK, A]
-  - name: B
-    script:
-      actions:
-        onRun:
-          command: echo
-          args: [TASK, B]
 environments:
 - specificationVersion: environment-2023-09
   extensions: [ENV_PARAMS]
   environment:
     name: Lic
-    runScope: ALL
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Product
       type: STRING

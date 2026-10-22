@@ -8,7 +8,7 @@
 # container starts in onEnter, and every inner Environment action and Task of
 # the Session runs inside it via the wrap hooks.
 #
-# The Environment has runScope: ONLY_REQUESTED, so only the Sessions of Steps
+# The Environment has activation: ON_REQUEST, so only the Sessions of Steps
 # that request it through an `environment: Docker` dependency enter it. A
 # scheduler can attach it alongside a Conda Environment and let each Step choose;
 # Steps that ask for neither run directly on the host. The Environment also
@@ -71,7 +71,7 @@ environment:
   description: >
     Runs the Session's actions inside a container started from the image the
     Session's Step asked for.
-  runScope: ONLY_REQUESTED
+  activation: ON_REQUEST
   envParameterDefinitions:
   - name: Image
     type: STRING

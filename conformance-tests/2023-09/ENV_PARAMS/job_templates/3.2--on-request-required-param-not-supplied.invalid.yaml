@@ -1,11 +1,12 @@
-# Template Schemas §3.2 constraint 7 (RFC 0010): an ALL Environment's parameter without a default is
-# valid when every Step of the Job supplies it.
+# Template Schemas §3.2 constraint 7 (RFC 0010): a Step that requests an ON_REQUEST Environment must
+# supply its parameters without a default. The entry requests Conda without supplying Packages.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - ENV_PARAMS
 name: TestJob
 jobEnvironments:
 - name: Conda
+  activation: ON_REQUEST
   envParameterDefinitions:
   - name: Packages
     type: STRING
@@ -18,18 +19,6 @@ steps:
 - name: Render
   dependencies:
   - environment: Conda
-    parameters:
-      Packages: ffmpeg
-  script:
-    actions:
-      onRun:
-        command: echo
-        args: ["render"]
-- name: Other
-  dependencies:
-  - environment: Conda
-    parameters:
-      Packages: colmap
   script:
     actions:
       onRun:

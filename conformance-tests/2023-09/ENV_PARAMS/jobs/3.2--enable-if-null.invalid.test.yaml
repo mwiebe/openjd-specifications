@@ -12,7 +12,7 @@ template:
     allowedValues: ["on", "off"]
   jobEnvironments:
   - name: Lic
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Product
       type: STRING

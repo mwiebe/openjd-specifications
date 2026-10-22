@@ -1,13 +1,13 @@
-# RFC 0010 / Template Schemas §4 runScope ONLY_REQUESTED ("does not have its
-# variables set"): the variables of an ONLY_REQUESTED Job Environment are set in
+# RFC 0010 / Template Schemas §4 activation ON_REQUEST ("does not have its
+# variables set"): the variables of an ON_REQUEST Job Environment are set in
 # the requesting Step's Task and not in a non-requesting Step's Task.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]
-  name: OnlyRequestedVariables
+  name: OnRequestVariables
   jobEnvironments:
   - name: Lic
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Product
       type: STRING

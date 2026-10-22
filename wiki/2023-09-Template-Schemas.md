@@ -68,8 +68,8 @@ Where:
       elements or 200 elements with the `FEATURE_BUNDLE_1` extension.
 7. *jobEnvironments* — An ordered list of the environments that are required to run Tasks in the Jobs created by this Job
    Template. These are entered in the order provided at the start of every Session for Tasks in the Job, and exited in the
-   reverse order at the end of those Sessions. With the `ENV_PARAMS` extension, an Environment whose `runScope` is
-   `ONLY_REQUESTED` is entered only in the Sessions of the Steps that request it (see
+   reverse order at the end of those Sessions. With the `ENV_PARAMS` extension, an Environment whose `activation` is
+   `ON_REQUEST` is entered only in the Sessions of the Steps that request it (see
    [&lt;Environment&gt;](#4-environment)). See: [&lt;Environment&gt;](#4-environment). Constraints:
       1. No two Environments in this list may have the same value for the `name` property.
       2. The Environments defined in this list must not have the same `name` as an Environment
@@ -989,8 +989,8 @@ Where:
        [Resolving external Environments](#321-resolving-external-environments)).
 
    The entry declares that the Step depends on the Environment: its Sessions need that Environment, entered with these
-   values. If the Environment's `runScope` is `ONLY_REQUESTED`, the entry is what causes this Step's Sessions to enter
-   it; if it is `ALL`, the Step's Sessions enter it regardless, and the entry only supplies values. The entry does not
+   values. If the Environment's `activation` is `ON_REQUEST`, the entry is what causes this Step's Sessions to enter
+   it; if it is `ALWAYS`, the Step's Sessions enter it regardless, and the entry only supplies values. The entry does not
    delay scheduling the Step's Tasks, and it does not change the position of the Environment in the order a Session
    enters its Environments.
 3. *required* — Whether the Environment must be present. Default `true`. When `false` and the name resolves to no
@@ -1005,8 +1005,8 @@ Where:
    target type is `bool`, with the same available scopes as a *parameters* value (`RawParam.*`, `Param.*` other than
    PATH and LIST[PATH], `Job.Name`, `Job.EnvNames`, `Step.Name`, and the Step's `let` bindings). It is resolved
    when the Job is created, before the entry's name is resolved; a `null` result is an error. If omitted, the entry is
-   enabled. A disabled entry is as if absent (item 2): for an `ONLY_REQUESTED` Environment the Step's Sessions do not
-   enter it, and for an `ALL` Environment they enter it with every parameter at its `default`, subject to constraint 7.
+   enabled. A disabled entry is as if absent (item 2): for an `ON_REQUEST` Environment the Step's Sessions do not
+   enter it, and for an `ALWAYS` Environment they enter it with every parameter at its `default`, subject to constraint 7.
 
 `<EnvironmentParameterValues>` is a map from [&lt;Identifier&gt;](#71-identifier) to `<EnvironmentParameterValue>`:
 
@@ -1056,8 +1056,8 @@ Constraints:
    not supply a parameter whose type requires `EXPR` (BOOL or a LIST type).
 7. For every Environment that a Step's Sessions enter, the Step must supply every parameter of that Environment that has
    no `default`. A Step's Sessions enter every Environment of the Job, whether a *jobEnvironments* entry or an attached
-   Environment, whose `runScope` is `ALL`, so such a parameter of such an Environment must be supplied by every Step of
-   the Job; and they enter every Environment with `runScope: ONLY_REQUESTED` that the Step requests, so such a parameter
+   Environment, whose `activation` is `ALWAYS`, so such a parameter of such an Environment must be supplied by every Step of
+   the Job; and they enter every Environment with `activation: ON_REQUEST` that the Step requests, so such a parameter
    of such an Environment must be supplied by every Step that requests it.
 8. *required* must not be `false` on an entry that names a *jobEnvironments* entry.
 9. *enableIf* is permitted only in a document that lists `EXPR`, and must be a boolean literal or a single `{{ }}`
@@ -1099,14 +1099,14 @@ follows:
 
 Each entry that resolves applies independently of the others: when the scheduler attaches several of the Environments
 a Step requests, the Step's Sessions enter all of them, each with the values its own entry supplies. An attached
-Environment with `runScope: ONLY_REQUESTED` is entered by the Sessions of exactly the Steps whose entries resolve to it;
-one with `runScope: ALL` is entered by every Session, as without the extension.
+Environment with `activation: ON_REQUEST` is entered by the Sessions of exactly the Steps whose entries resolve to it;
+one with `activation: ALWAYS` is entered by every Session, as without the extension.
 
 After resolution, constraint 7 is checked over the combined Job: every Step whose Sessions enter an attached Environment
 with a parameter that has no `default` must supply it, or the submission is rejected. For an attached Environment with
-`runScope: ALL`, every Session enters it, so such a parameter rejects every Job Template that does not supply it from
+`activation: ALWAYS`, every Session enters it, so such a parameter rejects every Job Template that does not supply it from
 every Step; an Environment Template intended for existing Job Templates therefore gives every parameter a `default`, or
-uses `runScope: ONLY_REQUESTED` so that only the Steps that request it are held to the rule.
+uses `activation: ON_REQUEST` so that only the Steps that request it are held to the rule.
 
 #### 3.2.2. Effective Environment parameter values
 
@@ -1130,10 +1130,10 @@ when they have equal elements in the same order.
 
 A Session enters each of its Environments once, with one set of parameter values, and keeps those values until it exits
 the Environment. A Session may run Tasks of a Step only when the set of Environments the Session has entered is the set
-the Step's Sessions enter (every `ALL` Environment of the Job, every `ONLY_REQUESTED` Environment the Step requests, and
+the Step's Sessions enter (every `ALWAYS` Environment of the Job, every `ON_REQUEST` Environment the Step requests, and
 the Step's own *stepEnvironments*) and, for every Environment in that set, the Step's effective values are equal to the
 values the Session entered it with. The first condition is the rule *How Jobs Are Run* already states for Sessions that
-run Tasks of several Steps, now applied to a set that `runScope` can make differ between Steps; the second is new. A
+run Tasks of several Steps, now applied to a set that `activation` can make differ between Steps; the second is new. A
 Session may therefore run Tasks of several Steps, as before, when their Environment sets and effective values agree; the
 set of Steps it will serve need not be known when it starts.
 See [How Jobs Are Run](How-Jobs-Are-Run#environment-parameters).
@@ -1335,9 +1335,9 @@ each source's *hostRequirements* separately, not to the combined set, so an Envi
 their own, and combining them adds no error other than the conflicts in items 1 and 2.
 
 An Environment's *hostRequirements* apply only to Sessions that enter it. A Step whose Sessions do not enter an
-Environment, because its `runScope` is `ONLY_REQUESTED` and the Step does not request it, because a `required: false`
+Environment, because its `activation` is `ON_REQUEST` and the Step does not request it, because a `required: false`
 entry resolved to nothing, or because the entry is disabled, gets none of that Environment's requirements. An
-Environment with `runScope: ALL` adds its requirements to every Step of the Job.
+Environment with `activation: ALWAYS` adds its requirements to every Step of the Job.
 
 ### 3.4. `<StepParameterSpaceDefinition>`
 
@@ -1767,7 +1767,7 @@ An `<Environment>` is the object:
 name: <EnvironmentName>
 description: <Description> # @optional
 envParameterDefinitions: [ <EnvironmentParameterDefinition>, ... ] # @optional @extension ENV_PARAMS
-runScope: <RunScope> # @optional @extension ENV_PARAMS
+activation: <EnvironmentActivation> # @optional @extension ENV_PARAMS
 hostRequirements: <HostRequirements> # @optional @extension ENV_PARAMS
 script: <EnvironmentScript> # @optional
 variables: <EnvironmentVariables> # @optional
@@ -1790,17 +1790,17 @@ Where:
        Parameter name or with a parameter of another Environment; they do not conflict.
     4. Permitted on a Job Template's *jobEnvironments* entries and on an Environment Template's *environment*. Not
        permitted on a *stepEnvironments* entry.
-4. *runScope* — Which Sessions enter this Environment. Available with the `ENV_PARAMS` extension. `<RunScope>` is one
-   of:
-    * `ALL` — Every Session of the Job enters this Environment, in its position in the Job's Environment order. This is
+4. *activation* — Whether every Session of the Job enters this Environment, or only the Sessions that request it.
+   Available with the `ENV_PARAMS` extension. `<EnvironmentActivation>` is one of:
+    * `ALWAYS` — Every Session of the Job enters this Environment, in its position in the Job's Environment order. This is
        the behavior of every Job Environment and attached Environment without the extension, and the default.
-    * `ONLY_REQUESTED` — Only the Sessions of a Step that requests this Environment, through an `environment:` entry in
+    * `ON_REQUEST` — Only the Sessions of a Step that requests this Environment, through an `environment:` entry in
        its *dependencies* (see [`<StepDependency>`](#32-stepdependency)), enter it. Any other Session does not enter or
        exit it, does not have its *variables* set, and does not have it in its Environment stack. The Environments a
        Session does enter keep their relative order.
 
    Constraints:
-    1. An implementation MUST reject a `<RunScope>` it does not recognize.
+    1. An implementation MUST reject an `<EnvironmentActivation>` it does not recognize.
     2. Permitted on a Job Template's *jobEnvironments* entries and on an Environment Template's *environment*. Not
        permitted on a *stepEnvironments* entry, which is entered only by its own Step's Sessions.
 5. *hostRequirements* — Requirements on the Worker Host that every Session entering this Environment must satisfy, in
@@ -2047,8 +2047,8 @@ A `default` is checked against the definition at two points:
    Job Parameter is a job-wide fallback, and the Job Parameter's value may be meaningful only to Jobs that use it.
 
 A parameter without a `default` is required: every Step whose Sessions enter the Environment must supply it (see
-[&lt;StepDependency&gt;](#32-stepdependency) constraint 7). For an Environment with `runScope: ONLY_REQUESTED`
-those are exactly the Steps that request it; for one with `runScope: ALL`, every Step of the Job.
+[&lt;StepDependency&gt;](#32-stepdependency) constraint 7). For an Environment with `activation: ON_REQUEST`
+those are exactly the Steps that request it; for one with `activation: ALWAYS`, every Step of the Job.
 
 A value of a PATH parameter, and each element of a value of a LIST[PATH] parameter, whether supplied by a Step or taken
 from the `default`, literal or resolved, is a path in the Job's submission path format: the path format of the Job's
@@ -2390,7 +2390,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Env.File.<name>`|The filesystem location to which the Environment Attachment with key `<name>` has been written.|Available within the Environment Script Actions and Embedded Files.|
 |`Env.Param.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment: the effective value for every Step whose Tasks the Session runs, which are equal (see [§3.2.2](#322-effective-environment-parameter-values)). The same as `Env.RawParam.<ParamName>` except for types PATH and LIST[PATH], where path mapping rules are applied. Requires the `ENV_PARAMS` extension.|Available within the Environment that declares the parameter: its `variables`, its `hostRequirements` (types other than PATH and LIST[PATH]), and its Script's `let`, Actions, and Embedded Files. Not available in any other Environment or in a Step.|
 |`Env.RawParam.<ParamName>`|The value of the Environment parameter `<ParamName>` with which the Session entered the Environment, with no path mapping applied. Requires the `ENV_PARAMS` extension.|As for `Env.Param.<ParamName>`.|
-|`Job.EnvNames`|The `name` of each Job Environment of the Job: the Job Template's `jobEnvironments` and the Environments attached from Environment Templates, whatever their `runScope`, in the order a Session that entered all of them would enter them. Step Environments are not included. A name appears once per Environment, so it appears twice if two attached Environments share it. A list, so usable only within a `{{ }}` expression. With `CONTROL_FLOW`, an Environment that `enableIf` disables is still listed: the list is read by expressions that feed effective values, which an Environment's `enableIf` may read, so excluding disabled Environments would be circular. Requires the `ENV_PARAMS` and `EXPR` extensions.|Available in every format string of a Job Template or Environment Template that is resolved at Job creation or later, including an Environment's `hostRequirements` and the `let`, actions, and embedded files of its script, and concrete at Job creation once the attached Environments are known. Not available in an Environment parameter `default`, which reads only `Param.*` and `RawParam.*`, nor in the Job Template's `name`.|
+|`Job.EnvNames`|The `name` of each Job Environment of the Job: the Job Template's `jobEnvironments` and the Environments attached from Environment Templates, whatever their `activation`, in the order a Session that entered all of them would enter them. Step Environments are not included. A name appears once per Environment, so it appears twice if two attached Environments share it. A list, so usable only within a `{{ }}` expression. With `CONTROL_FLOW`, an Environment that `enableIf` disables is still listed: the list is read by expressions that feed effective values, which an Environment's `enableIf` may read, so excluding disabled Environments would be circular. Requires the `ENV_PARAMS` and `EXPR` extensions.|Available in every format string of a Job Template or Environment Template that is resolved at Job creation or later, including an Environment's `hostRequirements` and the `let`, actions, and embedded files of its script, and concrete at Job creation once the attached Environments are known. Not available in an Environment parameter `default`, which reads only `Param.*` and `RawParam.*`, nor in the Job Template's `name`.|
 |`Session.WorkingDirectory`|The agent is expected to create a local temporary scratch directory for the duration of a Session. This builtin provides the location of that temporary directory. This is the working directory that the Worker Agent uses when running the task.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Job.Name`|The resolved name of the Job. This is a `string` type. Requires the `EXPR` extension.|Available in every Format String in the Job Template, except the `name` field of the Job Template itself.|
 |`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`, and with the `ENV_PARAMS` extension the *parameters* values and *enableIf* of `dependencies` entries.|
@@ -2412,7 +2412,7 @@ different sets of values are known, which determines which format strings can be
 | Stage | When | Known Values | Unknown Values | What Happens |
 |-------|------|-------------|----------------|--------------|
 | **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Env.Param.*`, `Job.EnvNames` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `ENV_PARAMS` extension: `Env.Param.*` is type-checked against the Environment's *envParameterDefinitions* and `Job.EnvNames` is `unresolved[list[string]]`; literal Environment parameter `default`s, and literal `environment:` values for Job Environments, are checked against their definitions. |
-| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*`; with `ENV_PARAMS`, at the end of this stage, each Step's Environment parameter effective values | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` Job Parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `ENV_PARAMS` extension: the Environment Templates attached to the Job are determined first, and `Job.EnvNames` is concrete before any TEMPLATE-scope expression of the Job, including a Step's `let` bindings, is evaluated; then each `environment:` entry's *enableIf* is evaluated; each enabled entry that names no *jobEnvironments* entry is resolved against the attached Environments (see [§3.2.1](#321-resolving-external-environments)); the set of Environments each Step's Sessions enter is fixed from each Environment's `runScope` and the Step's enabled entries; Environment parameter defaults and `environment:` values are resolved into each Step's effective values and checked (see [§3.2.2](#322-effective-environment-parameter-values)); and each Environment's *hostRequirements* are resolved with each entering Step's effective values and combined with the Step's own (see [§3.3.3](#333-combined-host-requirements-extension-env_params)). Environment parameter PATH and LIST[PATH] values are not joined with any directory and must be absolute (see [§4.5](#45-environmentparameterdefinition-extension-env_params)). |
+| **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*`; with `ENV_PARAMS`, at the end of this stage, each Step's Environment parameter effective values | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` Job Parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated; expressions in TEMPLATE scope are fully evaluated; `Job.Name` and `Step.Name` are concrete. With the `ENV_PARAMS` extension: the Environment Templates attached to the Job are determined first, and `Job.EnvNames` is concrete before any TEMPLATE-scope expression of the Job, including a Step's `let` bindings, is evaluated; then each `environment:` entry's *enableIf* is evaluated; each enabled entry that names no *jobEnvironments* entry is resolved against the attached Environments (see [§3.2.1](#321-resolving-external-environments)); the set of Environments each Step's Sessions enter is fixed from each Environment's `activation` and the Step's enabled entries; Environment parameter defaults and `environment:` values are resolved into each Step's effective values and checked (see [§3.2.2](#322-effective-environment-parameter-values)); and each Environment's *hostRequirements* are resolved with each entering Step's effective values and combined with the Step's own (see [§3.3.3](#333-combined-host-requirements-extension-env_params)). Environment parameter PATH and LIST[PATH] values are not joined with any directory and must be absolute (see [§4.5](#45-environmentparameterdefinition-extension-env_params)). |
 | **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, `Env.Param.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters, including PATH and LIST[PATH] Environment parameters (`ENV_PARAMS`). Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. |
 
 The `@fmtstring` and `@fmtstring[host]` annotations in this specification indicate which stage

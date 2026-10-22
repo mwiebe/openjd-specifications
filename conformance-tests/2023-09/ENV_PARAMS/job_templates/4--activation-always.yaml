@@ -1,11 +1,11 @@
-# Template Schemas §4 item 4 (RFC 0010): runScope: ALL on a Job Environment is valid.
+# Template Schemas §4 item 4 (RFC 0010): activation: ALWAYS on a Job Environment is valid.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - ENV_PARAMS
 name: TestJob
 jobEnvironments:
 - name: Conda
-  runScope: ALL
+  activation: ALWAYS
   script:
     actions:
       onEnter:

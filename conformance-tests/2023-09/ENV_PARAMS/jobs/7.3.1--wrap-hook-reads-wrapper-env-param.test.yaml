@@ -22,7 +22,7 @@ environments:
   extensions: [ENV_PARAMS, WRAP_ACTIONS, EXPR]
   environment:
     name: Docker
-    runScope: ALL
+    activation: ALWAYS
     envParameterDefinitions:
     - name: Image
       type: STRING

@@ -1,7 +1,7 @@
 # RFC 0010 / Template Schemas §3.2.1 item 5: an attached Environment that shares
 # its name with Step S's Step Environment is unreachable from S, but Step T's
 # entry for that name resolves to the attached Environment as usual. The
-# attached Environment is ALL, so S's Session also enters it, with its default.
+# attached Environment is ALWAYS, so S's Session also enters it, with its default.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS]

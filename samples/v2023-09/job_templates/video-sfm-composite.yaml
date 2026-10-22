@@ -21,7 +21,7 @@
 # which disables them when a Docker Environment is present, so a Step is
 # never told to install conda packages inside a container that has no conda.
 # Job.EnvNames lists the names of every Environment the Job has once
-# external ones are attached. The Docker Environment is ONLY_REQUESTED, so the
+# external ones are attached. The Docker Environment is ON_REQUEST, so the
 # Steps' requests are what bring it into their Sessions.
 #
 # `required: false` covers a Job with no Environment of that name attached.

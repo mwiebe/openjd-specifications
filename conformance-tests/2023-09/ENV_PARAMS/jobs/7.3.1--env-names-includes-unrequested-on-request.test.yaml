@@ -1,5 +1,5 @@
-# RFC 0010 / Template Schemas §7.3.1 Job.EnvNames ("whatever their runScope"):
-# an ONLY_REQUESTED Job Environment that the Step does not request is listed.
+# RFC 0010 / Template Schemas §7.3.1 Job.EnvNames ("whatever their activation"):
+# an ON_REQUEST Job Environment that the Step does not request is listed.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions: [ENV_PARAMS, EXPR]
@@ -12,7 +12,7 @@ template:
           command: echo
           args: [ENTER, J1]
   - name: J2
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     script:
       actions:
         onEnter:

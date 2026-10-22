@@ -1,5 +1,5 @@
 # RFC 0010 §Basic Examples, "A queue Conda Environment that each Step
-# configures" (Template Schemas §4.5, §3.2.2): with the queue's ALL Conda
+# configures" (Template Schemas §4.5, §3.2.2): with the queue's ALWAYS Conda
 # Environment, a Step with no entry gets the job-wide CondaPackages through the
 # default, and a Step with an entry gets its own Packages.
 template:

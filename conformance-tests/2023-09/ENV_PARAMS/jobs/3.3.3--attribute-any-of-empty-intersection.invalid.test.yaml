@@ -7,7 +7,7 @@ template:
   name: AttributeAnyOfEmptyIntersection
   jobEnvironments:
   - name: Hw
-    runScope: ALL
+    activation: ALWAYS
     envParameterDefinitions:
     - name: Flavor
       type: STRING

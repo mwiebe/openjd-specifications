@@ -28,7 +28,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Conda
-    runScope: ONLY_REQUESTED
+    activation: ON_REQUEST
     envParameterDefinitions:
     - name: Packages
       type: STRING

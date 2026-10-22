@@ -1,11 +1,13 @@
-# Template Schemas §3.2 constraint 7 (RFC 0010): every Step of the Job enters an ALL Environment, so each
-# must supply its parameters that have no default. Step Other has no entry for Conda.
+# Template Schemas §3.2 item 5 and constraint 7 (RFC 0010): a disabled entry requests nothing, so the Step
+# does not enter the ON_REQUEST Environment and need not supply its parameter without a default.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - ENV_PARAMS
+- EXPR
 name: TestJob
 jobEnvironments:
 - name: Conda
+  activation: ON_REQUEST
   envParameterDefinitions:
   - name: Packages
     type: STRING
@@ -18,16 +20,9 @@ steps:
 - name: Render
   dependencies:
   - environment: Conda
-    parameters:
-      Packages: ffmpeg
+    enableIf: false
   script:
     actions:
       onRun:
         command: echo
         args: ["render"]
-- name: Other
-  script:
-    actions:
-      onRun:
-        command: echo
-        args: ["other"]

@@ -88,8 +88,8 @@ With the ENV_PARAMS extension, introduced in
 [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-environment-parameters.md),
 an **Environment** may declare parameters, and a Step requests the **Environment** and supplies values for them in an
 `environment:` entry of its `dependencies`. The **Environment** reads the values as `{{Env.Param.<name>}}`. An
-**Environment** may also declare a `runScope`: `ALL`, the default, means every **Session** of the Job enters it, as
-every Job Environment does without the extension; `ONLY_REQUESTED` means only the **Sessions** of the Steps that
+**Environment** may also declare a `activation`: `ALWAYS`, the default, means every **Session** of the Job enters it, as
+every Job Environment does without the extension; `ON_REQUEST` means only the **Sessions** of the Steps that
 request it do, and every other **Session** runs as if it were not defined.
 
 The values are resolved once, when the Job is created. For each Step and each **Environment** that the Step's
@@ -101,8 +101,8 @@ Step's **Sessions** run without that **Environment**. If it says `required: true
 rejected. If something of that name is attached but does not declare a parameter the entry supplies, for example an
 **Environment** written before the extension, the submission is rejected whatever `required` says. The entries are
 independent of one another: if the render management system attaches several of the **Environments** a Step
-requests, the Step's **Sessions** enter each of them with the values its own entry supplies. For an `ALL`
-**Environment**, an entry only supplies values; for an `ONLY_REQUESTED` **Environment**, the entry is also what makes
+requests, the Step's **Sessions** enter each of them with the values its own entry supplies. For an `ALWAYS`
+**Environment**, an entry only supplies values; for an `ON_REQUEST` **Environment**, the entry is also what makes
 the Step's **Sessions** enter it. An entry may carry an `enableIf` condition, decided when the Job is created; a
 disabled entry is as if it were not written. The **Environments** a **Session** does enter keep the order they have in
 the Job.
@@ -124,7 +124,7 @@ and LIST[PATH]-typed values on the Worker Host, as for PATH Job Parameters. A St
 `Env.Param.*`.
 
 Because the values are fixed per Step and known when the Job is created, a render management system can group
-**Sessions** by them. Two Steps that request the same `ONLY_REQUESTED` **Environments** and whose effective values
+**Sessions** by them. Two Steps that request the same `ON_REQUEST` **Environments** and whose effective values
 are equal for every **Environment** may share **Sessions**; two Steps whose **Environment** sets or values differ
 never do. A render management system may also use the values to
 prefer a Worker Host that recently entered an **Environment** with the same values, for example one that has a
