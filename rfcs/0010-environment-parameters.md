@@ -71,27 +71,14 @@ environment:
     embeddedFiles:
       - name: Enter
         type: TEXT
-        data: |
-          #!/usr/bin/env bash
-          set -euo pipefail -f
-          PACKAGES="$1"
-          if [ -z "$PACKAGES" ]; then
-            echo "No conda packages requested; using the host's software."
-            exit 0
-          fi
-          CHANNELS=()
-          for c in $2; do CHANNELS+=(-c "$c"); done
-          conda create -y -p ./.conda-env "${CHANNELS[@]}" $PACKAGES
-          echo "openjd_env: PATH=$PWD/.conda-env/bin:$PATH"
-          echo "openjd_env: CONDA_PREFIX=$PWD/.conda-env"
+        data: ...
 ```
 
 This Environment keeps the default `activation: ALWAYS`, so every Session enters it and a Step that asks for
 nothing gets the job-wide `CondaPackages`, exactly as before. Environment Templates for several ways
 to provision software (Conda, Rez, and Docker, say) that are attached together can instead each be
-marked `activation: ON_REQUEST`:
-then a Session enters only the Environments its Step requests, and the `if [ -z "$PACKAGES" ]`
-branch above is taken only by a Step that requests `Conda` without any packages.
+marked `activation: ON_REQUEST`: then a Session enters only the Environments its Step requests, and
+the script sees an empty `Packages` only from a Step that requests `Conda` without any packages.
 
 ### A Job Template whose Steps each ask for their own software
 
