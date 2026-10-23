@@ -29,7 +29,7 @@ whether or not an external Environment it names is attached. A parameter's `defa
 Parameter, so an existing Environment Template can adopt parameters without breaking Job Templates that
 predate them.
 
-Three further `<Environment>` fields complete the feature. `activation: ON_REQUEST` makes an
+This RFC also adds three `<Environment>` fields. `activation: ON_REQUEST` makes an
 Environment one that only the Steps requesting it enter, so a scheduler can attach several Environments
 without every Session entering all of them. `enableIf` lets an Environment leave out the Steps it has
 nothing to do for, decided from each Step's values. `hostRequirements` on an Environment are combined with each
@@ -78,7 +78,7 @@ environment:
 ```
 
 This Environment keeps the default `activation: ALWAYS`, so a Step that asks for nothing gets the job-wide
-`CondaPackages`, exactly as before. Its `enableIf` is decided for each Step from that Step's `Packages`: a Step
+`CondaPackages`, as before. Its `enableIf` is decided for each Step from that Step's `Packages`: a Step
 that ends up with no packages, from its own entry or from `CondaPackages`, does not enter the Environment at all.
 Environment Templates for several ways to provision software (Conda, Rez, and Docker, say) that are attached
 together can instead each be marked `activation: ON_REQUEST`, so that a Session enters only the Environments its
@@ -246,8 +246,8 @@ environment:
 
 A Step that requests `Docker` with `Gpus: "all"` is placed only on a Linux host with at least one GPU; one
 that requests it without `Gpus` needs only Linux. A Step that does not request
-`Docker` is unaffected. On a fleet where only some hosts run containers, this is what keeps the Steps
-that asked for a container off the others.
+`Docker` is unaffected. On a fleet where only some hosts run containers, the Steps that asked for a
+container are placed only on those hosts.
 
 ### Execution
 
@@ -279,15 +279,15 @@ it, so the pipeline belongs in one Job with dependencies between its Steps.
 Today the software for such a Job usually comes from an external Environment, attached to the Job from
 an Environment Template; Deadline Cloud's Conda and Docker queue environments are examples. That Environment takes its configuration
 from a single template-level Job Parameter (`CondaPackages`, `DockerImage`), so it does the same thing
-in every Session of the Job. The Job's author has three options, none good:
+in every Session of the Job. The Job's author has three options:
 
-1. **Install everything everywhere.** List ffmpeg, COLMAP, and Maya in `CondaPackages`. Every Session
+1. Install everything in every Session. List ffmpeg, COLMAP, and Maya in `CondaPackages`. Every Session
    resolves and installs all three, which multiplies Session startup time and disk use, and fails
    outright when the packages' dependencies conflict, as they can when two applications pin
    different versions of the same shared libraries (Qt, OpenEXR, or Python, for example).
-2. **Build one image with everything.** The same conflict problem, moved into an image build that the
-   Job author may not control, and an image that is large to pull on every host.
-3. **Split the pipeline into several Jobs.** Each Job gets its own `CondaPackages` value, but the
+2. Build one image with everything. This has the same conflict problem, moved into an image build that
+   the Job author may not control, and the image is large to pull on every host.
+3. Split the pipeline into several Jobs. Each Job gets its own `CondaPackages` value, but the
    dependencies between Steps are lost, and the submitter must chain Jobs by hand.
 
 A Step Environment cannot help, because it has no way to ask an external Environment to do anything
@@ -299,7 +299,7 @@ applied here, the same Job Template should run whether a Conda, Rez, Docker, or 
 supplies its software.
 
 With this RFC, each Step states what it needs from each kind of provisioning Environment it may meet,
-and the external Environment does exactly that for each Step's Sessions.
+and the external Environment provides that in the Step's Sessions.
 
 ### Other workflows
 
@@ -325,27 +325,27 @@ and the external Environment does exactly that for each Step's Sessions.
 6. **A Job Environment that only some Steps need.** A license checkout, a database connection, or a
    large asset download that two of a Job's five Steps use is today written as a Step Environment on each
    of the two, or as a Job Environment that every Session pays for. An `ON_REQUEST` Job Environment
-   is written once and entered twice.
+   is written once and entered only by the Sessions of those two Steps.
 7. **An Environment that only works on some hosts.** An external Docker Environment needs a host with a
    container runtime; its Conda Environment, on a mixed fleet, needs Linux. Today an Environment Template
    cannot say so, and the Steps it serves fail at `onEnter` on the wrong host. With `hostRequirements` on
    the Environment, every Session that enters it is placed where it can run, and when the requirement
-   depends on a parameter (a GPU only when `Gpus` is set) it applies to exactly the Steps it should.
+   depends on a parameter (a GPU only when `Gpus` is set) it applies only to the Steps that set it.
 
-These patterns are common wherever a farm provisions software per Session: Conda- and Rez-based VFX
-farms, containerized HPC and ML batch systems, and CI systems that run matrix jobs. The
-[Prior Art](#prior-art) section shows that every comparable workflow system lets a unit of work choose
-its own software environment.
+These patterns arise wherever a farm provisions software per Session, such as Conda- and Rez-based
+VFX farms, containerized HPC and ML batch systems, and CI systems that run matrix jobs.
+[Prior Art](#prior-art) describes workflow systems that let each unit of work choose its own software
+environment.
 
 ### Why the values come from the Step
 
 A Session enters each of its Environments once and then runs Tasks, which may come from one Step or
 from several whose Environments are identical. The Step is the unit that knows what software its
-Tasks need, so it is the natural place to say what an Environment should do for them. With this
+Tasks need, so the Step says what an Environment should do for them. With this
 extension, a Session's Environments are entered with the values of the Steps it serves, and a Session
 serves several Steps only when their values agree, so one set of values is in force for the whole
-Session. Values are fixed per Step rather than per Task: a Session runs many Tasks, and an Environment
-is entered once for all of them, which is the amortization Environments exist to provide.
+Session. Values are fixed per Step rather than per Task, because a Session runs many Tasks and enters
+each Environment once for all of them.
 
 ### Backward compatibility
 
@@ -384,7 +384,7 @@ This RFC is additive and gated by the `ENV_PARAMS` extension name declared under
   names the entry and the parameter, so a submitter can see which external Environment needs updating. The rationale is in
   [An Environment without the supplied parameter is an error](#an-environment-without-the-supplied-parameter-is-an-error).
 - No existing field changes meaning. A Job with no `environment:` entries, no Environment
-  `envParameterDefinitions`, no `activation`, and no Environment `enableIf` behaves exactly as today, including which Environments
+  `envParameterDefinitions`, no `activation`, and no Environment `enableIf` behaves as today, including which Environments
   each Session enters and how Sessions are shared between Steps. A Job Template that lists
   `ENV_PARAMS` but no `environment:` entries, run with an Environment Template that declares
   parameters and keeps `activation: ALWAYS`, also shares Sessions as today: every Step takes the same
@@ -521,7 +521,7 @@ New properties:
   submission path format, and no path mapping applies; a `let` binding it reads, in a Step Environment, has its
   template-scope value. Where it is
   `false` for a Step, that Step's Sessions do not enter the Environment: they do not enter or exit it, do not have its
-  *variables* set, and do not have it in their Environment stack, exactly as for an `ON_REQUEST` Environment the Step
+  *variables* set, and do not have it in their Environment stack, as for an `ON_REQUEST` Environment the Step
   does not request. If omitted, the Environment is enabled for every such Step. Constraints:
    1. In a *jobEnvironments* entry or an Environment Template's *environment*, it may reference exactly the scopes
       that this Environment's *hostRequirements* may (*hostRequirements* item 1): the document's `RawParam.*` and `Param.*` other than
@@ -1243,11 +1243,11 @@ a validation rule, and has no row here.
 
 ### Parameters declared on the Environment
 
-The Environment is the only entity that knows what it can be told. Declaring the parameters there
-gives each one a type, constraints, and a default in the place they are used, and lets a template
-validator check every `Env.Param.*` reference and every supplied value against a definition, exactly
-as it checks `Param.*` against Job Parameters. Reusing the `<JobParameterDefinition>` shapes means
-there is nothing new to learn: an Environment parameter is a Job Parameter with a narrower audience.
+The Environment's author decides what the Environment accepts, so the parameters are declared on the
+Environment. That gives each one a type, constraints, and a default where it is used, and lets a
+template validator check every `Env.Param.*` reference and every supplied value against a definition,
+as it checks `Param.*` against Job Parameters. The definitions reuse the `<JobParameterDefinition>`
+shapes, so an author who can write a Job Parameter can write an Environment parameter.
 The fields that do not apply (`userInterface`, `objectType`, `dataFlow`) are the ones that describe a
 submitter or a Job's data flow, neither of which an Environment parameter has.
 
@@ -1283,8 +1283,8 @@ several Environments that use the same parameter name (see
 An `environment:` entry does not delay scheduling the way `dependsOn:` and `service:` do. It is still
 a dependency: with `required: true` the Step cannot run without the Environment, and the scheduler
 rejects the submission rather than run it without the Environment. For an `ON_REQUEST`
-Environment it is also what brings the Environment into the Step's Sessions, which is the same
-relationship a `service:` entry has to a Service: naming it is what makes it run for you.
+Environment, the entry also causes the Step's Sessions to enter it, as a `service:` entry causes its
+Service to run.
 
 ### `step:` as a synonym of `dependsOn:`
 
@@ -1328,10 +1328,10 @@ no Session-kind vocabulary, leaving RFC 0009 to state the one rule that is reall
 Environment that reads a Service's endpoint cannot run in that Service's Session) as a rule rather
 than a default for a list.
 
-The move also fixes an awkwardness in the first draft of this RFC. A required parameter on a Job
+Defining `activation` here also changes a rule from the first draft of this RFC. A required parameter on a Job
 Environment had to be supplied by every Step, because every Session entered every Job Environment,
 so a Step with no use for the Environment still had to configure it. With `ON_REQUEST`, the
-Steps that must supply a required parameter are exactly the Steps that asked for the Environment.
+Steps that must supply a required parameter are the Steps that request the Environment.
 
 The field is named for what it decides, when a Session enters the Environment, rather than kept as
 `runScope`: an Environment is entered, not run, and "scope" already names the value-reference scopes
@@ -1400,7 +1400,7 @@ uses `enableIf`, the name discussion #81 proposed and RFC 0011 uses for Steps, f
    `environment:` entries gives authors one word for one idea.
 
 The cost is unfamiliarity to authors who know `when:` or `if:`, and a literal `enableIf: false` that reads less
-naturally than `enabled: false`. Both are small next to a name whose meaning in OpenJD is unambiguous.
+naturally than `enabled: false`.
 
 ### Expression fields rather than format strings
 
@@ -1420,7 +1420,7 @@ the field, in the place they look for it. Existing fields that take a single-exp
 expression fields, and [Extensions specified after this one](#extensions-specified-after-this-one-non-normative) asks
 RFC 0011 to use them for its loop fields and a Step's *enableIf*.
 
-The cost is YAML quoting: an expression that begins with a quote or a bracket must be enclosed in quotes, as in
+Expression fields do need YAML quoting: an expression that begins with a quote or a bracket must be enclosed in quotes, as in
 `"'Docker' not in Job.EnvNames"`. That is no worse than the Format String form, which must always be quoted because
 `{{` begins a YAML flow mapping.
 
@@ -1517,7 +1517,7 @@ it is not the common case.
 
 A Job Template that writes `required: false` entries for both `Conda` and `Docker` says it can use
 either, but not which it prefers when both are attached. The template needs to see what the Job
-has. A list of names is the smallest thing that answers that, and EXPR already has `in` to test it and
+has. A list of names answers that, and EXPR already has `in` to test it and
 list comprehensions to filter it, so no new function is needed. The name follows RFC 0009's
 `WrappedService.PortNames`, a `list[string]` of declared names in declaration order; uses `Env` as the
 existing `Env.File.*` and `Env.Param.*` scopes do; and is in the `Job.*` scope because the list is a
@@ -1535,8 +1535,8 @@ Environments, which no Step can request and which the Step that owns them alread
 `Job.EnvNames` tells a Step which external Environments are attached; `enableIf` on the entry is how the Step
 acts on it. Without it, a Step that prefers Docker when both are attached could only request `Conda`
 with an empty value, which enters an Environment to do nothing and, for an `ON_REQUEST`
-Environment, defeats the point of opting in. Disabling the entry is the same as not writing it, which
-is the one meaning a reader can predict without consulting the Environment: nothing is requested,
+Environment, defeats the point of opting in. A disabled entry is the same as no entry, so a
+reader can tell what it does without consulting the Environment: nothing is requested,
 nothing is supplied, and an `ALWAYS` Environment behaves as it does for any Step without an entry.
 
 The field takes the name this RFC uses on `<Environment>` (and RFC 0011 on Steps) for the same idea, and the same
@@ -1557,17 +1557,16 @@ that wants to choose among present ones writes `enableIf`.
 An Environment that provisions software knows what it needs from a host: a container runtime, a
 Linux kernel, a GPU when asked for one. Today only a Step can state host requirements, so an
 Environment Template that works on part of a fleet has no way to say so, and the Steps it serves fail
-at `onEnter` on the rest. Putting `hostRequirements` on the Environment puts the statement with the
-author who knows it.
+at `onEnter` on the rest. With `hostRequirements` on the Environment, its author can state them.
 
-The parameters are what make this belong here. A static requirement could be its own small RFC, but
+The parameters are why this belongs in this RFC. A static requirement could be its own small RFC, but
 the requirement a provisioning Environment most wants to state depends on what the Step asked for:
 `amount.worker.gpu` matters only when `Gpus` is set. This RFC already resolves effective values per
 Step at job creation, which is the stage at which a Step's own `hostRequirements` are resolved, so
-resolving an Environment's requirements with those values costs no new stage and gives a per-Step
-answer for free.
+resolving an Environment's requirements with those values adds no new stage and gives a per-Step
+result.
 
-Conjunction is the only combination that respects both authors. The Step's author and the
+The requirements combine by conjunction. The Step's author and the
 Environment's author each state what they need; a host must satisfy both, and neither can loosen the
 other's. The normalization rules (greatest `min`, least `max`, intersected `anyOf`, united `allOf`)
 restate the conjunction as one requirement per capability where that is possible, so that tooling can
@@ -1578,8 +1577,8 @@ the specification makes the two keys exclusive in one requirement, and nothing i
 satisfies both or it does not.
 
 The requirements follow entering. An `ON_REQUEST` Environment constrains only the Steps that
-request it, so a fleet with some container-capable hosts pulls exactly the Steps that asked for a
-container onto them, and a `required: false` entry that resolves to nothing adds nothing. Session
+request it, so on a fleet with some container-capable hosts, only the Steps that asked for a
+container are placed on them, and a `required: false` entry that resolves to nothing adds nothing. Session
 sharing is unaffected: a host either satisfies the combined requirements of the Steps a Session
 serves or the Session is never placed there, as today.
 
@@ -1659,7 +1658,7 @@ changing anything here.
 The first draft also excluded `LIST[PATH]`, whose Job Parameter defaults are relative paths joined
 with the template directory (§2.12). Once Environment parameter paths are defined to be absolute in the
 submission path format, that objection no longer applies, and each element is mapped as a PATH value
-is, exactly as for a `LIST[PATH]` Job Parameter. The Docker sample needs it: a container must mount
+is, as for a `LIST[PATH]` Job Parameter. The Docker sample needs it: a container must mount
 every host path the Step's Tasks read or write, after mapping, and a `LIST[STRING]` of `RawParam`
 values would mount the submitter's paths instead of the Worker Host's.
 
@@ -1667,8 +1666,8 @@ values would mount the submitter's paths instead of the Worker Host's.
 
 A parameter without a `default` makes the Environment useless unless each Step that enters it
 configures it, which is the right contract for a Job Environment like `RenderLicense` whose author
-wants every Step that uses it to say which product it uses. With `activation: ON_REQUEST` the
-Steps held to that are exactly the Steps that asked. For an `ALWAYS` Environment in an Environment
+wants every Step that uses it to say which product it uses. With `activation: ON_REQUEST`, only
+the Steps that request the Environment are held to that. For an `ALWAYS` Environment in an Environment
 Template the same rule would break every Job Template that does not know the parameter, so this RFC
 states the consequence and leaves the choice to the Environment Template's author, who normally gives every
 parameter a default or makes the Environment `ON_REQUEST`.
@@ -1749,11 +1748,11 @@ cannot change between the two.
   it with `--use-conda`, `--use-singularity`, or `--use-envmodules`. Snakemake caches each distinct
   Conda environment by the hash of its definition, which is the reuse a scheduler can achieve by
   grouping Sessions by effective values.
-* **Deadline Cloud sample queue environments** — The in-ecosystem baseline. Deadline Cloud's
+* **Deadline Cloud sample queue environments** — Deadline Cloud's
   sample Conda queue environments, which are Environment Templates attached as external Environments, take `CondaPackages` and `CondaChannels` Job Parameters, and its
   Rez sample takes `RezPackages`, each applied to every Session of a Job. This RFC generalizes them: the
   same Environment Templates gain a per-Step value that defaults to those Job Parameters, which is
-  exactly the shape of this RFC's samples. Deadline Cloud's improved-caching Conda sample names each
+  the shape of this RFC's samples. Deadline Cloud's improved-caching Conda sample names each
   environment by a hash of its package list and reuses it across Sessions on a host, which is the
   reuse that grouping Sessions by effective values makes more frequent.
 * **Kubernetes `RuntimeClass`** — A `RuntimeClass` carries `scheduling.nodeSelector` and
@@ -1764,7 +1763,7 @@ cannot change between the two.
 * **Apache Airflow** — With the Kubernetes executor, each task can set
   `executor_config={"pod_override": ...}` to run in its own image or with its own resources, while
   the executor itself is configured once for the deployment. That is a platform-owned provisioning
-  layer configured per unit of work, the closest match to an Environment Template that each Step
+  layer configured per unit of work, like an Environment Template that each Step
   configures.
 * **Rez** — `rez env <packages> -- <command>` resolves and enters a software environment per
   invocation, and farm integrations run each job under its own request. The request is per job or per
@@ -1776,7 +1775,7 @@ cannot change between the two.
   is its own container.
 * **Slurm and Environment Modules** — A batch script runs `module load colmap/3.11` per job step, or
   `srun --container-image=...` (with Pyxis/Enroot) per step. The selection lives in the script text, so
-  no tool can see which software a step needs without parsing shell, which is what the
+  no tool can see which software a step needs without parsing shell, which the
   [Tooling parseable](https://github.com/OpenJobDescription/openjd-specifications/wiki/Design-Tenets)
   tenet asks OpenJD to avoid.
 * **GitHub Actions** — `jobs.<id>.container` and `runs-on` select the execution environment per job,
@@ -1786,10 +1785,10 @@ cannot change between the two.
   `SoftwareRequirement` with package names and versions) state what a tool needs, and a hint is
   optional while a requirement is not. That distinction is `required: false` versus `required: true`.
 
-Across these systems the unit of work names its own software, and the platform decides how it is
-provided. What none of them has is a provisioning layer owned by someone other than the workflow
-author, which OpenJD has in Environment Templates; this RFC is what lets a Job Template speak to that
-layer per Step.
+In each of these systems the unit of work names its own software, and the platform decides how it is
+provided. In OpenJD the provisioning layer is an Environment Template, which the render farm's
+operator owns rather than the Job's author, and this RFC lets a Job Template configure that layer per
+Step.
 
 ## Implementation Impact
 
@@ -1825,8 +1824,9 @@ layer per Step.
   scheduler may additionally use the values for host affinity, which is an optimization and not
   required.
 
-Nothing here is harder in one language than the other. The effective values are a small map per
-Step and Environment, computed once at job creation, so there is no runtime cost.
+The effective values are a small map per Step and Environment, computed once at job creation. At run
+time they are passed when a Session enters an Environment and compared when a scheduler shares a
+Session.
 
 ## Rejected Ideas
 
@@ -1850,7 +1850,9 @@ Environment would read the names it knows. Rejected because names collide: a Con
 Pip Environment can both reasonably call their input `Packages`, and a flat map would send the same
 value to both. It also cannot express `required`, cannot be checked against a definition (which
 Environment does `Image` belong to?), and gives a scheduler no way to tell which Environment a typo
-was meant for. Keying the values by Environment name in an `environment:` entry fixes all four.
+was meant for. An `environment:` entry keys the values by Environment name, so values do not collide,
+`required` has a place, and each value, typos included, is checked against the named Environment's
+definition.
 
 ### Letting a Step's script read `Env.Param.*`
 
@@ -1862,15 +1864,16 @@ the binding in both the `environment:` entry and its script.
 
 ### Values per Task
 
-Letting Task parameters feed Environment parameters would make every Task its own Session, defeating
-the amortization Environments exist for. A Step whose Tasks need different software is two Steps.
+Letting Task parameters feed Environment parameters would require a Session per Task, so each
+Environment would be entered once per Task rather than once for many. Tasks that need different
+software belong in different Steps.
 
 ### `required` defaulting to `false`
 
 With an optional default, the common case of a Job Template written for the Environments of its own
 `jobEnvironments` would carry no difference, but a misspelled external name would be silently
 ignored, and a Job written for a `Conda` Environment would run without one and fail inside its Tasks
-instead of at submission. Listing something as a dependency should mean depending on it.
+instead of at submission.
 
 ### Matching external Environments by something other than name
 
@@ -1888,15 +1891,14 @@ RFC 0009's earlier `runScope: [TASK, SERVICE]` selected Sessions by kind. See
 [Two values rather than a kind list](#two-values-rather-than-a-kind-list). The one thing the kind
 list could say that `ON_REQUEST` cannot is "every Step but no Service" without each Step
 writing an entry. RFC 0009's own motivation is that Services should get the Tasks' provisioning, so
-that case is not one to make easy.
+this RFC adds no shortcut for excluding them.
 
 ### `activation` on the entry instead of the Environment
 
 A Step could write `environment: Conda, exclusive: true` to mean "enter this for me and not for
 Steps that do not ask". Rejected because whether an Environment is opt-in is a property of the
 Environment, decided by its author: an auditing Environment must not be something a Step can turn
-off for everyone else, and two Steps could disagree. The Environment's author knows whether it is a
-menu item or a mandate.
+off for everyone else, and two Steps could disagree.
 
 ### Environment parameters on Step Environments
 
