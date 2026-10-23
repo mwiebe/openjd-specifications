@@ -1364,6 +1364,26 @@ step input binding, which is what `CONTROL_FLOW` adds, so this RFC defines it, w
 Environment whose *enableIf* reads the outputs of other Steps does need step input binding; that is an extension for
 `CONTROL_FLOW` to make ([Extensions specified after this one](#extensions-specified-after-this-one-non-normative)).
 
+### The name `enableIf`
+
+The most common name for this kind of field elsewhere is `when:`. Argo Workflows, Tekton, CWL, Nextflow, Ansible,
+CircleCI, and Jenkins all use it to mean "run this unit only if the condition holds". GitHub Actions, Buildkite, and
+GitLab CI use `if:`, Azure Pipelines uses `condition:`, and Helm charts conventionally use an `enabled:` value. This RFC
+uses `enableIf`, the name discussion #81 proposed and RFC 0011 uses for Steps, for three reasons:
+
+1. **It says what `false` does.** A disabled Environment is not entered and a disabled entry is as if absent; nothing
+   waits. In OpenJD, Steps do wait, on their dependencies and, under RFC 0011, for step input binding, so
+   `when: "Steps.QualityCheck.Output.Noisy"` invites the reading "wait until this is true". The systems that use
+   `when:` accept that ambiguity; `enableIf` avoids it.
+2. **It reads on any mapping.** `if:` works on a CI job, which plainly either runs or does not, but on a `dependencies`
+   entry or an `<Environment>` it does not say what the condition controls. `enabled:` reads well with a literal but
+   suggests a fixed setting, and a literal is the rare case for this field.
+3. **It is one name across the specification.** The same field on Steps (RFC 0011), Environments, and
+   `environment:` entries gives authors one word for one idea.
+
+The cost is unfamiliarity to authors who know `when:` or `if:`, and a literal `enableIf: false` that reads less
+naturally than `enabled: false`. Both are small next to a name whose meaning in OpenJD is unambiguous.
+
 ### Expression fields rather than format strings
 
 Both *enableIf* fields hold one boolean expression and nothing else. Written as a Format String, that is
