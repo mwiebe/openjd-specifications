@@ -271,10 +271,10 @@ values cannot share one.
 
 ### One Job, several applications
 
-A multi-application pipeline is a natural fit for one Job: decode a video into frames with ffmpeg,
-solve structure-from-motion with COLMAP, place 3D objects into the solved scene with Maya, render
-the composite, and encode the result with ffmpeg. Each Step needs different software, and the Step
-dependencies between them are exactly what a Job expresses well.
+Consider a Job that decodes a video into frames with ffmpeg, solves structure-from-motion with
+COLMAP, places 3D objects into the solved scene with Maya, renders the composite, and encodes the
+result with ffmpeg. Each Step uses different software and consumes the output of the Step before
+it, so the pipeline belongs in one Job with dependencies between its Steps.
 
 Today the software for such a Job usually comes from an external Environment, attached to the Job from
 an Environment Template; Deadline Cloud's Conda and Docker queue environments are examples. That Environment takes its configuration
@@ -516,7 +516,10 @@ New properties:
 * *enableIf* — Whether a Step's Sessions enter this Environment. Available with the `ENV_PARAMS` and `EXPR`
   extensions. An [expression field](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#75-expression-fields) of type `bool`. It is resolved when the Job is created, once for each Step whose Sessions would otherwise enter the
   Environment (by its *activation* and the Step's enabled `environment:` entries, or, for a Step Environment, as one of
-  the Step's own), with that Step's effective values (see [Effective Environment parameter values](#322-effective-environment-parameter-values)); a `null` result is an error. Where it is
+  the Step's own), with that Step's effective values (see [Effective Environment parameter values](#322-effective-environment-parameter-values)); a `null` result is an error. Like an entry's *enableIf*,
+  it is evaluated in template scope, not in a host context: `path` values have POSIX semantics whatever the Job's
+  submission path format, and no path mapping applies; a `let` binding it reads, in a Step Environment, has its
+  template-scope value. Where it is
   `false` for a Step, that Step's Sessions do not enter the Environment: they do not enter or exit it, do not have its
   *variables* set, and do not have it in their Environment stack, exactly as for an `ON_REQUEST` Environment the Step
   does not request. If omitted, the Environment is enabled for every such Step. Constraints:
@@ -536,8 +539,13 @@ New properties:
   an *enableIf* that reads such a parameter be evaluated. An Environment that is disabled for a Step contributes
   nothing to that Step's combined host requirements ([Combined host requirements](#333-combined-host-requirements-extension-env_params)), and its *hostRequirements* are not resolved for it. A check that depends on which
   Environments a Step's Sessions enter, such as the `WRAP_ACTIONS` single-layer rule
-  ([`<EnvironmentActions>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#43-environmentactions) constraint 2), is made before the Job is created only when the *enableIf* of every Environment involved is absent or a boolean scalar (§7.5 item 1), an
-  Environment whose scalar is `false` counting as not entered; otherwise it is made when the Job is created.
+  ([`<EnvironmentActions>`](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#43-environmentactions) constraint 2), uses what is known at each stage (§7.5 rule 5). Before
+  the Job is created, a Step's Sessions are known to enter an Environment whose *enableIf* is absent or `true` when the
+  Step would otherwise enter it (by `activation: ALWAYS`, or through an entry whose *enableIf* is absent or `true`),
+  and known not to enter one whose *enableIf* is `false`; any other Environment is undetermined. The check reports an
+  error before the Job is created only when the error holds whatever the undetermined Environments turn out to be:
+  two wrapping Environments known to be entered violate the single-layer rule whatever a third does. Otherwise it is
+  made when the Job is created, over the Step's final set.
 
 The format string scope `Env.*` within an Environment gains:
 
@@ -797,7 +805,10 @@ Where:
 5. *enableIf* — Whether this entry is in effect. Available with the `EXPR` extension. An
    [expression field](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#75-expression-fields) of type `bool`, with the same available scopes as a *parameters* value (`RawParam.*`, `Param.*` other than
    PATH and LIST[PATH], `Job.Name`, `Job.EnvNames`, `Step.Name`, and the Step's `let` bindings). It is resolved
-   when the Job is created, before the entry's name is resolved; a `null` result is an error. If omitted, the entry is
+   when the Job is created, before the entry's name is resolved; a `null` result is an error. It is evaluated in
+   template scope, not in a host context: `path` values have POSIX semantics whatever the Job's submission path format,
+   and no path mapping applies ([Expression Language §1.2.1](https://github.com/OpenJobDescription/openjd-specifications/wiki/2026-02-Expression-Language#121-expression-types)); a `let` binding it reads has its
+   template-scope value. If omitted, the entry is
    enabled. A disabled entry is as if absent (item 2): for an `ON_REQUEST` Environment the Step's Sessions do not
    enter it, and for an `ALWAYS` Environment they enter it with every parameter at its `default`, subject to constraint 7
    and to the Environment's own *enableIf*.
@@ -861,9 +872,11 @@ Constraints 1–4, 8, and 9 are checked at template validation. Constraints 5–
 entries that name a *jobEnvironments* entry (for constraint 6, against literal values only), and when the Job is
 created for every entry whose *enableIf* is absent or `true`, once format strings are resolved and external
 Environments are known. A check that depends on whether an entry is enabled, which includes constraint 7 and any check
-of which Steps request an Environment, is made at template validation only for entries whose *enableIf* is absent or a
-boolean scalar (§7.5 item 1); for any other entry, including one whose *enableIf* is a constant expression such as
-`"true"`, it is made when the Job is created. Constraint 3
+of which Steps request an Environment, uses at template validation only what is known then (§7.5 rule 5): an entry
+whose *enableIf* is absent or `true` is enabled, one whose *enableIf* is `false` is not, and any other entry, including
+one whose *enableIf* is a constant expression such as `"true"`, is undetermined. Template validation reports the
+check's error only when it holds however the undetermined entries resolve; otherwise the check is made when the Job is
+created. Constraint 3
 applies to entries as written, enabled or not, so two entries for one Environment with complementary *enableIf*
 conditions are an error; write one entry whose values are conditional instead.
 
@@ -1027,6 +1040,11 @@ Rules:
 3. Each field's definition gives the scopes the expression may reference and the stage at which it is evaluated. The
    `@fmtstring` annotations do not apply to expression fields.
 4. Parse errors, type errors, and references to names that are not available are reported at template validation.
+5. Until an expression field is evaluated, its value is known only when it is a boolean, integer, or float scalar
+   (item 1); any other value, a constant expression such as `"true"` included, is unknown at an earlier stage. A check
+   made at an earlier stage that depends on such a field's value reports an error only when the error holds for every
+   value the unknown fields could take; otherwise the check is made again at the stage where the fields are evaluated,
+   with the values they then have.
 
 #### Template processing stages
 
