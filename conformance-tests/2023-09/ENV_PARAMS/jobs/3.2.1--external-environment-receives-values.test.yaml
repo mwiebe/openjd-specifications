@@ -21,7 +21,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: pkgdefault

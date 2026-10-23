@@ -1,0 +1,24 @@
+# Template Schemas §4 item 6 constraint 4 (RFC 0010): an Environment's enableIf requires EXPR as well as
+# ENV_PARAMS, so a literal enableIf in a document that lists only ENV_PARAMS is rejected.
+specificationVersion: jobtemplate-2023-09
+extensions: [ENV_PARAMS]
+name: TestJob
+jobEnvironments:
+- name: Conda
+  envParameterDefinitions:
+  - name: Packages
+    type: STRING
+    default: ""
+  enableIf: true
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: [ENTER, Conda, "Packages={{Env.Param.Packages}}"]
+steps:
+- name: A
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: [TASK, A]

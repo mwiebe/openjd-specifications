@@ -6,7 +6,7 @@ extensions:
 - EXPR
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Frames
     type: RANGE_EXPR
     default: "1-10"

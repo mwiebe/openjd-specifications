@@ -7,8 +7,8 @@ template:
   name: AmountMinExceedsMax
   jobEnvironments:
   - name: Hw
-    runScope: ALL
-    parameterDefinitions:
+    activation: ALWAYS
+    envParameterDefinitions:
     - name: Flavor
       type: STRING
       default: a

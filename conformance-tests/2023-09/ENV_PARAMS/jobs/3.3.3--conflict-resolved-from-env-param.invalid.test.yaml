@@ -8,8 +8,8 @@ template:
   name: ConflictResolvedFromEnvParam
   jobEnvironments:
   - name: Hw
-    runScope: ALL
-    parameterDefinitions:
+    activation: ALWAYS
+    envParameterDefinitions:
     - name: Flavor
       type: STRING
       default: a

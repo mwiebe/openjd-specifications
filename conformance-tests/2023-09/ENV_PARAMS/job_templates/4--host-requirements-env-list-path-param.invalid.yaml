@@ -7,7 +7,7 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: Gpu
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Mounts
     type: LIST[PATH]
     default: []

@@ -26,7 +26,7 @@ environments:
     default: envdefault
   environment:
     name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: "{{Param.CondaPackages}}"

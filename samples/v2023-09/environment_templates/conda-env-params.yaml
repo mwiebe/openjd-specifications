@@ -3,15 +3,16 @@
 # ----
 # Demonstrates
 # ----
-# A queue Conda Environment that each Step of a Job can configure, using the
+# An external Conda Environment that each Step of a Job can configure, using the
 # ENV_PARAMS extension (RFC 0010). The Environment declares its own parameters,
 # Packages and Channels, read as {{Env.Param.*}}. Their defaults are the
 # template-level CondaPackages and CondaChannels Job Parameters, so a Job
 # Template that knows nothing about ENV_PARAMS keeps working: every Session
 # gets the job-wide packages, as before. For the same reason the Environment
-# keeps the default runScope of ALL, so every Session enters it; a queue that
-# offers conda only to Steps that ask for it would set runScope: ONLY_REQUESTED
-# and drop the "no packages requested" branch below.
+# keeps the default activation of ALWAYS. Its enableIf (which needs EXPR) is
+# decided per Step from that Step's Packages, so a Step that ends up with no
+# packages does not enter the Environment at all. To offer conda only to Steps
+# that ask for it, set activation: ON_REQUEST.
 #
 # A Step that lists this Environment in its dependencies supplies its own
 # values instead:
@@ -37,6 +38,7 @@
 specificationVersion: environment-2023-09
 extensions:
 - ENV_PARAMS
+- EXPR
 parameterDefinitions:
 - name: CondaPackages
   type: STRING
@@ -54,13 +56,14 @@ environment:
     Creates a conda environment in the Session Working Directory with the
     packages the Session's Step asked for, and activates it for the rest of
     the Session.
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: "{{Param.CondaPackages}}"
   - name: Channels
     type: STRING
     default: "{{Param.CondaChannels}}"
+  enableIf: "Env.Param.Packages != ''"
   script:
     actions:
       onEnter:
@@ -80,11 +83,6 @@ environment:
         # argv: <packages> <channels>
         PACKAGES="$1"
         CHANNELS="$2"
-
-        if [ -z "$PACKAGES" ]; then
-          echo "No conda packages requested; using the host's software."
-          exit 0
-        fi
 
         CHANNEL_ARGS=()
         for c in $CHANNELS; do

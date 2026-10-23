@@ -1,6 +1,6 @@
 # RFC 0010 §Backward compatibility, Template Schemas §1.2 item 3 (extensions
 # are per document): a Job Template that does not list ENV_PARAMS runs with an
-# attached ALL Environment from a document that does; every Environment
+# attached ALWAYS Environment from a document that does; every Environment
 # parameter takes its default.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -17,8 +17,8 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Conda
-    runScope: ALL
-    parameterDefinitions:
+    activation: ALWAYS
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: pkgdefault

@@ -1,5 +1,5 @@
 # RFC 0010 / Template Schemas §3.3.3 item 2 (conflicting sources may be two
-# Environments the Step's Sessions enter): two ALL Job Environments
+# Environments the Step's Sessions enter): two ALWAYS Job Environments
 # require disjoint anyOf values of one attribute, so every Step's combined
 # requirements conflict and the submission is rejected at job creation.
 template:

@@ -857,13 +857,13 @@ representation of frame ranges. Use `list(Task.Param.Frame)` to convert to a lis
 
 ##### Environment Parameter Symbols
 
-With the `ENV_PARAMS` extension, an Environment that declares *parameterDefinitions* (see
+With the `ENV_PARAMS` extension, an Environment that declares *envParameterDefinitions* (see
 [Template Schemas](2023-09-Template-Schemas#45-environmentparameterdefinition-extension-env_params)) can read their
 values within that Environment only:
 
 | Symbol | Type | Description |
 |--------|------|-------------|
-| `Env.Param.<name>` | The `Param.<name>` type of the parameter's type in the Job Parameter table above | The value with which the Session entered the Environment, with path mapping applied to PATH and LIST[PATH] |
+| `Env.Param.<name>` | The `Param.<name>` type of the parameter's type in the Job Parameter table above | The value with which the Session entered the Environment, with path mapping applied to PATH and LIST[PATH]; in the Environment's *hostRequirements* and *enableIf*, which are resolved at Job creation, the Step's effective value |
 | `Env.RawParam.<name>` | The `RawParam.<name>` type of the parameter's type in the Job Parameter table above | The same value with no path mapping applied |
 
 With the `ENV_PARAMS` extension, every template can also read:
@@ -1028,6 +1028,13 @@ type is determined by the schema context in which the expression appears:
     - "{{ '--verbose' if Param.Verbose else null }}"  # Dropped when false
     - "{{ ['--quality', Param.Quality] if Param.Quality > 0 else null }}"  # Flattened or dropped
   ```
+
+Some fields of the Template Schemas are **expression fields**, marked `@expr <type>`
+([Template Schemas §7.5](2023-09-Template-Schemas#75-expression-fields)): their value is one expression written without
+`{{ }}`, the target type is the field's `<type>`, and the result must already fit it as step 1 of
+[section 1.2.3](#123-implicit-type-coercion) defines, except that an `int` widens to `float`; no other conversion
+of step 2 applies. A field that accepts unrelated types says so in its target type, such as `int | string`. This holds when the field is optional,
+too: an expression of an optional type is accepted, and a `null` result is an error rather than omitting the field.
 
 When a format string is exactly `"{{<expr>}}"` with no surrounding text, the target type is
 inherited from the field context — the format string is transparent and the expression can

@@ -1,0 +1,36 @@
+# RFC 0010 / Template Schemas §3.2 constraint 7 and §3.2.1 (constraint 7 over
+# the combined Job): an attached ALWAYS Environment's parameter without a default
+# is supplied only by an entry whose enableIf resolves to false. A disabled
+# entry supplies nothing, so the Step enters the Environment without the
+# parameter and the submission is rejected at job creation.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions: [ENV_PARAMS, EXPR]
+  name: AttachedAllRequiredEntryDisabled
+  steps:
+  - name: A
+    dependencies:
+    - environment: Lic
+      enableIf: "'Nope' in Job.EnvNames"
+      parameters:
+        Product: arnold
+    script:
+      actions:
+        onRun:
+          command: echo
+          args: [TASK, A]
+environments:
+- specificationVersion: environment-2023-09
+  extensions: [ENV_PARAMS]
+  environment:
+    name: Lic
+    activation: ALWAYS
+    envParameterDefinitions:
+    - name: Product
+      type: STRING
+    script:
+      actions:
+        onEnter:
+          command: echo
+          args: [ENTER, Lic, "Product={{Env.Param.Product}}"]
+runOn: [posix, windows]

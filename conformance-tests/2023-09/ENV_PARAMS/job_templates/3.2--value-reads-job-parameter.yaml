@@ -10,7 +10,7 @@ parameterDefinitions:
   default: sh010
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Tag
     type: STRING
     default: none

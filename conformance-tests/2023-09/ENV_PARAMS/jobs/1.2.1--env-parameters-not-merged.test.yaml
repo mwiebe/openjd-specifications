@@ -12,7 +12,7 @@ template:
     default: jobparam
   jobEnvironments:
   - name: EnvA
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: adefault
@@ -22,7 +22,7 @@ template:
           command: echo
           args: [ENTER, EnvA, "Packages={{Env.Param.Packages}}"]
   - name: EnvB
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: bdefault

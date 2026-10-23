@@ -5,7 +5,7 @@ extensions:
 - ENV_PARAMS
 environment:
   name: Gpu
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Flavor
     type: STRING
     default: vanilla

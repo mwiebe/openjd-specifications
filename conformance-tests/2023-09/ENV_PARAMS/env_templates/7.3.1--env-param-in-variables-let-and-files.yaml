@@ -6,7 +6,7 @@ extensions:
 - EXPR
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: numpy

@@ -40,8 +40,8 @@ environments:
   extensions: [ENV_PARAMS, EXPR, FEATURE_BUNDLE_1]
   environment:
     name: Docker
-    runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    activation: ON_REQUEST
+    envParameterDefinitions:
     - name: Image
       type: STRING
     - name: Gpus

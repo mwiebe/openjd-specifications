@@ -6,7 +6,7 @@ extensions:
 - EXPR
 environment:
   name: Docker
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Mounts
     type: LIST[PATH]
     default: []

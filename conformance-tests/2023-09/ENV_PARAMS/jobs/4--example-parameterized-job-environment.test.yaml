@@ -1,5 +1,5 @@
 # RFC 0010 §Basic Examples, "One parameterized Job Environment serving several
-# Steps" (Template Schemas §4 runScope, §4.5): BeautyPass enters RenderLicense
+# Steps" (Template Schemas §4 activation, §4.5): BeautyPass enters RenderLicense
 # with arnold and the default 1 seat, VolumePass with redshift and 2 seats, and
 # Composite, which does not request it, never enters it (its Task does not see
 # the Environment's variable).
@@ -9,8 +9,8 @@ template:
   name: PluginSelectedRenders
   jobEnvironments:
   - name: RenderLicense
-    runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    activation: ON_REQUEST
+    envParameterDefinitions:
     - name: Product
       type: STRING
       allowedValues: [arnold, redshift, vray]

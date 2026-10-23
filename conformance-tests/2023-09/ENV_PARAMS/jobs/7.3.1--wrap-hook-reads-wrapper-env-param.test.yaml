@@ -22,8 +22,8 @@ environments:
   extensions: [ENV_PARAMS, WRAP_ACTIONS, EXPR]
   environment:
     name: Docker
-    runScope: ALL
-    parameterDefinitions:
+    activation: ALWAYS
+    envParameterDefinitions:
     - name: Image
       type: STRING
       default: imgdefault

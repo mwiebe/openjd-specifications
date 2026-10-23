@@ -1,4 +1,4 @@
-# RFC 0010 / Template Schemas §3.3.3 item 2: an attached ALL Environment
+# RFC 0010 / Template Schemas §3.3.3 item 2: an attached ALWAYS Environment
 # requires anyOf [b] and the Step requires anyOf [a] of the same attribute; the
 # combined requirements conflict and the submission is rejected at job creation.
 template:

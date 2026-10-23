@@ -23,8 +23,8 @@ environments:
   extensions: [ENV_PARAMS, FEATURE_BUNDLE_1]
   environment:
     name: Gpu
-    runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    activation: ON_REQUEST
+    envParameterDefinitions:
     - name: N
       type: INT
       default: 1

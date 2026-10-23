@@ -10,7 +10,7 @@ parameterDefinitions:
   default: numpy
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Channels
     type: LIST[STRING]
     default: "extra-{{Param.Pkg}}"

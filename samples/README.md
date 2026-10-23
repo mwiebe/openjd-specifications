@@ -43,8 +43,8 @@ Please see the [CONTRIBUTING guide](../CONTRIBUTING.md) for additional informati
 | [powershell-script](./v2023-09/environment_templates/powershell-script.yaml) | environment, calling embedded file with PowerShell |
 | [python-venv](./v2023-09/environment_templates/python-venv.yaml) | environment, openjd_env, embedded file |
 | [environment-variables](./v2023-09/environment_templates/environment-variables.yaml) | environment, variables section |
-| [conda-env-params](./v2023-09/environment_templates/conda-env-params.yaml) | ENV_PARAMS extension, environment parameters defaulting to job parameters, conda, openjd_env |
-| [docker-env-params](./v2023-09/environment_templates/docker-env-params.yaml) | ENV_PARAMS and WRAP_ACTIONS extensions, `runScope: ONLY_REQUESTED`, per-step container image, mounts, and GPUs, parameter-dependent environment hostRequirements, LIST[PATH] environment parameter, docker |
+| [conda-env-params](./v2023-09/environment_templates/conda-env-params.yaml) | ENV_PARAMS and EXPR extensions, environment parameters defaulting to job parameters, per-step environment `enableIf`, conda, openjd_env |
+| [docker-env-params](./v2023-09/environment_templates/docker-env-params.yaml) | ENV_PARAMS and WRAP_ACTIONS extensions, `activation: ON_REQUEST`, per-step container image, mounts, and GPUs, parameter-dependent environment hostRequirements, LIST[PATH] environment parameter, docker |
 
 ## License
 

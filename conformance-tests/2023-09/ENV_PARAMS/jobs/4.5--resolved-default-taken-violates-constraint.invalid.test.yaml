@@ -10,7 +10,7 @@ template:
     type: STRING
   jobEnvironments:
   - name: Lic
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Product
       type: STRING
       allowedValues: [arnold, redshift]

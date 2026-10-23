@@ -12,7 +12,7 @@ is a reading of the test against the specification text. No test has been run.
    has at least one test whose expected outcome and stage match the row, except the `SERVICE` and `CONTROL_FLOW` rows,
    which are out of scope. Each runtime behavior in the epic's `jobs/` scope (values in `onEnter`, `onExit` and
    `variables`; defaults from merged Job Parameters; external resolution with `required: true` and `false`; ambiguous
-   names; `ONLY_REQUESTED`; entry `enableIf` true, false and `null`; `Job.EnvNames` contents and order; path mapping;
+   names; `ON_REQUEST`; entry `enableIf` true, false and `null`; `Job.EnvNames` contents and order; path mapping;
    INT `1` and `"1"`; constraint 7 at job creation; host requirement conflicts) has a test.
 2. **Correctness.** All 240 existing files, and the 13 added here, were read by independent reviewers in five
    batches. For each `.invalid` file the reviewer named the single rule it violates and checked that nothing else in
@@ -65,7 +65,7 @@ is a reading of the test against the specification text. No test has been run.
   | JB-89 | `jobs/3.3.3--capability-name-compared-ignoring-case.invalid.test.yaml` | Capability names compare ignoring case, so a conflict is found |
   | JB-90 | `jobs/3.3.3--disabled-entry-requirements-not-applied.test.yaml` | A disabled entry contributes no host requirements |
   | JB-91 | `jobs/4--resolved-host-requirements-negative-min.invalid.test.yaml` | A resolved `min` of `-1` is rejected at job creation (V5) |
-  | JB-92 | `jobs/3.2.1--attached-all-required-entry-disabled.invalid.test.yaml` | Constraint 7 for an attached `ALL` Environment when the only supplying entry is disabled |
+  | JB-92 | `jobs/3.2.1--attached-always-required-entry-disabled.invalid.test.yaml` | Constraint 7 for an attached `ALWAYS` Environment when the only supplying entry is disabled |
 
   A second reviewer checked the added files. The README matrix, the Validation coverage table, and the runtime summary
   list them. The suite now has 123 `job_templates/`, 38 `env_templates/`, and 92 `jobs/` files.
@@ -82,7 +82,7 @@ predate this audit. Items 14–16 are new, and item 12 is narrowed:
 - Item 2: Whether a validator may reject a relative literal PATH `default` at template validation.
 - Item 6: What the template-validation literal type check can reject for an entry naming an external Environment.
 - Item 7: The "`Job.EnvNames` inside `{{ }}`" rule forbids nothing the format-string grammar allows.
-- Item 8: Whether `runScope` values are case-sensitive.
+- Item 8: Whether `activation` values are case-sensitive.
 - Item 9: Whether a submission may attach two Environment Templates with the same Environment name.
 - Item 10: Which document's `EXPR` admits a URI as a PATH value.
 - Item 11: Whether `enableIf` coerces to `bool` ("target type `bool`" in §3.2 item 5, "of type `bool`" in constraint 9).

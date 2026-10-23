@@ -1,5 +1,5 @@
 # RFC 0010 / Template Schemas §3.2 constraint 7 (checked at job creation for an
-# entry whose enableIf is an expression): the only entry that supplies an ALL
+# entry whose enableIf is an expression): the only entry that supplies an ALWAYS
 # Job Environment's required parameter has an enableIf that resolves to false,
 # so the Step supplies nothing and the Job is rejected at job creation.
 template:
@@ -8,7 +8,7 @@ template:
   name: RequiredParamEntryDisabledByExpression
   jobEnvironments:
   - name: Lic
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Product
       type: STRING
     script:
@@ -20,7 +20,7 @@ template:
   - name: A
     dependencies:
     - environment: Lic
-      enableIf: "{{ 'Nope' in Job.EnvNames }}"
+      enableIf: "'Nope' in Job.EnvNames"
       parameters:
         Product: arnold
     script:

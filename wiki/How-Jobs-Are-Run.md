@@ -26,7 +26,7 @@ until the **Environment** is exited.
 Once the **Environments** have been created and entered for a **Session**, a series of Tasks are run within that
 **Session** and the **Environments**. Tasks from any Step in a Job can run within the same **Session** provided that
 the set of **Environments** that are required to run those Tasks are identical (with the ENV_PARAMS extension, that
-set depends on which **Environments** each Step requests) and those Steps' effective values for every
+set depends on which **Environments** each Step requests and on each **Environment**'s `enableIf` for that Step) and those Steps' effective values for every
 **Environment**'s parameters are equal to the values the **Session** entered it with (see
 [Environment Parameters](#environment-parameters)). If the parameter space of a Step
 includes a task parameter with type `CHUNK[INT]` (part of the TASK_CHUNKING extension), then the **Session**
@@ -88,8 +88,8 @@ With the ENV_PARAMS extension, introduced in
 [RFC 0010](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0010-environment-parameters.md),
 an **Environment** may declare parameters, and a Step requests the **Environment** and supplies values for them in an
 `environment:` entry of its `dependencies`. The **Environment** reads the values as `{{Env.Param.<name>}}`. An
-**Environment** may also declare a `runScope`: `ALL`, the default, means every **Session** of the Job enters it, as
-every Job Environment does without the extension; `ONLY_REQUESTED` means only the **Sessions** of the Steps that
+**Environment** may also declare an `activation`: `ALWAYS`, the default, means every **Session** of the Job enters it
+(subject to the **Environment**'s `enableIf`, below), as every Job Environment does without the extension; `ON_REQUEST` means only the **Sessions** of the Steps that
 request it do, and every other **Session** runs as if it were not defined.
 
 The values are resolved once, when the Job is created. For each Step and each **Environment** that the Step's
@@ -101,10 +101,11 @@ Step's **Sessions** run without that **Environment**. If it says `required: true
 rejected. If something of that name is attached but does not declare a parameter the entry supplies, for example an
 **Environment** written before the extension, the submission is rejected whatever `required` says. The entries are
 independent of one another: if the render management system attaches several of the **Environments** a Step
-requests, the Step's **Sessions** enter each of them with the values its own entry supplies. For an `ALL`
-**Environment**, an entry only supplies values; for an `ONLY_REQUESTED` **Environment**, the entry is also what makes
+requests, the Step's **Sessions** enter each of them with the values its own entry supplies. For an `ALWAYS`
+**Environment**, an entry only supplies values; for an `ON_REQUEST` **Environment**, the entry is also what makes
 the Step's **Sessions** enter it. An entry may carry an `enableIf` condition, decided when the Job is created; a
-disabled entry is as if it were not written. The **Environments** a **Session** does enter keep the order they have in
+disabled entry is as if it were not written. An **Environment** may carry its own `enableIf`, also decided when the
+Job is created, once per Step and with that Step's values; a Step for which it is false does not enter it. The **Environments** a **Session** does enter keep the order they have in
 the Job.
 
 An **Environment** may also declare `hostRequirements`, which may read its parameters. A **Session** that enters it
@@ -124,7 +125,7 @@ and LIST[PATH]-typed values on the Worker Host, as for PATH Job Parameters. A St
 `Env.Param.*`.
 
 Because the values are fixed per Step and known when the Job is created, a render management system can group
-**Sessions** by them. Two Steps that request the same `ONLY_REQUESTED` **Environments** and whose effective values
+**Sessions** by them. Two Steps that request the same `ON_REQUEST` **Environments** and whose effective values
 are equal for every **Environment** may share **Sessions**; two Steps whose **Environment** sets or values differ
 never do. A render management system may also use the values to
 prefer a Worker Host that recently entered an **Environment** with the same values, for example one that has a

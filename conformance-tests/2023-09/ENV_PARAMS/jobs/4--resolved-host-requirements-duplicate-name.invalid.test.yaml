@@ -8,7 +8,7 @@ template:
   name: ResolvedHostRequirementsDuplicateName
   jobEnvironments:
   - name: Hw
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: First
       type: STRING
       default: conformance:attr.one

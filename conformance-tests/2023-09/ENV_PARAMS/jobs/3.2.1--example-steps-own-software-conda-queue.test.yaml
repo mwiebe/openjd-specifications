@@ -50,7 +50,7 @@ environments:
     default: conda-forge
   environment:
     name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: "{{Param.CondaPackages}}"

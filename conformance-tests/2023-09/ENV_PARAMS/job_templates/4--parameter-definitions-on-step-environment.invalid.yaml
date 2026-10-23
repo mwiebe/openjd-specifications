@@ -1,4 +1,4 @@
-# Template Schemas §4 item 3 constraint 4 (RFC 0010): parameterDefinitions are not permitted on a
+# Template Schemas §4 item 3 constraint 4 (RFC 0010): envParameterDefinitions are not permitted on a
 # stepEnvironments entry.
 specificationVersion: jobtemplate-2023-09
 extensions:
@@ -8,7 +8,7 @@ steps:
 - name: Render
   stepEnvironments:
   - name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Packages
       type: STRING
       default: numpy

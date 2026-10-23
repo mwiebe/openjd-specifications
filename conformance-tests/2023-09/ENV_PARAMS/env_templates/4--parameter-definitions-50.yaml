@@ -1,11 +1,11 @@
-# Template Schemas §4 item 3 constraint 2 (RFC 0010): an Environment's parameterDefinitions may contain up
+# Template Schemas §4 item 3 constraint 2 (RFC 0010): an Environment's envParameterDefinitions may contain up
 # to 50 elements, so 50 are valid in an Environment Template.
 specificationVersion: environment-2023-09
 extensions:
 - ENV_PARAMS
 environment:
   name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: P01
     type: STRING
     default: v

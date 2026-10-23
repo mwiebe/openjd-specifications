@@ -8,7 +8,7 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Names
     type: LIST[STRING]
     default: "{{ Job.EnvNames }}"

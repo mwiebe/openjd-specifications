@@ -6,7 +6,7 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: numpy
@@ -16,7 +16,7 @@ jobEnvironments:
         command: echo
         args: ["{{Env.Param.Packages}}"]
 - name: Rez
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: maya-2025

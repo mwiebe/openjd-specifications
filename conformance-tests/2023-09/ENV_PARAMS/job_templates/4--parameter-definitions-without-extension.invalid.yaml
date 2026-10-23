@@ -1,11 +1,11 @@
-# Template Schemas §4 item 3 (RFC 0010): an Environment's parameterDefinitions are available only with
+# Template Schemas §4 item 3 (RFC 0010): an Environment's envParameterDefinitions are available only with
 # the ENV_PARAMS extension. This Job Template lists no extensions, so its Job Environment's
-# parameterDefinitions are rejected.
+# envParameterDefinitions are rejected.
 specificationVersion: jobtemplate-2023-09
 name: TestJob
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: numpy

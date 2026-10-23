@@ -5,7 +5,7 @@ extensions:
 - ENV_PARAMS
 environment:
   name: Docker
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Mounts
     type: LIST[PATH]
     default: []

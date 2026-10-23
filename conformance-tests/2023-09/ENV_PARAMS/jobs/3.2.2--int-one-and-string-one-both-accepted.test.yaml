@@ -9,7 +9,7 @@ template:
   name: IntOneAndStringOne
   jobEnvironments:
   - name: Lic
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Seats
       type: INT
     - name: Tag

@@ -3,7 +3,7 @@
 # ----
 # Demonstrates
 # ----
-# A multi-application pipeline in one Job, where each Step asks the queue's
+# A multi-application pipeline in one Job, where each Step asks an external
 # software Environment for only the software it needs, using the ENV_PARAMS
 # extension (RFC 0010):
 #
@@ -12,23 +12,23 @@
 # Each Step has two `environment:` dependencies, both `required: false`:
 #   - Conda, matching environment_templates/conda-env-params.yaml
 #   - Docker, matching environment_templates/docker-env-params.yaml
-# On a Conda queue the Conda entries apply, on a Docker queue the Docker
-# entries apply, and on a queue whose hosts have the software preinstalled
-# neither applies. The Job Template is the same in all three cases.
+# When a Conda Environment is attached the Conda entries apply, when a Docker
+# Environment is attached the Docker entries apply, and when neither is
+# attached because the hosts have the software preinstalled, neither applies. The Job Template is the same in all three cases.
 #
-# A queue may attach both. The Conda entries carry
-#   enableIf: "{{ 'Docker' not in Job.EnvNames }}"
+# A scheduler may attach both. The Conda entries carry
+#   enableIf: "'Docker' not in Job.EnvNames"
 # which disables them when a Docker Environment is present, so a Step is
 # never told to install conda packages inside a container that has no conda.
 # Job.EnvNames lists the names of every Environment the Job has once
-# the queue's are attached. The Docker Environment is ONLY_REQUESTED, so the
+# external ones are attached. The Docker Environment is ON_REQUEST, so the
 # Steps' requests are what bring it into their Sessions.
 #
-# `required: false` covers a queue that attaches no Environment of that name.
-# A queue whose Conda (or Docker) Environment declares no ENV_PARAMS
+# `required: false` covers a Job with no Environment of that name attached.
+# An attached Conda (or Docker) Environment that declares no ENV_PARAMS
 # parameters, such as the Deadline Cloud console Conda queue environment, has
 # the name but not the parameters, so it rejects this Job at submission,
-# naming the entry. Its administrator updates it to declare Packages and
+# naming the entry. Its author updates it to declare Packages and
 # Channels with defaults that read CondaPackages and CondaChannels, as
 # environment_templates/conda-env-params.yaml does.
 #
@@ -119,7 +119,7 @@ steps:
   dependencies:
   - environment: Conda
     required: false
-    enableIf: &prefer_docker "{{ 'Docker' not in Job.EnvNames }}"
+    enableIf: &prefer_docker "'Docker' not in Job.EnvNames"
     parameters:
       Packages: "ffmpeg=7"
   - environment: Docker
@@ -145,7 +145,7 @@ steps:
 
 - name: SolveSfM
   dependencies:
-  - dependsOn: DecodeFrames
+  - step: DecodeFrames
   - environment: Conda
     required: false
     enableIf: *prefer_docker
@@ -187,7 +187,7 @@ steps:
 
 - name: Composite
   dependencies:
-  - dependsOn: SolveSfM
+  - step: SolveSfM
   - environment: Conda
     required: false
     enableIf: *prefer_docker
@@ -301,7 +301,7 @@ steps:
 
 - name: EncodeVideo
   dependencies:
-  - dependsOn: Composite
+  - step: Composite
   # Same values as DecodeFrames, so a scheduler may run this Step in the
   # Session that ran DecodeFrames, or reuse a host that already created this
   # conda environment or pulled this image.

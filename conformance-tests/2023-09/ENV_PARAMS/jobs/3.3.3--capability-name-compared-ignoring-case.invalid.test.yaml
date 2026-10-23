@@ -9,7 +9,7 @@ template:
   name: CapabilityNameIgnoresCase
   jobEnvironments:
   - name: Hw
-    runScope: ALL
+    activation: ALWAYS
     hostRequirements:
       attributes:
       - name: conformance:attr.flavor

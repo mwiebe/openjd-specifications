@@ -1,5 +1,5 @@
 # RFC 0010 / Template Schemas §3.2 items 2 and 5: an entry whose enableIf
-# resolves to false is disabled and requests nothing, so its ONLY_REQUESTED
+# resolves to false is disabled and requests nothing, so its ON_REQUEST
 # Environment is not entered.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -11,8 +11,8 @@ template:
     allowedValues: ["on", "off"]
   jobEnvironments:
   - name: Lic
-    runScope: ONLY_REQUESTED
-    parameterDefinitions:
+    activation: ON_REQUEST
+    envParameterDefinitions:
     - name: Product
       type: STRING
       default: pdefault
@@ -25,7 +25,7 @@ template:
   - name: A
     dependencies:
     - environment: Lic
-      enableIf: "{{ Param.Mode == 'on' }}"
+      enableIf: "Param.Mode == 'on'"
       parameters:
         Product: arnold
     script:

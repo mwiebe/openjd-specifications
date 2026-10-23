@@ -22,7 +22,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Mnt
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Dir
       type: PATH
     script:

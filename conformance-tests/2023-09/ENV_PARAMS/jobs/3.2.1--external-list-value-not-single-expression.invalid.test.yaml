@@ -21,7 +21,7 @@ environments:
   extensions: [ENV_PARAMS, EXPR]
   environment:
     name: Conda
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Items
       type: LIST[STRING]
       default: []

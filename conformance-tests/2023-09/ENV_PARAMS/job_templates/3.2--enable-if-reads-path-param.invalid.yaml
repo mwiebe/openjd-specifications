@@ -11,7 +11,7 @@ parameterDefinitions:
   default: data
 jobEnvironments:
 - name: Conda
-  parameterDefinitions:
+  envParameterDefinitions:
   - name: Packages
     type: STRING
     default: numpy
@@ -24,7 +24,7 @@ steps:
 - name: Render
   dependencies:
   - environment: Conda
-    enableIf: "{{ len(Param.Dir) > 0 }}"
+    enableIf: "len(Param.Dir) > 0"
   script:
     actions:
       onRun:

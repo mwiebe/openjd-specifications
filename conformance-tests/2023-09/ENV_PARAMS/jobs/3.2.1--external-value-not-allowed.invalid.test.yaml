@@ -20,7 +20,7 @@ environments:
   extensions: [ENV_PARAMS]
   environment:
     name: Lic
-    parameterDefinitions:
+    envParameterDefinitions:
     - name: Product
       type: STRING
       allowedValues: [arnold, redshift]
