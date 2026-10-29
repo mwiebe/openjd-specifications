@@ -632,7 +632,7 @@ order.
 | V1 | `ENV_PARAMS` listed by any document using Environment `envParameterDefinitions`, `activation`, `hostRequirements`, or `enableIf`, or `environment:` or `step:` entries | Template validation | JT-01–JT-04, JT-125, JT-139, ET-03–ET-05; per-document: ET-01, JB-74, JB-75, JB-19, JB-20; Environment Template `extensions` and `$schema` keys: ET-01, ET-02, ET-32, ET-33 |
 | V2 | Environment `envParameterDefinitions`: 1–50, unique names, not on `stepEnvironments`, permitted types and fields | Template validation | JT-15–JT-26, JT-120, ET-07–ET-12, ET-34, ET-35, ET-37 |
 | V3 | `activation` is `ALWAYS` or `ON_REQUEST`, not on `stepEnvironments` | Template validation | JT-40–JT-43, ET-13, ET-14; run time: JB-36–JB-41 |
-| V4 | Environment `hostRequirements`: §3.3 shape, not on `stepEnvironments`, `Env.*` only of the enclosing Environment's parameters, `Env.Param.*` only of its non-PATH ones | Template validation | JT-44, JT-45, JT-48, JT-49, JT-53, JT-54, JT-117–JT-119, ET-15, ET-16 |
+| V4 | Environment `hostRequirements`: §3.3 shape, not on `stepEnvironments`; references only the document's `RawParam.*`, non-PATH `Param.*`, `Job.Name`, `Job.EnvNames`, and the enclosing Environment's own `Env.RawParam.*` of any type and non-PATH `Env.Param.*` | Template validation | JT-44–JT-54, JT-117–JT-119, JT-155, JT-169, ET-15–ET-17, ET-38 |
 | V5 | An Environment's resolved `hostRequirements` satisfy §3.3.1 and §3.3.2 per Step | Job creation | JB-73, JB-91 |
 | V6 | Combined host requirements are satisfiable: `min` ≤ `max` for each amount, and a common value for `attr.worker.os.family` and `attr.worker.cpu.arch` (§3.3.3 items 1, 2.1) | Job creation | JB-65–JB-69, JB-89, JB-121; non-conflicts: JB-64, JB-70–JB-72, JB-84, JB-88, JB-90, JB-119, JB-120 |
 | V7 | Removed: the RFC no longer specifies composition with `CONTROL_FLOW` (see its *Extensions specified after this one*) | — | — |
@@ -640,7 +640,7 @@ order.
 | V9 | A literal `default` satisfies its type and constraints, whether or not any Step uses it, and whatever any `enableIf` decides | Template validation | JT-34–JT-36, JT-168, ET-23 |
 | V10 | `Env.Param.*` / `Env.RawParam.*` name a parameter of the enclosing Environment, and appear only inside it | Template validation | JT-55–JT-64, JT-123, ET-27, ET-28, ET-31; run time: JB-01–JB-04, JB-76 |
 | V11 | A `parameters` value or `enableIf` references only `RawParam.*`, non-PATH `Param.*`, and `Job.Name`, `Job.EnvNames`, `Step.Name`, Step `let`; never `Task.*`, `Session.*`, `Env.*` | Template validation | JT-105–JT-116, JT-122; run time: JB-14, JB-53 |
-| V12 | An Environment's `hostRequirements` reference only its document's `RawParam.*`, non-PATH `Param.*`, `Job.Name`, `Job.EnvNames`, and its own `Env.RawParam.*` of any type and non-PATH `Env.Param.*` | Template validation | JT-45–JT-47, JT-49–JT-53, JT-118, JT-119, JT-169, ET-15–ET-17, ET-38, JT-155 |
+| V12 | Merged into V4: the RFC table now has one row for Environment `hostRequirements` | — | — |
 | V13 | `Job.EnvNames` only inside `{{ }}` or an expression field, not in an Environment parameter `default` | Template validation | JT-10, JT-33, JT-65–JT-68, ET-22, ET-29; contents: JB-47–JB-53, JB-86 (see ambiguity 7 for "inside `{{ }}`") |
 | V14 | `<StepDependency>` has exactly one of `dependsOn` / `step` / `environment`; `required`, `enableIf`, `parameters` only with `environment` (constraint 1) | Template validation | JT-69–JT-74, JT-126–JT-129, JT-134 |
 | V15 | `enableIf` is an expression field of type `bool` (constraint 9, §7.5) | Template validation | JT-95–JT-98, JT-149 |
@@ -648,14 +648,14 @@ order.
 | V17 | Not the Step's own Step Environment; no duplicates; 1–50 `parameters` (constraints 2–4) | Template validation | JT-75–JT-80 |
 | V18 | `required: false` not on an entry naming a Job Environment (constraint 8) | Template validation | JT-92–JT-94 |
 | V19 | Keys and literal values of `parameters` for a Job Environment (constraints 5, 6) | Template validation | JT-81–JT-91; resolved format strings at job creation: JB-13; constraint 6 and the value's type skipped for an Environment whose `enableIf` is `false`: JT-156, JT-157, JT-165; constraint 5 and the value's form still checked: JT-163, JT-164 |
-| V20 | Required parameters of `ALWAYS` Job Environments supplied by every Step, of `ON_REQUEST` ones by every requester, except Steps for which the Environment is disabled (constraint 7, §3.2.2) | Job creation; template validation only when the failure holds however every undetermined entry or Environment `enableIf` resolves (§7.5 rule 5) | JT-99–JT-104, JT-152, JB-35, JB-102, JB-107; disabled Environments: JT-148, JT-158, JT-162, JB-113, JB-115 |
+| V20 | Required parameters of `ALWAYS` Environments supplied by every Step, of `ON_REQUEST` ones by every requester, except Steps for which the Environment is disabled; Job Environments and, after resolution, attached Environments (constraint 7, §3.2.1, §3.2.2) | Job creation; for a Job Environment, also template validation when the failure holds however every undetermined entry or Environment `enableIf` resolves (§7.5 rule 5) | JT-99–JT-104, JT-152, JB-31–JB-35, JB-92, JB-102, JB-107; disabled Environments: JT-148, JT-158, JT-162, JB-113, JB-115, JB-116 |
 | V21 | External resolution: missing with `required: true`, or ambiguous (§3.2.1) | Job creation | JB-16, JB-21; accepted forms: JB-15, JB-17, JB-22, JB-23, JB-30, JB-45, JB-87 |
 | V22 | Keys and values for an external Environment; a key the resolved Environment lacks is an error even with `required: false` | Job creation | JB-18, JB-19, JB-24–JB-26; accepted: JB-20 |
 | V23 | Removed: `ENV_PARAMS` requires `EXPR`, so no requesting document lacks `EXPR`; see V36 | — | — |
 | V24 | A format-string value or `default` for a list-typed parameter is one `{{ }}` expression | Template validation for `default`s and Job Environment entries; job creation for external | JT-37, JT-38, JT-91, ET-24, JB-29 |
 | V25 | A resolved, non-literal `default` satisfies its type and constraints for each Step that takes it | Job creation | JB-11, JB-12 |
 | V26 | PATH / LIST[PATH] values absolute in the submission path format or URIs; string constraints on the unmapped value; including an unused literal `default` | Job creation | JB-60–JB-63; mapping: JB-54–JB-59 |
-| V27 | Required parameters of attached `ALWAYS` Environments supplied by every Step, of attached `ON_REQUEST` ones by every requester, except Steps for which the Environment is disabled (constraint 7, §3.2.1) | Job creation | JB-31–JB-34, JB-92; disabled: JB-116 |
+| V27 | Merged into V20: the RFC table now has one row for constraint 7 | — | — |
 | V28 | Removed: the RFC no longer specifies composition with `SERVICE` | — | — |
 | V29 | Removed: the RFC no longer specifies composition with `SERVICE`. RFC 0008's wrap-hook rules apply per Session stack, which with `activation` and `enableIf` is per Step's Environment set | Job creation | JB-77 |
 | V30 | Removed: Environment `enableIf` is now part of this RFC; see V32, V33 | — | — |
@@ -666,8 +666,8 @@ order.
 | V35 | An Environment disabled for a Step (its `enableIf` is `false` with the values that are known) is not held to constraint 7, and the Step's effective values for it are not checked; one whose `enableIf` depends on a missing, unresolvable, or unconvertible value is an error, at template validation when that is known then (§3.2.2). Listed after V34 so that existing row numbers are stable | Template validation for a literal `false` and for a value known then to be missing; job creation otherwise | JT-148, JT-156–JT-158, JT-162, JB-108–JB-110, JB-112, JB-113, JB-115, JB-125, JB-126 |
 | V36 | A document that lists `ENV_PARAMS` also lists `EXPR` (§1.1 item 3, §1.2 item 3). Listed after V35 so that existing row numbers are stable | Template validation | JT-160, JT-161, ET-43 |
 
-The RFC's closing note, that a Session runs Tasks of a Step only when its Environments and values match (§3.2.2), is a
-scheduling rule with no Validation row. Its observable parts are JB-10 and JB-85.
+The rule that a Session runs Tasks of a Step only when its Environments and values match (§3.2.2) is a scheduling rule
+with no Validation row. Its observable parts are JB-10 and JB-85.
 
 Runtime behaviors in the suite's scope that are not Validation rows are covered as follows: values in `onEnter`,
 `onExit`, and `variables` (JB-01–JB-04); defaults from merged Job Parameters (JB-05–JB-08); `ON_REQUEST` entry
