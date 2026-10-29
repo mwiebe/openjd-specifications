@@ -443,6 +443,9 @@ At each stage, known values are evaluated concretely while unresolved values pro
    host-context scopes (SESSION/TASK) still have `Task.Param.*`, `Session.*`, `Task.File.*`,
    and `Env.File.*` as unresolved, but can now type-check operations on the known `Param.*`
    values combined with the unresolved task/session symbols.
+   With the `ENV_PARAMS` extension, an Environment's *enableIf* is the exception: a Step's effective value that is
+   missing, fails to resolve, or does not convert is `unresolved[T]` of its type, and a result that stays unresolved
+   is an error ([Template Schemas §3.2.2](2023-09-Template-Schemas#322-effective-environment-parameter-values)).
 
 3. **Worker host execution**. All symbols are known — `Task.Param.*`, `Session.*`, file paths,
    and path mapping rules are all concrete. Every expression is fully evaluated with no
@@ -935,6 +938,23 @@ or `range_expr()` for example, is written in canonical form.
 | `Task.File.<name>` | `path` | Location of the embedded file within a Step Script |
 | `Env.File.<name>` | `path` | Location of the embedded file within an Environment |
 
+##### Environment Parameter Symbols
+
+With the `ENV_PARAMS` extension, an Environment that declares *envParameterDefinitions* (see
+[Template Schemas](2023-09-Template-Schemas#45-environmentparameterdefinition-extension-env_params)) can read their
+values within that Environment only:
+
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `Env.Param.<name>` | As `Param.<name>` for a Job Parameter of its type (table above) | The value with which the Session entered the Environment, read as `Param.<name>` reads a Job Parameter; in the Environment's *hostRequirements* and *enableIf*, which are resolved at Job creation, the Step's effective value |
+| `Env.RawParam.<name>` | As `RawParam.<name>` for a Job Parameter of its type (table above) | The same value, read as `RawParam.<name>` reads a Job Parameter |
+
+With the `ENV_PARAMS` extension, templates can also read:
+
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `Job.EnvNames` | `list[string]` | The names of the Job's Job Environments, including those attached from Environment Templates; `unresolved[list[string]]` at template validation. See [Template Schemas §7.3.1](2023-09-Template-Schemas#731-value-references) for its order and where it is available. |
+
 #### 1.2.3. Implicit Type Coercion
 
 As a glue expression language intended for convenience, implicit non-destructive type
@@ -1096,6 +1116,13 @@ type is determined by the schema context in which the expression appears:
     - "{{ '--verbose' if Param.Verbose else null }}"  # Dropped when false
     - "{{ ['--quality', Param.Quality] if Param.Quality > 0 else null }}"  # Flattened or dropped
   ```
+
+Some fields of the Template Schemas are **expression fields**, marked `@expr <type>`
+([Template Schemas §7.5](2023-09-Template-Schemas#75-expression-fields)): their value is one expression written without
+`{{ }}`, the target type is the field's `<type>`, and the result must already fit it as step 1 of
+[section 1.2.3](#123-implicit-type-coercion) defines, except that an `int` widens to `float`; no other conversion
+of step 2 applies. A field that accepts unrelated types says so in its target type, such as `int | string`. This holds when the field is optional,
+too: an expression of an optional type is accepted, and a `null` result is an error rather than omitting the field.
 
 When a format string is exactly `"{{<expr>}}"` with no surrounding text, the target type is
 inherited from the field context — the format string is transparent and the expression can

@@ -1,0 +1,23 @@
+# Template Schemas §4 item 5 (RFC 0010) with §3.3 constraint 1: a Job Environment's hostRequirements have
+# the same constraints as on a <StepTemplate>, so in a Job Template an empty object (neither amounts nor
+# attributes) is rejected.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- ENV_PARAMS
+- EXPR
+name: TestJob
+jobEnvironments:
+- name: Gpu
+  hostRequirements: {}
+  script:
+    actions:
+      onEnter:
+        command: echo
+        args: ["enter"]
+steps:
+- name: Render
+  script:
+    actions:
+      onRun:
+        command: echo
+        args: ["render"]

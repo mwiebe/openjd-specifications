@@ -1,0 +1,25 @@
+# Template Schemas §2.10 (RFC 0010): minLength and maxLength of a RANGE_EXPR are checked against the value as written
+# and its canonical form. "1-3:2" is 5 characters, but its canonical form "1,3" is 3, shorter than minLength 4, so job
+# creation fails.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions: [EXPR]
+  name: RangeExprMinLengthCanonical
+  parameterDefinitions:
+  - name: Frames
+    type: RANGE_EXPR
+    minLength: 4
+  steps:
+  - name: A
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: INT
+        range: "{{Param.Frames}}"
+    script:
+      actions:
+        onRun:
+          command: echo
+          args: ["{{Task.Param.Frame}}"]
+parameters:
+  Frames: "1-3:2"
