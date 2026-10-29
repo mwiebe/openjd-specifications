@@ -1,7 +1,6 @@
 * Feature Name: Environment Parameters
 * Author(s): Mark Wiebe <[mwiebe](https://github.com/mwiebe)>
-* RFC Tracking Issue: (pending). The number `0010` is a placeholder assigned before a tracking issue exists, and may
-  change when one is created.
+* RFC Tracking Issue: (pending)
 * Start Date: 2026-10-17
 * Specification Version: 2023-09 extension ENV_PARAMS
 * Accepted On: (pending)
