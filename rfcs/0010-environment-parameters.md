@@ -339,13 +339,13 @@ environment.
 
 ### Why the values come from the Step
 
-A Session enters each of its Environments once and then runs Tasks, which may come from one Step or
-from several whose Environments are identical. The Step is the unit that knows what software its
+A Session enters its Environments and then runs Tasks, which may come from one Step or from several
+whose Environments are identical. The Step is the unit that knows what software its
 Tasks need, so the Step says what an Environment should do for them. With this
 extension, a Session's Environments are entered with the values of the Steps it serves, and a Session
 serves several Steps only when their values agree, so one set of values is in force for the whole
-Session. Values are fixed per Step rather than per Task, because a Session runs many Tasks and enters
-each Environment once for all of them.
+Session. Values are fixed per Step rather than per Task, because a Session runs many Tasks under one entry
+of each Environment.
 
 ### Backward compatibility
 
@@ -1012,14 +1012,17 @@ they have equal elements in the same order; and two RANGE_EXPR values are equal 
 ([§3.4.1.1.1](https://github.com/OpenJobDescription/openjd-specifications/wiki/2023-09-Template-Schemas#34111-intrangeexpr)),
 which is when they denote the same integers. `1-3` and `1,2,3` are equal, so Steps that supply them can share a Session.
 
-A Session enters each of its Environments once, with one set of parameter values, and keeps those values until it exits
-the Environment. A Session may run Tasks of a Step only when the set of Environments the Session has entered is the set
+Each time a Session enters an Environment, it enters it with one set of parameter values and keeps those values until
+it exits the Environment. A Session may run Tasks of a Step only when the set of Environments the Session has entered,
+and not yet exited, is the set
 the Step's Sessions enter (every `ALWAYS` Environment of the Job, every `ON_REQUEST` Environment the Step requests, and
 the Step's own *stepEnvironments*, less any whose *enableIf* is `false` for the Step) and, for every Environment in that set, the Step's effective values are equal to the
 values the Session entered it with. The first condition is the rule *How Jobs Are Run* already states for Sessions that
 run Tasks of several Steps, now applied to a set that `activation` and *enableIf* can make differ between Steps; the second is new. A
 Session may therefore run Tasks of several Steps, as before, when their Environment sets and effective values agree; the
-set of Steps it will serve need not be known when it starts.
+set of Steps it will serve need not be known when it starts. Between Tasks of different Steps, a Session may also exit
+Environments, in the reverse of the order it entered them, and enter others, or enter an Environment again with
+another Step's values, as it already may for Step Environments.
 See [How Jobs Are Run](https://github.com/OpenJobDescription/openjd-specifications/wiki/How-Jobs-Are-Run#environment-parameters).
 
 #### Extensions specified after this one (non-normative)
@@ -1137,7 +1140,7 @@ Rules:
   `false` (§4); constraint 7 and the other checks of the effective values are made for the Environments that remain in
   each Step's set (§3.2.2); and each Environment's *hostRequirements* are resolved with each entering Step's effective
   values and combined with the Step's own (§3.3.3). Environment parameter PATH and LIST[PATH] values are not joined
-  with any directory and must be absolute (see [§4.5](#45-environmentparameterdefinition-extension-env_params)).
+  with any directory and must be absolute or a URI (see [§4.5](#45-environmentparameterdefinition-extension-env_params)).
 * **Task execution** — `Env.Param.*` is available in the Environment's host-evaluated format strings, with path mapping
   applied to PATH and LIST[PATH] values.
 
@@ -1231,9 +1234,9 @@ And a new section, *Environment Parameters*, after *Running a Session*:
 > **Session** like the Step's. Because they are resolved with each Step's values, one **Environment** can ask for a GPU
 > only for the Steps that asked it to use one.
 >
-> A **Session** enters each **Environment** once, with one set of parameter values, and keeps those values until it
-> exits the **Environment**: the **Environment**'s `onEnter`, every Task the **Session** runs, and the **Environment**'s
-> `onExit` all see the same values. A **Session** may run Tasks of a Step only when the **Environments** it has entered
+> Each time a **Session** enters an **Environment**, it uses one set of parameter values and keeps them until it exits
+> the **Environment**: the **Environment**'s `onEnter`, every Task run while it is entered, and its `onExit` all see the
+> same values. A **Session** may run Tasks of a Step only when the **Environments** it has entered and not yet exited
 > are exactly the ones the Step's **Sessions** enter, and the Step's effective values for each of them are equal to the
 > values the **Session** entered it with. Values are equal when they have the same type and the same resolved value
 > before path mapping. A **Session** can therefore serve several Steps, as it can without the extension, whenever their
@@ -1571,7 +1574,7 @@ asks for.
 
 ### Values fixed per Step
 
-An Environment is entered once per Session and serves every Task of that Session. Values that varied
+An Environment, once a Session enters it, serves every Task the Session runs until it exits. Values that varied
 per Task would force one Session per Task, which defeats the Environment's purpose. Values fixed per
 Step are known at job creation, so tooling can display them, a scheduler can group Sessions by them,
 and two Steps with equal values can still share Sessions as today.
@@ -1587,7 +1590,8 @@ Session, not as a property of a set of Steps fixed when the Session starts, for 
 that today adds Tasks of a newly ready Step to a running Session can keep doing so, with one more
 comparison. And the condition is all a Session needs: its Environments' values were fixed at `onEnter`,
 and every Task it runs belongs to a Step whose values match them, so `Env.Param.*` has one meaning for
-the whole Session.
+as long as the Environment is entered. A Session that moves on to a Step with other values can exit and
+re-enter the Environment rather than end.
 
 Equality compares typed values as resolved at job creation, before path mapping. Comparing after
 mapping would let two hosts with different mapping rules disagree about whether two Steps may share a

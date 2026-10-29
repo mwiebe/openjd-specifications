@@ -9,7 +9,7 @@
 # template-level CondaPackages and CondaChannels Job Parameters, so a Job
 # Template that knows nothing about ENV_PARAMS keeps working: every Session
 # gets the job-wide packages, as before. For the same reason the Environment
-# keeps the default activation of ALWAYS. Its enableIf (which needs EXPR) is
+# keeps the default activation of ALWAYS. Its enableIf is
 # decided per Step from that Step's Packages, so a Step that ends up with no
 # packages does not enter the Environment at all. To offer conda only to Steps
 # that ask for it, set activation: ON_REQUEST.

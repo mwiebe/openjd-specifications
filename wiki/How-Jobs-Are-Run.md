@@ -113,9 +113,9 @@ must be placed on a Worker Host that satisfies them as well as the Step's own, a
 **Session** like the Step's. Because they are resolved with each Step's values, one **Environment** can ask for a GPU
 only for the Steps that asked it to use one.
 
-A **Session** enters each **Environment** once, with one set of parameter values, and keeps those values until it
-exits the **Environment**: the **Environment**'s `onEnter`, every Task the **Session** runs, and the **Environment**'s
-`onExit` all see the same values. A **Session** may run Tasks of a Step only when the **Environments** it has entered
+Each time a **Session** enters an **Environment**, it uses one set of parameter values and keeps them until it exits
+the **Environment**: the **Environment**'s `onEnter`, every Task run while it is entered, and its `onExit` all see the
+same values. A **Session** may run Tasks of a Step only when the **Environments** it has entered and not yet exited
 are exactly the ones the Step's **Sessions** enter, and the Step's effective values for each of them are equal to the
 values the **Session** entered it with. Values are equal when they have the same type and the same resolved value
 before path mapping. A **Session** can therefore serve several Steps, as it can without the extension, whenever their

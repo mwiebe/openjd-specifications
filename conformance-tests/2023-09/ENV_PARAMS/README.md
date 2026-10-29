@@ -384,7 +384,7 @@ lists the extensions the document under test declares, where it matters (`EP` = 
 
 | ID | File | Exts | Assertion |
 |---|---|---|---|
-| ET-01 | `1.2--extensions-env-params.yaml` | EP | An Environment Template with `extensions: [ENV_PARAMS]` and Environment parameters is valid. |
+| ET-01 | `1.2--extensions-env-params.yaml` | EP | An Environment Template with `extensions: [ENV_PARAMS, EXPR]` and Environment parameters is valid. |
 | ET-02 | `1.2--extensions-empty.invalid.yaml` | — | `extensions: []` is rejected (§1.2 item 3, non-empty). |
 | ET-03 | `4--parameter-definitions-without-extension.invalid.yaml` | — | `envParameterDefinitions` on the `environment` is rejected without `ENV_PARAMS`. |
 | ET-04 | `4--activation-without-extension.invalid.yaml` | — | `activation` is rejected without `ENV_PARAMS`. |
@@ -716,10 +716,11 @@ These rules, or parts of rules, have no planned test with a definite expected ou
    `relative/dir` is relative in every path format, so a validator could know at template validation; the text does
    not say whether rejecting it then is permitted or forbidden. JB-61 tests rejection at job creation only, which is
    definite either way; no `job_templates/` or `env_templates/` test asserts that `openjd check` accepts it.
-3. **§3.2.2 equality and Session sharing.** That two Steps with equal values may share a Session, that two with
-   different values never do, and that a Session's values are fixed until it exits are scheduling properties.
-   `openjd run` runs each Step in its own Session, so the suite can show only that `1` and `"1"` are both accepted for
-   an INT and print the same value (JB-10), not that they are treated as equal.
+3. **§3.2.2 equality and Session sharing.** Whether two Steps with equal values share a Session is up to the
+   scheduler, so no test can require it. That a Step never runs Tasks under an Environment entered with other values
+   is a requirement, but an implementation may meet it by exiting and entering the Environment again within one
+   Session or by starting a new Session, so the output differs between conforming implementations. The suite shows
+   only that `1` and `"1"` are both accepted for an INT and print the same value (JB-10).
 4. **Placement and reservation by combined host requirements.** That a Session is placed only on a host satisfying the
    combined set, that `amounts` are reserved for the Session, and that amounts "do not add" (one GPU, not two) are
    scheduler behaviors with no output in `openjd run`. Only conflict and resolution rejection (JB-65–JB-69, JB-73,
@@ -792,8 +793,8 @@ Deliberately, and why:
 - **Composition with `SERVICE` and `CONTROL_FLOW`.** The RFC no longer specifies either composition; those RFCs will
   extend it (RFC *Extensions specified after this one*). No test uses either extension.
 - **Scheduling behavior.** Session sharing and §3.2.2 equality, placement on a host that satisfies the combined host
-  requirements, reservation of `amounts`, and "amounts do not add" have no output in `openjd run`, which runs each Step
-  in its own Session and does not place Sessions (items 3 and 4 above). The suite tests only what job creation decides:
+  requirements, reservation of `amounts`, and "amounts do not add" are scheduler decisions with no definite output in
+  `openjd run` (items 3 and 4 above). The suite tests only what job creation decides:
   conflicts are rejected and non-conflicts run.
 - **Warnings** (item 5 above), since the test format cannot assert one.
 - **The forms listed above as ambiguous** (items 1, 2 and 6–16) whose outcome the text does not decide. Where a form is
