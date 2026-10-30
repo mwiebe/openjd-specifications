@@ -926,10 +926,10 @@ Where:
    violation fails the loop.
 
 A loop variable's value is converted to its type as a job output's value is (see
-[RFC 0011 §`<JobOutputDefinition>`](0011-control-flow.md#joboutputdefinition) item 3). A `PATH` or `LIST[PATH]`
-variable's expressions read `PATH` values in the submission path context, through `RawParam.*`, `RawOutput`,
-`TaskRawParam`, and `RawLoop.*`, so its value is in the submission path context, and `Loop.<name>` maps it forward in
-the consuming Session.
+[RFC 0011 §`<JobOutputDefinition>`](0011-control-flow.md#joboutputdefinition) item 3), except that the target type is
+not made optional, so a `null` result is an error. A `PATH` or `LIST[PATH]` variable's expressions read `PATH` values in
+the submission path context, through `RawParam.*`, `RawOutput`, `TaskRawParam`, and `RawLoop.*`, so its value is in the
+submission path context, and `Loop.<name>` maps it forward in the consuming Session.
 
 ##### `<LoopOutputVariableDefinition>`
 
@@ -1055,8 +1055,8 @@ says for any Step, within its iteration.
 | **Template validation** | as today | as today | as today, and `Loop.*`, `RawLoop.*` | Every rule of [Validation](#validation) is checked, with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. |
 | **Job creation** | as today | as today | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated, and the `minLength` check of the loop's `APPEND` outputs is never part of Job creation. |
 | **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011, and for a body Step instance, `Loop.*` | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
-| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' `Steps.*` values, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
-| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
+| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each body Step, `Loop.*` and `RawLoop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' `Steps.*` values, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
+| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` and `RawLoop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
 | **Job output evaluation** | as RFC 0011 | as RFC 0011 | as RFC 0011 | A job output may read a loop's `Steps.*` symbols, and not a body Step's. |
 | **Task execution** | as today | as today, and `Loop.*` for a body Step instance | *(none)* | As RFC 0011. |
 
@@ -1199,18 +1199,16 @@ one Session under those rules, keeping its Job Environments entered, but need no
 #### Retries and re-runs
 
 [RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs) applies to every Task of a body Step
-instance, with one addition to when an output is **consumed**: any `Steps.*` output, of a body Step instance or of
-one of the loop's dependencies, that a loop's *while*, *until*, *next*, *initial*, or loop output *value* references,
-as found by symbol collection, is consumed once that expression has been evaluated, consistent with
-[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs). So a re-run of a Task of a
-completed iteration, after the loop has gone past its boundary, that succeeds with different values for a consumed
-output fails under rule 3, because the next iteration was built from them. Loop variables and loop outputs are never
-re-evaluated, and an iteration is never run again. A failed attempt of a Task of the iteration in progress that has
-not yet succeeded may be retried as any Task's may. A loop whose failure is recoverable is `FAILED` until every failed
-body Step instance of the iteration in progress has succeeded after a retry or requeue of its Tasks; it then returns
-to `RUNNING`, and the iteration continues to its boundary, unless a final failure has occurred (see
-[Failure](#failure)). A re-run of a body Task that has already succeeded leaves its instance `SUCCEEDED`, as RFC 0012
-says, so it never fails the loop and the boundary does not wait for it (see [Failure](#failure)).
+instance, with one addition to when an output is **consumed**: any `Steps.*` output, of a body Step instance or of one
+of the loop's dependencies, that a loop's *while*, *until*, *next*, *initial*, or loop output *value* references, as
+found by symbol collection, is consumed once that expression has been evaluated, consistent with
+[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs). So a re-run of a Task of a completed
+iteration, after the loop has gone past its boundary, that succeeds with different values for a consumed output fails
+under rule 3, because the next iteration was built from them. Loop variables and loop outputs are never re-evaluated,
+and an iteration is never run again. A failed attempt of a Task of the iteration in progress that has not yet succeeded
+may be retried as any Task's may, and the loop recovers as [Failure](#failure) describes. A re-run of a body Task that
+has already succeeded leaves its instance `SUCCEEDED`, as RFC 0012 says, so it never fails the loop and the boundary
+does not wait for it (see [Failure](#failure)).
 
 #### Limits
 
@@ -1228,12 +1226,13 @@ says, so it never fails the loop and the boundary does not wait for it (see [Fai
    template, and the number of iterations does not change the count.
 4. A scheduler MUST accept loop variable and loop output values totaling at least 1 MiB (1,048,576 bytes) per loop at
    any moment, and MAY accept more. The size counted is that of the values the loop currently holds, each as its JSON
-   serialization: the current value of each loop variable (a value that *next* replaces stops counting), the current
-   value of each `LAST` loop output (nothing before its first iteration's value), and each element of each `APPEND` loop
-   output, counted on its own, so the brackets and separators of the list do not count. The total is checked after the
-   *initial* values are evaluated, at loop binding (at Job creation if the start group is evaluated then, where
-   exceeding the limit fails Job creation), and at each iteration boundary after step 1 (loop outputs) and after step 3
-   (*next*) of [The iteration boundary](#the-iteration-boundary). Exceeding its limit fails the loop.
+   serialization ([RFC 0011 §Limits](0011-control-flow.md#limits)): the current value of each loop variable (a value
+   that *next* replaces stops counting), the current value of each `LAST` loop output (nothing before its first
+   iteration's value), and each element of each `APPEND` loop output, counted on its own, so the brackets and separators
+   of the list do not count. The total is checked after the *initial* values are evaluated, at loop binding (at Job
+   creation if the start group is evaluated then, where exceeding the limit fails Job creation), and at each iteration
+   boundary after step 1 (loop outputs) and after step 3 (*next*) of [The iteration boundary](#the-iteration-boundary).
+   Exceeding its limit fails the loop.
 5. Expressions in a loop are evaluated under EXPR's existing memory and operation limits.
 
 #### Composition with other extensions

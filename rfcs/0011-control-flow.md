@@ -1169,7 +1169,8 @@ Changed semantics of existing properties:
   annotated `@fmtstring[host]`) and references `Steps.*` is evaluated at step input binding instead, when the
   inputs of its materialization group are concrete. See [Step input binding](#step-input-binding). In a body Step
   of a loop, they may also read `Loop.*` and the `Steps.*` symbols that RFC 0013 allows (see
-  [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope)).
+  [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope) and
+  [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
 
 ##### `<JobOutputDefinition>`
 
@@ -1377,7 +1378,7 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
 |---|---|---|---|---|
 | **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every template-validation rule of [Validation](#validation) and of [RFC 0012 §Validation](0012-step-output-variables.md#validation) and [RFC 0013 §Validation](0013-step-loops.md#validation) is checked. |
 | **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, every materialization group whose inputs are concrete; a failure fails Job creation. Nothing of a loop's body Steps is evaluated: they are bound per iteration (see [RFC 0013 §Template processing stages](0013-step-loops.md#template-processing-stages)). A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
-| **Step input binding** (new, `CONTROL_FLOW` only) | Per materialization group of a Step, once its inputs are concrete (with `TASK_DEPENDENCIES`, the Task graph group also once the Tasks of every Step its subspace dependencies name are known), with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.*`, `Session.*` | The group's expressions are evaluated and checked. *enableIf* `false` makes the Step `SKIPPED`; Task enumeration makes its Tasks known; host selection makes its host requirements known; a failure makes it `FAILED` at once; when every group has evaluated, it is bound and `READY`. See [Step input binding](#step-input-binding). |
+| **Step input binding** (new, `CONTROL_FLOW` only) | Per materialization group of a Step, once its inputs are concrete (with `TASK_DEPENDENCIES`, the Task graph group also once the Tasks of every Step its subspace dependencies name are known), with *enableIf* first | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name`, the referenced `Steps.*` | `Task.*`, `Session.*` | The group's expressions are evaluated and checked. *enableIf* `false` makes the Step `SKIPPED`; Task enumeration makes its Tasks known; host selection makes its host requirements known; a failure makes it `FAILED` at once; when every group has evaluated, it is bound and `READY`. See [Step input binding](#step-input-binding). |
 | **Job output evaluation** (new, `CONTROL_FLOW` only) | Per job output, once every `Steps.*` symbol its *value* references is concrete | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted, and checked; a failure fails the Job. See [Job outputs](#job-outputs). |
 | **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies | *(none)* | As today. With `CONTROL_FLOW`, the runtime processes `onRun`'s output directives as they are printed, reverse-maps `PATH` values, and commits the values when the Task succeeds. |
 
@@ -1470,18 +1471,18 @@ arrive:
    are concrete can be evaluated, in the order above, and each other group once its inputs become concrete (see
    [When groups are evaluated](#when-groups-are-evaluated)). A group that evaluates successfully gives the Step a
    fact:
-    * Task enumeration: the Step's parameter space is materialized from the evaluated ranges and its
-      `combination`, and checked against the scheduler's Task-count limit (see [Limits](#limits)). The Step's
+    * Task enumeration: the Step's parameter space is materialized from the evaluated ranges and its `combination`, and
+      checked against the scheduler's per-Step and per-Job Task limits (see [Limits](#limits) item 1). The Step's
       **Tasks are known**: they are enumerable, and so is their count.
     * Host selection: the Step's **host requirements are known**.
     * Task graph: the Step's Task-level dependency graph is known and has passed its checks.
     * Remaining: nothing new is visible; these values are needed only to run the Step's Tasks.
 3. **A failure fails the Step at once.** If evaluating any group fails (including a `fail(...)` call, a `null` where a
-   value is required, and a type or constraint error) or any check fails (a Task count over the scheduler's limit, or
-   with `TASK_DEPENDENCIES` a cycle or an out-of-range index), the Step becomes `FAILED` as soon as that group is
-   evaluated, without waiting for the inputs of its other groups, and before any of its Tasks is dispatched. The
-   failure message names the field and the expression. A Step that fails this way has the consequences of any failed
-   Step.
+   value is required, and a type or constraint error) or any check fails (a Task count over the scheduler's per-Step or
+   per-Job limit, or with `TASK_DEPENDENCIES` a cycle or an out-of-range index), the Step becomes `FAILED` as soon as
+   that group is evaluated, without waiting for the inputs of its other groups, and before any of its Tasks is
+   dispatched. The failure message names the field and the expression. A Step that fails this way has the consequences
+   of any failed Step.
 4. **The Step is bound when every group has evaluated.** A Step is **bound** when *enableIf* is `true` and every
    one of its groups has evaluated successfully. It becomes `READY`, and its Tasks are scheduled as today: when
    every dependency is satisfied and a Worker Host meets its host requirements. A Step with zero Tasks completes
@@ -1512,8 +1513,8 @@ Tasks may be known even though none of them will run.
   groups evaluate is bound at Job creation, as every Step is today. Every other Step that is not `SKIPPED` enters
   `PENDING_INPUTS`. A Step whose *enableIf* is not decided at Job creation evaluates nothing else then, so an error in
   one of its other groups fails it only once its *enableIf* is decided `true`. A loop is a Step for these rules,
-  and nothing of a loop's body Steps is evaluated at Job creation: an instance of each body Step is created and bound
-  when its iteration starts (see [RFC 0013 §Iterations](0013-step-loops.md#iterations) and
+  and nothing of a loop's body Steps is evaluated at Job creation: an instance of each body Step is created when its
+  iteration starts and is bound progressively within it (see [RFC 0013 §Iterations](0013-step-loops.md#iterations) and
   [RFC 0013 §Template processing stages](0013-step-loops.md#template-processing-stages)).
 * **After Job creation**, a scheduler SHOULD evaluate each group of a `PENDING_INPUTS` Step as soon as its inputs
   become concrete, and MUST have evaluated every group before it dispatches any of the Step's Tasks. A `Steps.*`
@@ -1614,11 +1615,19 @@ Limits on output values, which a producer's Tasks report, are in
 [Job outputs](#job-outputs) item 7, and limits on loops, including how loops, body Steps, and their Tasks count toward
 the limits below, are in [RFC 0013 §Limits](0013-step-loops.md#limits). This RFC adds two more:
 
-1. A scheduler MAY impose a maximum number of Tasks per Step, and MAY impose a maximum total number of Tasks per Job.
-   A materialized parameter space that exceeds the Step limit, or that would take the Job's total over the Job limit,
-   is an error when the Step's Task enumeration group is evaluated, before any of its Tasks runs, with a message that
-   names the limit: it fails Job creation if that group is evaluated then, and the Step otherwise.
+1. A scheduler MAY impose a maximum number of Tasks per Step, and MAY impose a maximum total number of Tasks per Job. A
+   materialized parameter space that exceeds the Step limit, or that would take the Job's total over the Job limit, is
+   an error when the Step's Task enumeration group is evaluated, before any of its Tasks runs, with a message that names
+   the limit: it fails Job creation if that group is evaluated then, and the Step otherwise. The Job's total is the sum
+   of the Task counts of every Step, and with RFC 0013 every body Step instance, whose Tasks are known, whatever its
+   state, and retries and re-runs add no Tasks to it. When two Steps' Tasks become known after Job creation, which of
+   them exceeds the Job limit can depend on the order in which their groups are evaluated.
 2. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
+
+Where this RFC and RFC 0013 measure values by their **JSON serialization**, the size of a value is the number of
+UTF-8 bytes of its compact JSON serialization, with no whitespace between tokens. RFC 0012 measures a Task's values by
+the bytes that reported them instead, so a value built from a Task output can measure differently here, for example a
+`FLOAT` reported as `1` and serialized as `1.0`.
 
 ### Job outputs
 
@@ -1664,8 +1673,9 @@ an expression over the Job's parameters and its Steps' outputs. A Task never wri
    built from a `STRING`, which EXPR converts implicitly to `path`, is whatever that string holds, so a path that a
    Task reports belongs in a `PATH` output variable. A caller can use it directly
    on the submitting host, for example to download or open the results.
-7. **Limits.** A scheduler MUST accept job output values totaling at least 1 MiB per Job, measured as their JSON
-   serialization, and MAY accept more. Exceeding its limit fails the Job, as in item 3.
+7. **Limits.** A scheduler MUST accept job output values totaling at least 1 MiB (1,048,576 bytes) per Job, measured
+   as their JSON serialization (see [Limits](#limits)), and MAY accept more. The total counts each job output's current
+   value, and an output with no value counts nothing. Exceeding its limit fails the Job, as in item 3.
 8. **Secrets.** Job outputs are stored and displayed, so they are not redacted and MUST NOT be used to pass secrets.
 
 ```yaml
@@ -1767,12 +1777,12 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
     [`<JobOutputDefinition>`](#joboutputdefinition) allows, with the `Steps.*` symbols of any Step except a loop's
     body Step (RFC 0013), values whose type is or contains `path` only through `RawOutput` and `TaskRawParam`.
 
-**At step input binding** (by the scheduler, group by group as each group's inputs become concrete, and before any
-Task of the Step runs): *enableIf* evaluates to `true` or `false`, not `null`; then, once it is `true`, every other
-materialization expression evaluates; ranges are valid (a range string may not be empty; a list may be); the Task
-count is within the scheduler's limit; and with `TASK_DEPENDENCIES`, the Task graph is acyclic and its indices are in range. The first failure fails the Step at
-once. In a Step whose *enableIf* is `true` or absent at Job creation, a group whose inputs are concrete then is
-checked then, and a failure fails Job creation.
+**At step input binding** (by the scheduler, group by group as each group's inputs become concrete, and before any Task
+of the Step runs): *enableIf* evaluates to `true` or `false`, not `null`; then, once it is `true`, every other
+materialization expression evaluates; ranges are valid (a range string may not be empty; a list may be); the Task count
+is within the scheduler's per-Step and per-Job Task limits; and with `TASK_DEPENDENCIES`, the Task graph is acyclic and
+its indices are in range. The first failure fails the Step at once. In a Step whose *enableIf* is `true` or absent at
+Job creation, a group whose inputs are concrete then is checked then, and a failure fails Job creation.
 
 **At job output evaluation** (by the scheduler, as each job output's inputs become concrete): the *value* evaluates,
 converts to the declared type, satisfies its constraint properties, and fits the size limit; a failure fails the Job.
