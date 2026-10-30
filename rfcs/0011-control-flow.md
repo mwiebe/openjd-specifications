@@ -37,20 +37,21 @@ the Job runs: how many frames a video has, which objects are under an S3 prefix,
 sweep, or whether a quality check found a problem. Today that data reaches a Job only through a pre-submission script,
 which job bundle submitters cannot run, or through files and conventions that no scheduler or tool can see.
 
-This RFC, with RFCs 0012 and 0013, proposes a `CONTROL_FLOW` extension that lets a Step declare typed **output variables**, lets a Task report
-them with an **`openjd_output_var:` stdout directive** (with an `@<file>` form for large values), and lets the Steps
-that depend on it use those values in EXPR expressions through a new `Steps.<Name>.Output.<Var>` symbol class. With those values a dependent Step can compute
-its parameter space (**dynamic fan-out**), decide whether it runs at all (**conditional execution** with `enableIf`),
-and reduce the values of every Task of a multi-Task Step (**fan-in**) with the existing EXPR function library. The
-Job's Steps and their dependencies stay fixed and are validated before submission; only Task counts, Task parameter
-values, and enablement are late-bound, at a new per-Step evaluation stage called **step input binding**. A **loop**
-repeats a group of Steps until a condition holds, within a declared bound, carrying typed state from one iteration to
-the next, with evaluation stages of its own at the start and end of each iteration. Output variables
-are also how a Task reports **metrics**, such as an error score or a frame rate, for a scheduler to show beside the
-Task's parameters: a metric is an output variable that no Step reads. A Job can also declare **job outputs**, typed
-values computed from its parameters and its Steps' outputs, which complement job parameters by reporting results
-back to the submitter as soon as each one is known. `PATH` values that flow out of a Task are stored in the
-submission path context, so a path a Task reports on a Linux worker reaches a Windows submitter in a form it can use.
+This RFC, with RFCs 0012 and 0013, proposes a `CONTROL_FLOW` extension that lets a Step declare typed **output
+variables**, lets a Task report them with an **`openjd_output_var:` stdout directive** (with an `@<file>` form for large
+values), and lets the Steps that depend on it use those values in EXPR expressions through a new
+`Steps.<Name>.Output.<Var>` symbol class. With those values a dependent Step can compute its parameter space (**dynamic
+fan-out**), decide whether it runs at all (**conditional execution** with `enableIf`), and reduce the values of every
+Task of a multi-Task Step (**fan-in**) with the existing EXPR function library. The Job's Steps and their dependencies
+stay fixed and are validated before submission; only Task counts, Task parameter values, host requirements, and
+enablement are late-bound, at a new per-Step evaluation stage called **step input binding**. A **loop** repeats a group
+of Steps until a condition holds, within a declared bound, carrying typed state from one iteration to the next, with
+evaluation stages of its own at the start and end of each iteration. Output variables are also how a Task reports
+**metrics**, such as an error score or a frame rate, for a scheduler to show beside the Task's parameters: a metric is
+an output variable that no Step reads. A Job can also declare **job outputs**, typed values computed from its parameters
+and its Steps' outputs, which complement job parameters by reporting results back to the submitter as soon as each one
+is known. `PATH` values that flow out of a Task are stored in the submission path context, so a path a Task reports on a
+Linux worker reaches a Windows submitter in a form it can use.
 
 Like EXPR, the extension is specified in more than one RFC. All of them define parts of the one extension name
 `CONTROL_FLOW`, so a template that lists it gets everything below:
@@ -913,7 +914,8 @@ edges.
 
 Job outputs are the exception: a job output's *value* may read any Step, except a loop's body Step, which RFC 0013
 keeps inside its loop (see [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
-A job output is not scheduled, so there is no edge to declare, and the Job is the consumer of all of its Steps.
+A job output is not scheduled, so there is no edge to declare, and the Job is the consumer of all of its Steps
+outside loop bodies.
 
 ### 4. Output shape is determined by the template
 
@@ -1152,7 +1154,9 @@ New property:
   [Conditional execution](#conditional-execution-enableif). Constraints:
     1. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters, which are available only on the worker
        host), `RawParam.*`, `Job.Name`, `Step.Name`, and the `Steps.*` symbols of the Step's direct dependencies (see
-       [The `Steps.*` scope](#the-steps-scope)).
+       [The `Steps.*` scope](#the-steps-scope)). A body Step of a loop may also reference what
+       [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope) and
+       [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop) allow.
     2. It may not reference names bound by the Step's own `let`, `Task.*`, or `Session.*`.
 
 Changed semantics of existing properties:
@@ -1163,7 +1167,9 @@ Changed semantics of existing properties:
 * *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, *script* — These fields may reference the `Steps.*`
   symbols of the Step's direct dependencies. A format string among them that is resolved at Job creation (not
   annotated `@fmtstring[host]`) and references `Steps.*` is evaluated at step input binding instead, when the
-  inputs of its materialization group are concrete. See [Step input binding](#step-input-binding).
+  inputs of its materialization group are concrete. See [Step input binding](#step-input-binding). In a body Step
+  of a loop, they may also read `Loop.*` and the `Steps.*` symbols that RFC 0013 allows (see
+  [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope)).
 
 ##### `<JobOutputDefinition>`
 
@@ -1604,13 +1610,14 @@ let:
 ### Limits
 
 Limits on output values, which a producer's Tasks report, are in
-[RFC 0012 §Limits](0012-step-output-variables.md#limits), and limits on loops, including how body Steps and their
-Tasks count toward this section's limits, are in [RFC 0013 §Limits](0013-step-loops.md#limits). This RFC adds two that
-concern the Steps that read them:
+[RFC 0012 §Limits](0012-step-output-variables.md#limits), the limit on job output values is in
+[Job outputs](#job-outputs) item 7, and limits on loops, including how loops, body Steps, and their Tasks count toward
+the limits below, are in [RFC 0013 §Limits](0013-step-loops.md#limits). This RFC adds two more:
 
-1. A scheduler MAY impose a maximum number of Tasks per Step. A materialized parameter space that exceeds it is an
-   error when the Step's Task enumeration group is evaluated, before any of its Tasks runs, with a message that names
-   the limit: it fails Job creation if that group is evaluated then, and the Step otherwise.
+1. A scheduler MAY impose a maximum number of Tasks per Step, and MAY impose a maximum total number of Tasks per Job.
+   A materialized parameter space that exceeds the Step limit, or that would take the Job's total over the Job limit,
+   is an error when the Step's Task enumeration group is evaluated, before any of its Tasks runs, with a message that
+   names the limit: it fails Job creation if that group is evaluated then, and the Step otherwise.
 2. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
 
 ### Job outputs
@@ -1742,9 +1749,12 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
    that declares output `<VarName>`. Every `Steps.<StepName>.TaskParam.<ParamName>` and `TaskRawParam.<ParamName>`
    names a Step that has Task parameter `<ParamName>`.
 3. A Step that references `Steps.<StepName>.*` lists `<StepName>` directly in its `dependencies` as a whole-Step
-   dependency, and `<StepName>` is not the Step itself.
-4. `Steps.*` appears only in the fields listed in [The `Steps.*` scope](#the-steps-scope), and a `Steps.*.Output.*`
-   or `Steps.*.TaskParam.*` whose type is or contains `path` only in format strings resolved on the worker host.
+   dependency, and `<StepName>` is not the Step itself. For a loop's expressions and its body Steps, this rule is
+   modified by [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop).
+4. `Steps.*` appears only in the fields listed in [The `Steps.*` scope](#the-steps-scope), and in the loop fields that
+   [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop) adds, and a
+   `Steps.*.Output.*` or `Steps.*.TaskParam.*` whose type is or contains `path` only in format strings resolved on the
+   worker host.
 5. *enableIf* references only the symbols its location allows, and does not appear in an Environment Template.
 6. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types; *enableIf* has type
    `bool`.
