@@ -182,7 +182,8 @@ metric that no Step reads never blocks a re-run. Because a scheduler should, not
 values are available, an eager and a lazy scheduler may disagree on whether an output has been consumed. When a re-run
 commits new values, the Job outputs that read the Step are evaluated again. If one of those fails, the re-run's values
 stay committed, that Job output keeps its earlier value, marked stale, and the Job fails, even if it had already
-succeeded (see [RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)).
+succeeded (see [RFC 0011 §Job outputs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md#job-outputs)
+item 5 and [RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)).
 
 A scheduler may create a pending Step's Tasks only when it is bound, when its Tasks are known, or create the Step at
 submission and fill in its Tasks later. The three are equivalent to a Job's author.
