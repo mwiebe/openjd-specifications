@@ -1,0 +1,151 @@
+# RFC 0013 §<StepLoop> outputVariables constraint 2: at most 32 loop outputs, so 32 is
+# accepted.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{Loop.Iteration >= 0}}'
+    maxIterations: 1
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('W_' + 'RAN')
+  outputVariables:
+  - name: O1
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O2
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O3
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O4
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O5
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O6
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O7
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O8
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O9
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O10
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O11
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O12
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O13
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O14
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O15
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O16
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O17
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O18
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O19
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O20
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O21
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O22
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O23
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O24
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O25
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O26
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O27
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O28
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O29
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O30
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O31
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+  - name: O32
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'

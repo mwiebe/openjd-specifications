@@ -1,0 +1,49 @@
+# RFC 0013 §Limits item 4: the size counted is the values the loop currently holds, and a
+# loop variable's value that next replaces stops counting. S holds a JSON string of
+# 1,048,574 characters and its quotes (1,048,576 bytes) in every iteration, and next
+# replaces it twice; a runtime that kept counting replaced values would fail the loop. The
+# loop has no other variables and no outputs, and W does not print S, which would not fit
+# on a command line.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      variables:
+      - name: S
+        type: STRING
+        initial: '{{''a'' * 1048574}}'
+        next: '{{(''b'' if Loop.Iteration % 2 == 0 else ''a'') * 1048574}}'
+      until: '{{Loop.Iteration >= 2}}'
+      maxIterations: 5
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  output:
+  - IT_0
+  - IT_1
+  - IT_2
+  - C_RAN

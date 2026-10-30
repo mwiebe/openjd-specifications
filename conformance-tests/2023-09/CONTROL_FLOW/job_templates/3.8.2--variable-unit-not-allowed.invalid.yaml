@@ -1,0 +1,28 @@
+# RFC 0013 §<LoopVariableDefinition>: a loop variable has name, type, initial, next,
+# description, and constraint properties; unlike a loop output it has no unit.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N}}'
+      unit: mm
+    until: '{{Loop.Iteration >= 0}}'
+    maxIterations: 1
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('W_' + 'RAN')

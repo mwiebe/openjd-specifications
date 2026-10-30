@@ -1,0 +1,58 @@
+# RFC 0013 §Loop binding item 2 and §Validation (At Job creation and loop binding):
+# maxIterations computed from a job parameter must be from 1 to 1,000. Its inputs are
+# concrete at Job creation and L has no enableIf, so it is evaluated then, and Max = 1001
+# fails Job creation before X, which is independent of L, runs. The run fails at Job creation, not in a Task; expected.taskFailure is used anyway
+# because the runner ignores forbidden markers in .invalid tests.
+# 3.8.5--max-iterations-from-param is the same template shape with a valid value.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Max
+    type: INT
+  steps:
+  - name: X
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('X_' + 'RAN')
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 4}}'
+      maxIterations: '{{Param.Max}}'
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+parameters:
+  Max: 1001
+expected:
+  taskFailure: {}
+  forbidden:
+  - X_RAN
+  - IT_0
+  - C_RAN

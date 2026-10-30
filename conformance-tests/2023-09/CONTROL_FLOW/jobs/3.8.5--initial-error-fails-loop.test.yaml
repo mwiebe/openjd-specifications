@@ -1,0 +1,60 @@
+# RFC 0013 §Loop binding item 3 and §Failure: an error in an initial that reads the loop's
+# dependency fails the loop at loop binding, after P succeeds and before iteration 0 starts.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: V=1')
+  - name: L
+    dependencies:
+    - dependsOn: P
+    loop:
+      variables:
+      - name: N
+        type: INT
+        initial: '{{fail(''bad start'') if Steps.P.Output.V == 1 else 0}}'
+        next: '{{Loop.N + 1}}'
+      until: '{{Loop.Iteration >= 4}}'
+      maxIterations: 10
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - P_RAN
+  forbidden:
+  - IT_0
+  - C_RAN

@@ -1,0 +1,181 @@
+# RFC 0013 §<LoopOutputVariableDefinition> items 2 and 6 and §Validation item 6: a LAST loop
+# output of each of the 12 types, and APPEND outputs of three list types, accept every
+# constraint property of RFC 0012's table for the type (BOOL has none). LIST[LIST[INT]] is
+# allowed.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{Loop.Iteration >= 0}}'
+    maxIterations: 1
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('W_' + 'RAN')
+  outputVariables:
+  - name: I
+    type: INT
+    collect: LAST
+    value: '{{1}}'
+    allowedValues:
+    - 1
+    - 2
+    minValue: 0
+    maxValue: 10
+  - name: F
+    type: FLOAT
+    collect: LAST
+    value: '{{0.5}}'
+    allowedValues:
+    - 0.5
+    - 1.5
+    minValue: 0.0
+    maxValue: 2.0
+  - name: S
+    type: STRING
+    collect: LAST
+    value: '{{''a''}}'
+    allowedValues:
+    - a
+    - b
+    minLength: 1
+    maxLength: 8
+  - name: Pa
+    type: PATH
+    collect: LAST
+    value: '{{''/a''}}'
+    objectType: FILE
+    allowedValues:
+    - /a
+    - /b
+    minLength: 1
+    maxLength: 100
+  - name: B
+    type: BOOL
+    collect: LAST
+    value: '{{true}}'
+  - name: R
+    type: RANGE_EXPR
+    collect: LAST
+    value: '{{''1-3''}}'
+    minLength: 1
+    maxLength: 100
+  - name: LI
+    type: LIST[INT]
+    collect: LAST
+    value: '{{[1]}}'
+    minLength: 1
+    maxLength: 4
+    item:
+      allowedValues:
+      - 1
+      - 2
+      minValue: 0
+      maxValue: 9
+  - name: LF
+    type: LIST[FLOAT]
+    collect: LAST
+    value: '{{[0.5]}}'
+    minLength: 1
+    maxLength: 4
+    item:
+      allowedValues:
+      - 0.5
+      - 1.5
+      minValue: 0.0
+      maxValue: 2.0
+  - name: LS
+    type: LIST[STRING]
+    collect: LAST
+    value: '{{[''a'']}}'
+    minLength: 1
+    maxLength: 4
+    item:
+      allowedValues:
+      - a
+      - b
+      minLength: 1
+      maxLength: 8
+  - name: LP
+    type: LIST[PATH]
+    collect: LAST
+    value: '{{[''/a'']}}'
+    objectType: DIRECTORY
+    minLength: 1
+    maxLength: 4
+    item:
+      allowedValues:
+      - /a
+      - /b
+      minLength: 1
+      maxLength: 100
+  - name: LB
+    type: LIST[BOOL]
+    collect: LAST
+    value: '{{[true]}}'
+    minLength: 1
+    maxLength: 3
+  - name: LL
+    type: LIST[LIST[INT]]
+    collect: LAST
+    value: '{{[[1]]}}'
+    minLength: 1
+    maxLength: 4
+    item:
+      minLength: 1
+      maxLength: 3
+      item:
+        allowedValues:
+        - 1
+        - 2
+        minValue: 0
+        maxValue: 9
+  - name: ALI
+    type: LIST[INT]
+    collect: APPEND
+    value: '{{1}}'
+    minLength: 1
+    maxLength: 4
+    item:
+      allowedValues:
+      - 1
+      - 2
+      minValue: 0
+      maxValue: 9
+  - name: ALS
+    type: LIST[STRING]
+    collect: APPEND
+    value: '{{''a''}}'
+    minLength: 1
+    maxLength: 4
+    item:
+      allowedValues:
+      - a
+      - b
+      minLength: 1
+      maxLength: 8
+  - name: ALL
+    type: LIST[LIST[INT]]
+    collect: APPEND
+    value: '{{[1]}}'
+    minLength: 1
+    maxLength: 4
+    item:
+      minLength: 1
+      maxLength: 3
+      item:
+        allowedValues:
+        - 1
+        - 2
+        minValue: 0
+        maxValue: 9

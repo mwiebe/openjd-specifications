@@ -1,7 +1,8 @@
-# RFC 0011 §How a Step is bound: a consumer whose producer fails can never be bound and
-# never runs. A failed attempt commits nothing (§Processing a directive). C reads P's output
-# in its range, a binding-time field, so a runtime that committed the failed attempt's N=1
-# and bound C with it would run C's one Task.
+# RFC 0011 §The Steps.* scope (Concreteness): a producer's Output becomes concrete only when
+# it is terminal and has not failed, so a consumer whose producer fails can never be bound
+# (RFC 0011 §How a Step is bound) and never runs. A failed attempt has no outputs (RFC 0012
+# §Processing a directive). C reads P's output in its range, a binding-time field, so a
+# runtime that committed the failed attempt's N=1 and bound C with it would run C's one Task.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

@@ -1,0 +1,56 @@
+# RFC 0013 §<LoopDefinition> item 2: a null result of while is an error. The first while
+# reads the loop's dependency and is null, so the loop fails at loop binding before
+# iteration 0 starts.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: V=1')
+  - name: L
+    dependencies:
+    - dependsOn: P
+    loop:
+      while: '{{null if Steps.P.Output.V == 1 else Loop.Iteration < 2}}'
+      maxIterations: 10
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - P_RAN
+  forbidden:
+  - IT_0
+  - C_RAN

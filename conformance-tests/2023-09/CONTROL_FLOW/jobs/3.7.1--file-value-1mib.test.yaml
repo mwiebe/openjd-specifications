@@ -1,5 +1,7 @@
-# RFC 0012 §Limits item 2: a runtime MUST accept at least 1 MiB of output values per Task;
-# this @ file is 1,000,002 bytes.
+# RFC 0012 §Limits item 2: a runtime MUST accept at least 1 MiB (1,048,576 bytes) of output
+# values per Task attempt, counted as the whole content of an @ file. This @ file is exactly
+# 1,048,576 bytes: a JSON string of 1,048,574 characters and its two quotes, with no
+# trailing newline.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -19,7 +21,7 @@ template:
           - -c
           - |-
             import json
-            with open('big.json', 'w') as f: json.dump('a' * 1000000, f)
+            with open('big.json', 'w') as f: json.dump('a' * 1048574, f)
             print('openjd_output_var: V=@big.json')
   - name: C
     dependencies:
@@ -34,4 +36,4 @@ template:
             import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(len(Steps.P.Output.V)))}})))
 expected:
   output:
-  - GOT:1000000
+  - GOT:1048574

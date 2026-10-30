@@ -5,10 +5,12 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Unverified.** These tests were written from the RFC text before any implementation of
-> `CONTROL_FLOW` existed, so none of them has been run. They are meant to be correct
-> against the spec so that a prototype can be developed against them. If a test and the RFC
-> disagree, the RFC wins: fix the test, or raise the question on the RFC.
+> **Status.** There are 411 tests: 3 in `env_templates`, 199 in `job_templates`, and 209 in
+> `jobs`. All 411 pass on Linux against the openjd-rs prototype (branch
+> `control-flow-prototype`, commit `6553952`), the only implementation that has run them.
+> The tests were written from the RFC text, and the prototype was developed against them.
+> If a test and the RFC disagree, the RFC wins: fix the test, or raise the question on the
+> RFC.
 
 ## What this extension does
 
@@ -36,22 +38,26 @@ and its section.
 
 - **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `EXPR`; every new
   field and symbol requires `CONTROL_FLOW`; Environment Templates can't declare
-  `CONTROL_FLOW`, use `enableIf`, or reference `Steps.*`.
+  `CONTROL_FLOW`, use `enableIf`, or reference `Steps.*`. Because an Environment Template
+  can't list `CONTROL_FLOW`, the last two are also run beside a Job that lists it
+  (`jobs/*-in-environment-template-with-control-flow-job`), with
+  `jobs/4--environment-template-in-control-flow-job-runs` as their valid companion.
 - **`<OutputVariableDefinition>`** (`job_templates/3.7--*`): each `<OutputVariableType>`,
   case-insensitive type names, 1 to 32 outputs with unique `<Identifier>` names,
   `LIST[LIST[INT]]` only without a `parameterSpace`, no `default`/`userInterface`/`dataFlow`,
   `objectType` on paths, `collect` modes (`APPEND` needs a list type), `unit` length and
-  character rules, and constraint properties valid for the type.
+  character rules, and constraint properties valid for the type (all 12 types).
 - **The directive** (`jobs/3.7.1--*`): every row of the RFC's type conversion table that
   has a defined result, other JSON coercions implied by EXPR §1.2.3, `null`/objects/`NaN`/
   `Infinity`, the `<Directive>` grammar (whitespace placement, case-sensitive names, empty
   payload, line must begin with the prefix), CRLF and stderr, UTF-8, the 64 KiB line
-  floor, logging of valid and invalid directives, and cancel-at-once on an invalid directive.
+  floor (a line of exactly 65,536 bytes), logging of valid and invalid directives, and cancel-at-once on an invalid directive.
 - **`@<FilePath>` values** (`jobs/3.7.1--file-*`): relative and absolute paths inside the
   Working Directory, BOM and multi-line JSON, trailing-whitespace trimming, escapes via an
   absolute path, `..`, or a symbolic link, missing file, directory, not exactly one JSON
   value, NUL, invalid UTF-8, empty path, one element per `APPEND` directive, the 1 MiB
-  floor, and reading the file when the directive is processed.
+  floor (an `@` file of exactly 1,048,576 bytes), and reading the file when the directive
+  is processed.
 - **Which Actions may print a directive** (`jobs/3.7.1--directive-*`): only `onRun` of a
   Step with `outputVariables`; Job/Step Environment `onEnter` and other Steps fail; an
   Environment Template's actions and a non-`CONTROL_FLOW` Job see ordinary output; a
@@ -60,10 +66,12 @@ and its section.
 - **Collect modes and constraints** (`jobs/3.7--*`): `ONCE` twice or missing, `LAST`
   takes the last and checks every value, `APPEND` order, `[]` when empty, a list as one
   element, `maxLength`/`minLength`/`item` checks; `minValue`/`maxValue`/`allowedValues`/
-  `maxLength` violations fail the producer; only declared constraints apply.
+  `maxLength` violations fail the producer; only declared constraints apply; a `LAST`
+  value that a later directive replaces stops counting toward the 1 MiB floor.
 - **Chunked Steps** (`*--chunk*`, with `TASK_CHUNKING`): the `[<value>]` selector is
   required (even for a chunk of one), forbidden without `CHUNK[INT]`, must be in the chunk
-  being run (not merely in the range), and is matched by integer value; `ONCE` and the
+  being run (not merely in the range), is matched by integer value, may be negative, and
+  has no whitespace inside its brackets; `ONCE` and the
   exit check apply per Task; duplicate chunk values are rejected in a literal list at
   validation and in a computed list at binding, before any Task runs, and are allowed
   without `outputVariables`; consumers see per-Task lists aligned with `TaskParam`.
@@ -104,23 +112,28 @@ and its section.
   `LIST[LIST[INT]]`, any Step readable without a dependency, path rules (`RawParam`,
   `RawOutput`, and `TaskRawParam` allowed; `Param` of `PATH` and `LIST[PATH]` parameters
   and `TaskParam` of a `PATH` Task parameter forbidden), other forbidden symbols, type and `collect`; at run time, failures at Job
-  creation and after a Step fail the run, and valid or `null` job outputs don't.
+  creation and after a Step fail the run, valid or `null` job outputs don't, and job
+  outputs totaling exactly 1 MiB are accepted.
 - **Loop schema** (`1.1--loop-*`, `job_templates/3.8--*`, `3.8.1--*`, `3.8.2--*`, `3.8.3--*`):
   gating; no `script` or `parameterSpace` on a loop; names unique across top-level Steps,
   loops, and body Steps (also across two loops, and a loop and its own body Step); top-level
   Steps depend only on top-level Steps; exactly one of `while` and `until`; `maxIterations`
   required, 1 to 1,000, from `Param.*` but not from `Steps.*` or `Loop.*`; no nested loops;
   a non-empty, acyclic body whose dependencies stay inside it; `while` can't read body Steps;
-  `until` is `bool`; variables of several types with constraints, unique, not named
-  `Iteration`, `initial` without `Loop.*` and only from the loop's dependencies, `next`
-  with the variable's type; `PATH` variables through `RawLoop.*` in TEMPLATE scope; loop
-  outputs need `value` and `collect` (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a
-  list, its value of the element type), unique names, `LAST` scalar and `APPEND` list types.
+  `until` is `bool`; 1 to 32 variables, unique, not named `Iteration`, with no `unit`,
+  `initial` without `Loop.*` and only from the loop's dependencies, `next` with the
+  variable's type; constraint properties valid for the type (all 12 types; none on `BOOL`,
+  none from another type, `minValue` not above `maxValue`); `PATH` variables through
+  `RawLoop.*` in TEMPLATE scope; 1 to 32 loop outputs, which need `value` and `collect`
+  (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a list, its value of the element
+  type), with unique names, `LAST` scalar and `APPEND` list types, the `unit` rules, and
+  constraint properties valid for the type.
 - **Loop scopes** (`job_templates/3.8.4--*`): a body Step reads the loop's dependencies, but
   not other outside Steps nor body Steps it doesn't depend on; `until`/`next`/`value` read
   any body Step; outside Steps and job outputs read loop outputs, never body Steps, and
-  need a dependency on the loop; `Loop.*` only in the loop and its body, and only the
-  loop's own variables; no `TaskParam` or undeclared outputs of a loop.
+  need a dependency on the loop; `Loop.*` only in the loop and its body (not in the loop's
+  `enableIf` or `maxIterations`, a top-level Step, a job output, or a Job Environment), and
+  only the loop's own variables; no `TaskParam` or undeclared outputs of a loop.
 - **Running loops** (`jobs/3.8.5--*`): `until` after each iteration, with `APPEND`
   history, `LAST` final value, and `Loop.Iteration` from 0; `while` before each iteration,
   including zero iterations (`LAST` is `null`, `APPEND` is `[]`), and an `APPEND` output's
@@ -134,7 +147,15 @@ and its section.
   dependents; a body fan-out from a loop variable with its own Tasks per iteration; a
   fan-out after the loop over an `APPEND` output; a skipped loop's `null` outputs; a body
   Step skipped in some iterations; body Steps reading the loop's dependency; and a job
-  output from a loop output, valid and failing.
+  output from a loop output, valid and failing. Loop binding: `maxIterations` from a
+  parameter outside 1 to 1,000, and an `initial` that reads only parameters and fails,
+  fail Job creation (with a valid companion); an `initial` that fails, is `null`, or
+  violates a constraint, and a first `while` that fails or is `null`, fail the loop before
+  iteration 0. At the boundary, a `fail(...)` in `until` or `while` and a `null` `until`,
+  `while`, `next`, or loop output `value` fail the loop. A body Step whose range fails at
+  the start of an iteration fails the loop. Size: loop values totaling exactly 1 MiB are
+  accepted, with each `APPEND` element counted on its own and replaced loop variable and
+  `LAST` output values not counted.
 
 ## Conventions in this directory
 
@@ -221,8 +242,9 @@ and its section.
   of body Tasks that have already succeeded (the Task stays `SUCCEEDED` under RFC 0012
   §Retries and re-runs, so a re-run never fails the loop and the iteration boundary does
   not wait for it), a
-  scheduler's limits on total Tasks or body Step instances, the 1 MiB floor for loop
-  values, and chunked body Steps.
+  scheduler's limits on total Tasks or body Step instances, how a loop and its body Steps
+  count as Steps of the template (the base specification sets no limit on the number of
+  Steps), and chunked body Steps.
 - The loop rules of `openjd run`, which are CLI-specific: `--tasks` and `--task-param` are
   rejected whenever the selected Step is a loop, an explicitly given `--maximum-tasks` is
   rejected with `--step` naming a loop, and otherwise `--maximum-tasks` applies to each body
@@ -272,7 +294,9 @@ Items 9 and later concern loops (RFC 0013).
    job parameters accept `1`; EXPR coercion has no `int` to `bool`. The tests follow
    RFC 0012's EXPR coercion rule (`B=1` is invalid; `N="12"` is the INT 12).
 7. **The 64 KiB line floor (RFC 0012 §Limits)**: whether it includes the line terminator.
-   The test uses a 65,023-byte line.
+   The test uses a line of exactly 65,536 bytes, not counting the terminator, which is the
+   reading under which the floor applies to the same text as RFC 0012's grammar, whose
+   terminator is not part of the directive.
 8. **`@` file read time (RFC 0012 §File values)**: no bound on how soon a runtime must
    process a flushed line.
 9. **Other body Steps after a failure (RFC 0013 §Failure).** RFC 0013 lets instances of

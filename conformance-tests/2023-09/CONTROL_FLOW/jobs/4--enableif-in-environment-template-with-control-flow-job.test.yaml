@@ -1,0 +1,64 @@
+# RFC 0011 §<Environment> enableIf constraint 4: enableIf is permitted only in a Job
+# Template, even when the Job's template lists CONTROL_FLOW. The Environment Template's
+# enableIf is true, so a runtime that allowed it would enter the Environment and run the
+# Steps. The template is rejected before anything runs. This run fails before any Task;
+# expected.taskFailure is used because the runner ignores forbidden markers in .invalid
+# tests. env_templates/4--enableif-in-environment-template checks the template alone, and
+# 4--environment-template-in-control-flow-job-runs is the companion without enableIf.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN', {{Steps.P.Output.N}})
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  environment:
+    name: EnvTemplate
+    enableIf: true
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('E_' + 'RAN')
+        onExit:
+          command: python
+          args:
+          - -c
+          - |-
+            print('X_' + 'EXIT')
+expected:
+  taskFailure: {}
+  forbidden:
+  - E_RAN
+  - P_RAN
+  - C_RAN

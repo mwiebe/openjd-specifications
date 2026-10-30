@@ -1,0 +1,64 @@
+# RFC 0011 §The Steps.* scope: Steps.* is not available anywhere in an Environment Template,
+# even when the Job's template lists CONTROL_FLOW. The reference is in onExit, so a runtime
+# that resolved it from the Session's Step would print E_RAN on entering the Environment
+# before it failed or succeeded. The template is rejected before anything runs. This run
+# fails before any Task; expected.taskFailure is used because the runner ignores forbidden
+# markers in .invalid tests. env_templates/7.3.1--steps-symbol-in-environment-template
+# checks the template alone, and 4--environment-template-in-control-flow-job-runs is the
+# companion without the symbol.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN', {{Steps.P.Output.N}})
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  environment:
+    name: EnvTemplate
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('E_' + 'RAN')
+        onExit:
+          command: python
+          args:
+          - -c
+          - |-
+            print({{Steps.P.Output.N}})
+expected:
+  taskFailure: {}
+  forbidden:
+  - E_RAN
+  - P_RAN
+  - C_RAN
