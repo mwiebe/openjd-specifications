@@ -112,7 +112,8 @@ should evaluate it then, and must have evaluated every group before it schedules
 1. `enableIf` is always decided first. Nothing else of the Step is evaluated until it is. If it is `false`, the Step
    is **skipped**: it has zero Tasks, and none of its other fields is evaluated. A Step without `enableIf` is enabled
    at once.
-2. Then, independently and in whichever order their values arrive:
+2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
+   order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
      in the whole Job, and the Step's **Tasks are known**: they can be listed and counted;
    * its host requirements are evaluated, and its **host requirements are known**;
@@ -129,8 +130,10 @@ can already show its Tasks to the people monitoring the Job and plan capacity fo
 requirements are known tells the scheduler which Worker Hosts it may need. A scheduler or tool that shows a pending
 Step should report, for whether it runs, its Tasks, and its host requirements, whether each is known, and for each
 that is not, what it is waiting for: the values of other Steps that are not available yet, or the Step's undecided
-`enableIf`. In a Step whose `enableIf` is decided `true` (or absent) at Job creation, the groups whose values are
-available then are evaluated then, and an error in one makes Job creation fail.
+`enableIf`. At Job creation the scheduler works through the Steps in dependency order, so a Step skipped there, or
+whose Tasks become known there, supplies its values to the Steps after it in the same pass. In a Step whose `enableIf`
+is decided `true` (or absent) at Job creation, the groups whose values are available then are evaluated then, and an
+error in one makes Job creation fail.
 
 The Step then becomes one of:
 
@@ -203,14 +206,16 @@ Job Template's `steps` may be a **loop**: a group of Steps, its **body**, that r
 says to stop. A loop is a Step of the Job for scheduling: it has dependencies, may have an `enableIf`, and has the
 states of a Step, and the Steps that depend on it wait for the whole loop. It has no Tasks of its own.
 
-Once a loop's `enableIf` is decided `true`, the scheduler evaluates its `maxIterations`, each loop variable's
-`initial` value, and, for a loop with `while`, the first `while`. When the loop's dependencies are satisfied, it runs
+Once a loop's `enableIf` is decided `true`, the scheduler evaluates its `maxIterations`, then each loop variable's
+`initial` value, and, for a loop with `while`, the first `while`, as soon as the values they read are available. An
+error in one fails the loop, or fails Job creation if it is evaluated then. When the loop's dependencies are satisfied, it runs
 its **iterations** one after another, numbered from 0:
 
 1. At the start of an iteration, the loop variables take their values for the iteration, which every Step of the
    body reads as `Loop.<Name>` for the whole iteration, along with `Loop.Iteration`. A new instance of every Step of
-   the body is created, with its own Tasks, states, and output values. Each instance is bound and run as any Step
-   is, in the order of the body's dependencies, and may read the outputs of the body Steps it depends on in the same
+   the body is created, with its own Tasks, states, and output values. The groups of each instance whose values are
+   available when the iteration starts must be evaluated then, and an error in one fails the loop finally. Each
+   instance is then bound and run as any Step is, in the order of the body's dependencies, and may read the outputs of the body Steps it depends on in the same
    iteration and of the Steps the loop depends on. It never reads an earlier iteration.
 2. The iteration ends when every instance has completed successfully or been skipped. The scheduler then evaluates,
    in order: each of the loop's outputs for this iteration; `until`, if the loop has it, which ends the loop if it is
