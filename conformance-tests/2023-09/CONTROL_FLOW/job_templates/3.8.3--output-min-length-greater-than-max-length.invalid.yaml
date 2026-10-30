@@ -1,0 +1,30 @@
+# RFC 0013 §Validation item 6 and RFC 0012 §<OutputVariableDefinition> constraint 2: a
+# constraint property must be valid for the type with the job parameter definition's
+# validity rules, and a STRING job parameter's minLength may not exceed its maxLength.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{Loop.Iteration >= 0}}'
+    maxIterations: 1
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('W_' + 'RAN')
+  outputVariables:
+  - name: S
+    type: STRING
+    collect: LAST
+    value: '{{string(Loop.Iteration)}}'
+    minLength: 3
+    maxLength: 2

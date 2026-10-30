@@ -1,5 +1,7 @@
 # RFC 0011 §The Steps.* scope: Steps.* is not available anywhere in an Environment
-# Template.
+# Template. An Environment Template can't list CONTROL_FLOW, so a validator could also reject
+# this as an unknown symbol; jobs/7.3.1--steps-symbol-in-environment-template-with-control-flow-job
+# checks the rule beside a Job that lists CONTROL_FLOW.
 specificationVersion: environment-2023-09
 extensions:
 - EXPR

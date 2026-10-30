@@ -1,5 +1,6 @@
-# RFC 0012 §Limits item 1: a runtime MUST accept a directive line of at least 64 KiB. This
-# line is 65,023 bytes.
+# RFC 0012 §Limits item 1: a runtime MUST accept a directive line of at least 64 KiB
+# (65,536 bytes of UTF-8). This line is exactly 65,536 bytes, not counting its terminator:
+# the 22 bytes of `openjd_output_var: V="`, 65,513 characters, and the closing quote.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -18,7 +19,7 @@ template:
           args:
           - -c
           - |-
-            print('openjd_output_var: V="' + 'a' * 65000 + '"')
+            print('openjd_output_var: V="' + 'a' * 65513 + '"')
   - name: C
     dependencies:
     - dependsOn: P
@@ -32,4 +33,4 @@ template:
             import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(len(Steps.P.Output.V)))}})))
 expected:
   output:
-  - GOT:65000
+  - GOT:65513

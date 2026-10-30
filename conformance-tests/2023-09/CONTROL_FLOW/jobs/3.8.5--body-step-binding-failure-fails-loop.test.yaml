@@ -1,0 +1,48 @@
+# RFC 0013 §Iterations item 3 and §Failure: a body Step instance's groups whose inputs are
+# concrete at the start of its iteration are evaluated then, and an error in one fails the
+# instance and so the loop, finally. W's range reads only Loop.Iteration, and its fail(...)
+# in iteration 1 fails the loop before any Task of that instance runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 4}}'
+      maxIterations: 10
+      steps:
+      - name: W
+        parameterSpace:
+          taskParameterDefinitions:
+          - name: I
+            type: INT
+            range: '{{[Loop.Iteration] if Loop.Iteration < 1 else fail(''no Tasks in iteration 1'')}}'
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Task.Param.I}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - IT_0
+  forbidden:
+  - IT_1
+  - C_RAN

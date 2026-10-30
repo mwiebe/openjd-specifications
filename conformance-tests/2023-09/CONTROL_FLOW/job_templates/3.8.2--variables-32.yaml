@@ -1,0 +1,151 @@
+# RFC 0013 §<LoopDefinition> variables constraint 2: at most 32 variables, so 32 is
+# accepted.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    variables:
+    - name: V1
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V1}}'
+    - name: V2
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V2}}'
+    - name: V3
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V3}}'
+    - name: V4
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V4}}'
+    - name: V5
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V5}}'
+    - name: V6
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V6}}'
+    - name: V7
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V7}}'
+    - name: V8
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V8}}'
+    - name: V9
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V9}}'
+    - name: V10
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V10}}'
+    - name: V11
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V11}}'
+    - name: V12
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V12}}'
+    - name: V13
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V13}}'
+    - name: V14
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V14}}'
+    - name: V15
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V15}}'
+    - name: V16
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V16}}'
+    - name: V17
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V17}}'
+    - name: V18
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V18}}'
+    - name: V19
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V19}}'
+    - name: V20
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V20}}'
+    - name: V21
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V21}}'
+    - name: V22
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V22}}'
+    - name: V23
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V23}}'
+    - name: V24
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V24}}'
+    - name: V25
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V25}}'
+    - name: V26
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V26}}'
+    - name: V27
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V27}}'
+    - name: V28
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V28}}'
+    - name: V29
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V29}}'
+    - name: V30
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V30}}'
+    - name: V31
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V31}}'
+    - name: V32
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.V32}}'
+    until: '{{Loop.Iteration >= 0}}'
+    maxIterations: 1
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('W_' + 'RAN')

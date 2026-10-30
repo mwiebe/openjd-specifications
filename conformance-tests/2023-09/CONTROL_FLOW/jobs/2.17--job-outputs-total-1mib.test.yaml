@@ -1,0 +1,31 @@
+# RFC 0011 §Job outputs item 7: a scheduler MUST accept job output values totaling 1 MiB
+# (1,048,576 bytes) per Job, each measured as its JSON serialization (RFC 0011 §Limits).
+# A and B are JSON strings of 524,286 characters and their quotes (524,288 bytes each), so
+# the total is exactly 1,048,576 bytes. Both are evaluated at Job creation, so a runtime that
+# rejected the total would fail before C runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  jobOutputDefinitions:
+  - name: A
+    type: STRING
+    value: '{{''a'' * 524286}}'
+  - name: B
+    type: STRING
+    value: '{{''b'' * 524286}}'
+  steps:
+  - name: C
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  output:
+  - C_RAN
