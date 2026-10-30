@@ -586,7 +586,8 @@ they mean:
 1. **Fixed step graph (RFC 0011 item 3).** The body's Steps, their names, their dependencies, and their output types
    are in the template and validated before submission. The number of iterations is late-bound, as a Task count is.
 2. **Bounded (RFC 0011 item 7).** Every loop declares a maximum number of iterations, within a limit of this
-   specification, so its total work is bounded when the Job is created.
+   specification, so its number of iterations is bounded when the Job is created. Its Task counts are bounded only
+   by scheduler limits ([Limits](#limits) item 2).
 3. **Fail fast and at the cause (RFC 0011 items 4 and 5).** Every reference in a loop and its body is checked at
    template validation, and an error in a loop's own expressions fails the loop when it is evaluated, naming the
    expression.
@@ -791,7 +792,8 @@ The terms of [RFC 0011 §Terminology](0011-control-flow.md#terminology) and
 | **Body Step instance** | The Step that a body Step becomes in one iteration, with its own states, binding, Tasks, and outputs. It is identified by its loop, its iteration index, and its body Step's name, written `<LoopName>[<Iteration>].<BodyStepName>` in this RFC. |
 | **Loop variable** | A typed value declared in a loop's `variables`, set by `initial` before the first iteration and by `next` at each iteration boundary, and read as `Loop.<Name>`. |
 | **Loop output** | A typed value declared in a loop's `outputVariables`, evaluated at each iteration boundary, collected by `LAST` or `APPEND`, and read after the loop as `Steps.<LoopName>.Output.<Name>`. |
-| **Iteration boundary** | The evaluation point after every body Step instance of an iteration has succeeded or been skipped, at which the loop outputs, `until`, `next`, `while`, and the bound are evaluated. |
+| **Iteration start** | The evaluation stage at which a loop creates an instance of every body Step for an iteration and evaluates each instance's groups whose inputs are concrete. |
+| **Iteration boundary** | The evaluation stage after every body Step instance of an iteration has succeeded or been skipped, at which the loop outputs, `until`, `next`, `while`, and the bound are evaluated. |
 
 ### Schema modifications
 
@@ -1057,7 +1059,7 @@ says for any Step, within its iteration.
 | **Job creation** | as today | as today | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated, and the `minLength` check of the loop's `APPEND` outputs is never part of Job creation. |
 | **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011; for a body Step instance, `Loop.*` and `RawLoop.*`; for the loop's first *while*, `Loop.*` and `RawLoop.*` for iteration 0 | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
 | **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each body Step, `Loop.*` and `RawLoop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' `Steps.*` values that are not yet concrete, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
-| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` and `RawLoop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
+| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` and `RawLoop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Step.Name`, `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
 | **Job output evaluation** | as RFC 0011 | as RFC 0011 | as RFC 0011 | A job output may read a loop's `Steps.*` symbols, and not a body Step's. |
 | **Task execution** | as today | as today, and for a body Step instance, `Loop.*`, `RawLoop.*`, and the `Steps.*` of the loop's dependencies | *(none)* | As RFC 0011. |
 
