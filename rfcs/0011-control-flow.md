@@ -43,15 +43,16 @@ values), and lets the Steps that depend on it use those values in EXPR expressio
 `Steps.<Name>.Output.<Var>` symbol class. With those values a dependent Step can compute its parameter space (**dynamic
 fan-out**), decide whether it runs at all (**conditional execution** with `enableIf`), and reduce the values of every
 Task of a multi-Task Step (**fan-in**) with the existing EXPR function library. The Job's Steps and their dependencies
-stay fixed and are validated before submission; only Task counts, Task parameter values, host requirements, and
-enablement are late-bound, at a new per-Step evaluation stage called **step input binding**. A **loop** repeats a group
-of Steps until a condition holds, within a declared bound, carrying typed state from one iteration to the next, with
-evaluation stages of its own at the start and end of each iteration. Output variables are also how a Task reports
-**metrics**, such as an error score or a frame rate, for a scheduler to show beside the Task's parameters: a metric is
-an output variable that no Step reads. A Job can also declare **job outputs**, typed values computed from its parameters
-and its Steps' outputs, which complement job parameters by reporting results back to the submitter as soon as each one
-is known. `PATH` values that flow out of a Task are stored in the submission path context, so a path a Task reports on a
-Linux worker reaches a Windows submitter in a form it can use.
+stay fixed and are validated before submission; only what a Step's materialization expressions compute (whether it runs,
+its Tasks and their parameter values, its host requirements, and its other TEMPLATE-scope fields) is late-bound, at a
+new per-Step evaluation stage called **step input binding**. A **loop** repeats a group of Steps until a condition
+holds, within a declared bound, carrying typed state from one iteration to the next, with evaluation stages of its own
+at the start and end of each iteration. Output variables are also how a Task reports **metrics**, such as an error score
+or a frame rate, for a scheduler to show beside the Task's parameters: a metric is an output variable that no Step
+reads. A Job can also declare **job outputs**, typed values computed from its parameters and its Steps' outputs, which
+complement job parameters by reporting results back to the submitter as soon as each one is known. `PATH` values that
+flow out of a Task are stored in the submission path context, so a path a Task reports on a Linux worker reaches a
+Windows submitter in a form it can use.
 
 Like EXPR, the extension is specified in more than one RFC. All of them define parts of the one extension name
 `CONTROL_FLOW`, so a template that lists it gets everything below:
@@ -1253,10 +1254,10 @@ result follows the same rules as a `range` given as a format string, and so may 
 ###### Range length
 
 With `CONTROL_FLOW`, the 1024-element maximum of §3.4.1 applies to the items of a `range` written as a YAML list
-literal, counted as written, and not to the values a format string evaluates to, which follows the rule §3.4.1.1.1 already states for `<IntRangeExpr>`: the
-number of values is not constrained by this specification, and a scheduler that needs to bound it does so with its
-own limit on the Task count of a Step (see [Limits](#limits)). Computed fan-out is the purpose of this extension, and
-a discovered list of 5,000 object keys is ordinary.
+literal, counted as written, and not to the values a format string evaluates to, which follows the rule §3.4.1.1.1
+already states for `<IntRangeExpr>`: the number of values is not constrained by this specification, and a scheduler that
+needs to bound it does so with its own per-Step or per-Job Task limit (see [Limits](#limits) item 1). Computed fan-out
+is the purpose of this extension, and a discovered list of 5,000 object keys is ordinary.
 
 #### `<Environment>`
 
@@ -1279,7 +1280,9 @@ New property:
        `RawParam.*`, and `Job.Name`, and is evaluated at Job creation.
     2. In a Step Environment (`stepEnvironments`), it may also reference `Step.Name` and the `Steps.*` symbols of the
        enclosing Step's direct dependencies, and is evaluated in the Step's remaining materialization group (see
-       [Materialization groups](#materialization-groups)).
+       [Materialization groups](#materialization-groups)). In a body Step of a loop, it may also reference what
+       [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope) and
+       [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop) allow.
     3. It may not reference `Session.*`, `Env.*`, or names bound by `let`.
     4. Permitted only in a Job Template. An `<Environment>` in an Environment Template may not have *enableIf*.
 
@@ -1619,15 +1622,20 @@ the limits below, are in [RFC 0013 §Limits](0013-step-loops.md#limits). This RF
    materialized parameter space that exceeds the Step limit, or that would take the Job's total over the Job limit, is
    an error when the Step's Task enumeration group is evaluated, before any of its Tasks runs, with a message that names
    the limit: it fails Job creation if that group is evaluated then, and the Step otherwise. The Job's total is the sum
-   of the Task counts of every Step, and with RFC 0013 every body Step instance, whose Tasks are known, whatever its
-   state, and retries and re-runs add no Tasks to it. When two Steps' Tasks become known after Job creation, which of
-   them exceeds the Job limit can depend on the order in which their groups are evaluated.
+   of the Task counts of every top-level Step whose Tasks are known and, with RFC 0013, of every body Step instance
+   whose Tasks are known, whatever its state; retries and re-runs add no Tasks to it. When two Steps' Tasks become known
+   after Job creation, which of them exceeds the Job limit can depend on the order in which their groups are evaluated.
 2. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
 
-Where this RFC and RFC 0013 measure values by their **JSON serialization**, the size of a value is the number of
-UTF-8 bytes of its compact JSON serialization, with no whitespace between tokens. RFC 0012 measures a Task's values by
-the bytes that reported them instead, so a value built from a Task output can measure differently here, for example a
-`FLOAT` reported as `1` and serialized as `1.0`.
+Where these RFCs measure a value by its **JSON serialization** (job outputs in [Job outputs](#job-outputs) item 7, loop
+values in [RFC 0013 §Limits](0013-step-loops.md#limits) item 4, and the stored form of a `PATH` value in
+[RFC 0012 §Limits](0012-step-output-variables.md#limits) item 2), its size is the number of UTF-8 bytes of this
+canonical form: no whitespace between tokens; a `string` or `path` as a JSON string of its characters in raw UTF-8,
+escaping only `"`, `\`, and U+0000 to U+001F; an `int` in plain decimal; a `float` as the fewest decimal digits that
+read back as the same 64-bit value, with an exponent (`1e300`) only where that is shorter; `true`, `false`, and `null`;
+and a list as `[`, its elements separated by `,`, and `]`. An implementation may store values in any form, but measures
+them this way. RFC 0012 otherwise measures a Task's values by the bytes that reported them, so a value built from a Task
+output can measure differently here: a `FLOAT` reported as `1.50` counts as `1.5`.
 
 ### Job outputs
 
@@ -1774,8 +1782,8 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
 8. The Step dependency graph is acyclic, as today.
 9. *jobOutputDefinitions*: 1 to 50 elements; names are unique `<Identifier>`s; types and constraint properties as
     for *outputVariables*; each *value* type-checks against its type, made optional, and references only the symbols
-    [`<JobOutputDefinition>`](#joboutputdefinition) allows, with the `Steps.*` symbols of any Step except a loop's
-    body Step (RFC 0013), values whose type is or contains `path` only through `RawOutput` and `TaskRawParam`.
+    [`<JobOutputDefinition>`](#joboutputdefinition) allows: the `Steps.*` symbols of any Step except a loop's body
+    Step (RFC 0013), and values whose type is or contains `path` only through `RawOutput` and `TaskRawParam`.
 
 **At step input binding** (by the scheduler, group by group as each group's inputs become concrete, and before any Task
 of the Step runs): *enableIf* evaluates to `true` or `false`, not `null`; then, once it is `true`, every other
