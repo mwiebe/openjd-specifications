@@ -1,5 +1,7 @@
-# RFC 0013 §Loop binding item 3 and §Failure: an error in an initial that reads the loop's
-# dependency fails the loop at loop binding, after P succeeds and before iteration 0 starts.
+# RFC 0013 §<LoopOutputVariableDefinition> item 6 and §The iteration boundary: under LAST,
+# each iteration's value is checked against the output's constraint properties, and a
+# violation fails the loop at once. O is Loop.Iteration with maxValue 0, so the boundary of
+# iteration 1 fails the loop.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -7,27 +9,8 @@ template:
   - CONTROL_FLOW
   name: TestJob
   steps:
-  - name: P
-    outputVariables:
-    - name: V
-      type: INT
-    script:
-      actions:
-        onRun:
-          command: python
-          args:
-          - -c
-          - |-
-            print('P_' + 'RAN'); print('openjd_output_var: V=1')
   - name: L
-    dependencies:
-    - dependsOn: P
     loop:
-      variables:
-      - name: N
-        type: INT
-        initial: '{{fail(''bad start'') if Steps.P.Output.V == 1 else 0}}'
-        next: '{{Loop.N + 1}}'
       until: '{{Loop.Iteration >= 4}}'
       maxIterations: 10
       steps:
@@ -40,6 +23,12 @@ template:
               - -c
               - |-
                 print('IT' + '_' + str({{Loop.Iteration}}))
+    outputVariables:
+    - name: O
+      type: INT
+      collect: LAST
+      value: '{{Loop.Iteration}}'
+      maxValue: 0
   - name: C
     dependencies:
     - dependsOn: L
@@ -54,7 +43,8 @@ template:
 expected:
   taskFailure: {}
   output:
-  - P_RAN
-  forbidden:
   - IT_0
+  - IT_1
+  forbidden:
+  - IT_2
   - C_RAN

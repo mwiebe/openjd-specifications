@@ -1,19 +1,16 @@
-# RFC 0013 §Loop binding item 3 and §Failure: an error in an initial fails the loop, and
-# fails Job creation when the start group is evaluated then. N's initial reads only a job
-# parameter, so with N = 0 its fail(...) fails Job creation before X, which is independent
-# of L, runs. The run fails at Job creation, not in a Task; expected.taskFailure is used anyway
-# because the runner ignores forbidden markers in .invalid tests.
+# RFC 0013 §Loop binding item 3 and §Failure: an error in an initial that reads the loop's
+# dependency fails the loop at loop binding, after P succeeds and before iteration 0 starts.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
   - EXPR
   - CONTROL_FLOW
   name: TestJob
-  parameterDefinitions:
-  - name: N
-    type: INT
   steps:
-  - name: X
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
     script:
       actions:
         onRun:
@@ -21,13 +18,15 @@ template:
           args:
           - -c
           - |-
-            print('X_' + 'RAN')
+            print('openjd_output_var: V=1'); print('P_' + 'RAN')
   - name: L
+    dependencies:
+    - dependsOn: P
     loop:
       variables:
       - name: N
         type: INT
-        initial: '{{Param.N if Param.N > 0 else fail(''N must be positive'')}}'
+        initial: '{{fail(''bad start'') if Steps.P.Output.V == 1 else 0}}'
         next: '{{Loop.N + 1}}'
       until: '{{Loop.Iteration >= 4}}'
       maxIterations: 10
@@ -52,11 +51,10 @@ template:
           - -c
           - |-
             print('C_' + 'RAN')
-parameters:
-  N: 0
 expected:
   taskFailure: {}
+  output:
+  - P_RAN
   forbidden:
-  - X_RAN
   - IT_0
   - C_RAN
