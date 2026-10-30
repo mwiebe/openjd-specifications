@@ -58,8 +58,8 @@ Where:
          [WRAP_ACTIONS](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0008-environment-wrap-actions.md),
          [CONTROL_FLOW](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) (draft;
          specified in RFCs 0011, [0012](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md), and [0013](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0013-step-loops.md))
-      * A template that lists `CONTROL_FLOW` must also list `EXPR`. Schedulers must reject templates that list
-        `CONTROL_FLOW` without `EXPR`.
+      * A template that lists `CONTROL_FLOW` must also list `EXPR`. Schedulers and validators must reject templates
+        that list `CONTROL_FLOW` without `EXPR`.
 4. *name* — The name to give to a Job that is created from the template. See: [&lt;JobName&gt;](#111-jobname).
 5. *description* — A description to apply to all Jobs that are created from the template. It has no functional purpose,
    but may appear in UI elements. See: [&lt;Description&gt;](#72-description).
@@ -904,25 +904,57 @@ Where:
    expression types, and constraint properties. `LIST[LIST[INT]]` is allowed.
 3. *value* — The output's value, whose target type is the expression type of *type*, made optional: a `null` result
    means the output has no value, which is not an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]`
-   parameters), `RawParam.*`, `Job.Name`, and the `Steps.*` values of any Step of the Job, with values whose type is or
+   parameters), `RawParam.*`, `Job.Name`, and the `Steps.*` values of any Step of the Job except a Step of a loop's body (see
+   [3.8.4](#384-scopes-in-and-around-a-loop)), with values whose type is or
    contains `path` read through `Steps.<StepName>.RawOutput.*` and `Steps.<StepName>.TaskRawParam.*`. It may not reference `Step.Name`, `Task.*`,
    `Session.*`, or names bound by `let`.
 4. *description*, *unit* — For display only, as on `<OutputVariableDefinition>`.
 5. Constraint properties — Checked against the value when it is evaluated. A `null` value is not checked.
 
-The render management system evaluates each Job output as soon as every `Steps.*` value its *value* references is
-concrete, which is at Job creation if it references none or only Task parameters of Steps whose Tasks are known then,
-and keeps the result for the life of the Job. It does not need the referenced Steps to be dependencies of anything. A
-Step's Task parameters are concrete once its Tasks are known, which can be before the Step can run, and an output
-evaluated then stays committed even if that Step later fails; the Job then fails as it otherwise would. If evaluation
-fails, including a conversion error, a constraint violation, or a value over the implementation's size limit (which
-must be at least 1 MiB for all of a Job's outputs), the Job fails: no further Tasks are dispatched, and an output
-evaluated at Job creation makes Job creation fail. If a Step the output references fails or can never run because a
-dependency failed, an output not yet evaluated is not evaluated while that remains so. A Job does not succeed until
-every Job output whose inputs are concrete has been evaluated. When a re-run of a Task commits new values, the outputs
-that reference its Step are evaluated again; if that fails, the output keeps its earlier value, marked stale, and the
-Job fails, even if it had already succeeded. A `PATH` Job output built from `PATH` values is in the submission path
-context. Job outputs are not redacted and must not be used to pass secrets.
+The render management system handles Job outputs as follows:
+
+1. **When an output is evaluated.** Each Job output is evaluated on its own, as soon as every `Steps.*` value its
+   *value* references is concrete (see [Value References](#731-value-references)). An output that references no
+   `Steps.*` value, or only Task parameters of Steps whose Tasks are known at Job creation, is evaluated at Job
+   creation. An output that reads `Output` or `RawOutput` of a Step is evaluated when that Step succeeds or is
+   skipped. It does not need the referenced Steps to be dependencies of anything. A Job does not succeed until every
+   Job output whose inputs are concrete has been evaluated.
+2. **Commit and display.** An evaluated output is committed at once and kept for the life of the Job. The render
+   management system should make Job outputs visible to users and return them to callers, using *description* and
+   *unit*, and should show an output that is not yet evaluated as pending and name what it waits for.
+3. **Failure.** If evaluating an output fails, including a `fail(...)` call, a value that doesn't convert to *type*, a
+   violated constraint property, or a size over the limit of item 7, the Job fails: it is marked failed with a message
+   that names the output, the expression, and the problem, no further Tasks are dispatched, and Tasks that are running
+   should be canceled. An output evaluated at Job creation that fails makes Job creation fail.
+4. **Missing producers.** A Step's Task parameters are concrete once its Tasks are known, which can be before the Step
+   can run, and an output evaluated then stays committed even if that Step later fails; the Job then fails as it
+   otherwise would. If a Step that an output not yet evaluated references fails, or can never run because one of its
+   dependencies failed, the output is not evaluated while that remains so (if a requeue later makes the Step succeed,
+   it is evaluated then), and it should be shown as unavailable, naming the Step, rather than as pending. If the Step
+   is skipped, its values are `null` and the output is evaluated with them. A Step with zero Tasks gives empty lists, so
+   `min(Steps.P.Output.X)` fails the Job when the parameter space is empty; write
+   `min(Steps.P.Output.X) if len(Steps.P.Output.X) > 0 else null` where emptiness is expected.
+5. **Re-runs.** Job outputs do not count as consumers for the re-run rules of
+   [How Jobs Are Run](How-Jobs-Are-Run#step-states-and-step-input-binding). When a re-run of a Task commits new values,
+   every Job output that references its Step is evaluated again and its value replaced. If that fails, the re-run's
+   values stay committed, the output keeps its earlier value, marked stale, and the Job fails as in item 3, even if it
+   had already succeeded.
+6. **Paths.** A `PATH` or `LIST[PATH]` Job output built from `PATH` values is in the submission path context. A value
+   built from a `STRING` is whatever that string holds.
+7. **Limits.** An implementation must accept Job output values totaling at least 1 MiB (1,048,576 bytes) per Job,
+   measured as their JSON serialization (see below), and may accept more. The total counts each Job output's current
+   value, and an output with no value counts nothing.
+8. **Secrets.** Job outputs are stored and displayed, so they are not redacted and must not be used to pass secrets.
+
+**Measuring a value's size.** Where this specification measures a value by its *JSON serialization* (Job outputs in
+item 7, the stored form of a `PATH` output value in [3.7.1](#371-reporting-output-values), and loop values in
+[3.8.5](#385-running-a-loop)), its size is the number of bytes of its serialization under the JSON Canonicalization
+Scheme ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785)): no whitespace, a `string` or `path` as a UTF-8 JSON string
+with that scheme's escapes, and a `float` in its ECMAScript number form (`2`, `1.5e-7`, `1e+300`). An `int` is written
+in plain decimal instead, and a `range_expr` as a JSON string of its canonical form, the text the Expression Language's
+`string()` gives it (`1-5`). An implementation may store values in any form, but measures them this way. A Task's own
+output values are otherwise measured by the bytes that reported them (see [3.7.1](#371-reporting-output-values)), so a
+value built from a Task output can measure differently here: a `FLOAT` reported as `1.50` counts as `1.5`.
 
 ## 3. `<StepTemplate>`
 
@@ -956,7 +988,7 @@ Where:
    `Steps.<name>.*` value of the Step (see [Value References](#731-value-references)) is `null`. A skipped Step
    satisfies the dependencies of the Steps that depend on it once its own dependencies are satisfied. If omitted, the
    Step is always enabled. Constraints:
-    1. It may reference `Param.*` (except `PATH` parameters), `RawParam.*`, `Job.Name`, `Step.Name`, and the
+    1. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name`, `Step.Name`, and the
        `Steps.*` values of the Step's direct dependencies. It may not reference names bound by the Step's own *let*, `Task.*`, or `Session.*`.
     2. If every value it references is concrete at Job creation (it references no `Steps.*` value, or only values
        concrete then, such as those of a Step skipped at Job creation), it is evaluated at Job creation. Otherwise it
@@ -1003,13 +1035,18 @@ the Step's *materialization expressions*. They may reference the `Steps.*` value
 They are divided into *materialization groups*. *enableIf* is decided first; after it is `true` (or if it is
 absent), each other group can be evaluated as soon as the `Steps.*` values it reads (directly or through the *let*
 bindings it uses) are concrete, and should be evaluated then. Every group whose values are concrete at Job creation
-is evaluated then, only in a Step whose *enableIf* is `true` or absent at Job creation. The groups are:
+is evaluated then, only in a Step whose *enableIf* is `true` or absent at Job creation. The groups are listed below.
+When more than one group can be evaluated at the same moment, they are evaluated in this order:
 
 1. *enableIf*, which is decided before any other group is evaluated;
-2. *parameterSpace* (its ranges, then its other format strings, such as the `chunks` fields of `TASK_CHUNKING`); once
-   it is evaluated, the Step's Tasks are known;
+2. *parameterSpace* (the `range` of each Task parameter in declaration order, then its other format strings, such as
+   the `chunks` fields of `TASK_CHUNKING`); once it is evaluated, the Step's Tasks are known;
 3. *hostRequirements*; once it is evaluated, the Step's host requirements are known;
-4. every other materialization expression, in *stepEnvironments* and *script*.
+4. with a future task-task dependencies extension (`TASK_DEPENDENCIES`) only, the subspace ranges of its
+   *dependencies* and the checks of the Task-level dependency graph built from them, evaluated once the Step's Tasks,
+   and the Tasks of every Step those dependencies name, are known;
+5. every other materialization expression: the format strings of each of its *stepEnvironments*, in order, each
+   starting with its *enableIf*, and those of its *script*, such as an action's `timeout` and `cancelation` fields.
 
 A *let* binding is evaluated with the first group that uses it, and the last group uses every *let* binding. An
 evaluation error in any group fails the Step as soon as that group is evaluated (or Job creation, for a group
@@ -1231,13 +1268,24 @@ With the `CONTROL_FLOW` extension:
 1. A task parameter `range` given as a Format String, and the other format strings of the *parameterSpace* (such as
    the `chunks` fields of `TASK_CHUNKING`), may reference the `Steps.*` values of the Step's direct dependencies. The
    *combination* may not.
-2. A task parameter `range` given as a Format String may evaluate to an empty list. Combined by product, it makes the
-   parameter space empty; associated with a non-empty range, it is an error. A Step with an empty parameter space has
-   zero Tasks and completes successfully once its dependencies are satisfied. A range expression string such as
-   `"1-{{N}}"` cannot be empty, and a `range` written as a list literal must have at least one item as written.
-3. The maximum of 1024 elements on a task parameter range list applies to list literals only. The number of values a
-   `range` given as a Format String evaluates to is not constrained by this specification, as for
-   [&lt;IntRangeExpr&gt;](#34111-intrangeexpr); an implementation bounds it with its own limit on the Task count.
+2. A task parameter `range` given as a Format String may evaluate to an empty list, for any Task parameter type.
+   Combined by product, it makes the parameter space empty; associated with a non-empty range, it is an error when
+   that range is evaluated, and associated empty ranges give an empty space. A Step with an empty parameter space has
+   zero Tasks and completes successfully once its dependencies are satisfied, and its `Steps.*.Output` and
+   `Steps.*.TaskParam` lists are `[]`. A range expression string such as `"1-{{N}}"` cannot be empty (with `N = 0` it
+   is `1-0`); write `"{{range(1, N + 1)}}"` for zero Tasks when `N = 0`. A `range` written as a list literal must have
+   at least one item as written; after its items are evaluated (where the Expression Language flattens a list-valued
+   item), it follows the same rules as a `range` given as a Format String, and so may be empty.
+3. The maximum of 1024 elements on a task parameter range list applies to the items of a list literal, counted as
+   written. The number of values a `range` given as a Format String evaluates to is not constrained by this
+   specification, as for [&lt;IntRangeExpr&gt;](#34111-intrangeexpr). An implementation may impose a maximum number
+   of Tasks per Step, and a maximum total number of Tasks per Job. A materialized parameter space that exceeds the Step
+   limit, or that would take the Job's total over the Job limit, is an error when the Step's *parameterSpace* is
+   evaluated, before any of its Tasks runs, with a message that names the limit: it fails Job creation if that happens
+   then, and the Step otherwise. The Job's total is the sum of the Task counts of every Step, and of every instance of
+   a Step of a loop's body (see [3.8.5](#385-running-a-loop)), whose Tasks are known, whatever its state. Retries and
+   re-runs add no Tasks to it, and with `TASK_CHUNKING` Tasks are counted, not chunks. When two Steps' Tasks become
+   known after Job creation, which of them exceeds the Job limit can depend on the order in which they are evaluated.
 
 #### 3.4.1. `<TaskParameterDefinition>`
 
@@ -1610,6 +1658,9 @@ The format string scopes available to format strings within a `<StepScript>` are
 5. `Steps.*` — Output variables and Task parameter values of the Step's direct dependencies. Available with the
    `CONTROL_FLOW` extension.
    See [Value References](#731-value-references).
+6. `Loop.*` and `RawLoop.*` — In a Step of a loop's body, the loop variables and `Loop.Iteration` for the iteration
+   that the Step instance belongs to. Available with the `CONTROL_FLOW` extension. In a Step of a loop's body, the
+   `Steps.*` values of item 5 are those that [3.8.4](#384-scopes-in-and-around-a-loop) allows.
 
 #### 3.5.1. `<StepActions>`
 
@@ -1691,9 +1742,11 @@ and where the bound names are available:
 Note: `Task.Param.*` and `Task.RawParam.*` are only available in `<StepScript>` and `<SimpleAction>` contexts because task parameter
 values are not known until task execution time.
 
-Note: With the `CONTROL_FLOW` extension, `<StepTemplate>.let`, `<StepScript>.let`, and `<SimpleAction>.let` may also
-reference the `Steps.*` values of the Step's direct dependencies, and in a Step of a loop's body, the `Loop.*` values
-and the `Steps.*` values that [&lt;StepLoop&gt;](#38-steploop-extension-control_flow) makes available there. A `<StepTemplate>.let` that references `Steps.*` is
+Note: With the `CONTROL_FLOW` extension, `<StepTemplate>.let`, `<StepScript>.let`, `<SimpleAction>.let`, and the
+`<EnvironmentScript>.let` of a Step Environment may also reference the `Steps.*` values of the Step's direct
+dependencies, and in a Step of a loop's body, the `Loop.*` and `RawLoop.*` values and the `Steps.*` values that
+[&lt;StepLoop&gt;](#38-steploop-extension-control_flow) makes available there (see
+[3.8.4](#384-scopes-in-and-around-a-loop)). The `<EnvironmentScript>.let` of a Job Environment may not. A `<StepTemplate>.let` that references `Steps.*` is
 evaluated at step input binding, with the first materialization group of the Step that uses it (see
 [&lt;StepTemplate&gt;](#3-steptemplate)). A group evaluates the bindings it uses in declaration order, so a binding
 is never evaluated before one it reads, but a later binding may be evaluated before an earlier one that it doesn't
@@ -1802,10 +1855,18 @@ openjd_output_var: <Name>[<Int>]=@<FilePath>
 <WS>           ::= " " | "\t"
 ```
 
-Where `<JSON>` is one JSON value on the rest of the line (`NaN` and `Infinity` are not JSON, and the line must be valid
-UTF-8), and `<FilePath>` is the
-rest of the line after `@`, with trailing spaces and tabs removed. The line terminator is not part of the directive. Names
-are case-sensitive. For example:
+Where:
+
+* The line terminator (`\n` or `\r\n`) is not part of the directive, and the line must be valid UTF-8.
+* `<Identifier>` is the output's name, matched case-sensitively against the Step's declared outputs. There is no
+  whitespace between it, the `<TaskSelector>`, and the `=`.
+* `<Int>` is a decimal integer, an optional `-` then digits, with no whitespace inside the brackets.
+* `<JSON>` is one JSON value on the rest of the line. A string that contains a line break is written with the escape
+  `\n`. `NaN`, `Infinity`, and `-Infinity` are not JSON.
+* `<FilePath>` is the rest of the line after `@`, with trailing spaces and tabs removed. It must not be empty.
+
+The runtime recognizes a directive only in a Session running a Job whose Job Template lists `CONTROL_FLOW`; in any other
+Session the line is ordinary output. For example:
 
 ```bash
 echo "openjd_output_var: FrameCount=$count"
@@ -1815,15 +1876,19 @@ echo "openjd_output_var: RenderTimeS[$frame]=$seconds"   # in a Step with a CHUN
 
 In a Step with a `CHUNK[INT]` Task parameter, one action runs a chunk of Tasks, and every directive must have a
 `<TaskSelector>`: the decimal value of the `CHUNK[INT]` parameter for the Task it reports for, which must be a value in
-the chunk being run. The `CHUNK[INT]` parameter's values must be distinct in such a Step; a duplicate fails the Step
-when its parameter space is materialized (or fails Job creation, if that is when it is materialized). In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
+the chunk being run, not merely of the parameter's whole range. In a Step that declares *outputVariables*, the
+`CHUNK[INT]` parameter's values must be distinct, so that a value names exactly one Task. When its `range` is a list
+literal, its integer elements are checked at template validation (a range expression cannot repeat a value); format
+string elements and computed ranges are checked when the parameter space is materialized, where a duplicate fails the
+Step (or fails Job creation, if that is when it is materialized). In any other Step a `<TaskSelector>` is not allowed. Collect modes, constraint properties, and the
 size limit apply to each Task of the chunk separately, and when the action exits successfully each Task must have its
 required values; if any Task doesn't, or the action fails, the whole chunk fails and no Task of it commits any
 output. The selector is matched by integer value and is required even in a chunk of one Task.
 
 A relative `<FilePath>` is resolved against the Session's Working Directory; an absolute one is used as written. Either
 way, the file the runtime opens must be a regular file inside the Session's Working Directory, after following symbolic links, and the runtime must read it
-with no more access than the user that runs the action. The file holds exactly
+with no more access than the user that runs the action. A runtime should open the path without blocking and check
+that it is a regular file before reading, because opening a FIFO for reading blocks. The file holds exactly
 one UTF-8 JSON value, which may span lines and be preceded by a byte order mark. The runtime does not modify or delete
 the file. The runtime reads the file when it reads the directive, so the action must finish writing the file before it
 prints the directive.
@@ -1839,9 +1904,18 @@ normal cancelation, if it: does not match the grammar or is not valid JSON; name
 is `null`, an object, or does not convert; violates a constraint property; repeats a `collect: ONCE` output (for the
 same Task, in a chunk); lacks a required `<TaskSelector>`, has one where none is allowed, or names a value not in the
 chunk; names a file that is not a regular file inside the Session's Working Directory, is unreadable, or is not UTF-8,
-contains NUL, or is not exactly one JSON value; is on a line that is not valid UTF-8; is longer than the runtime's line
-limit, which must be at least 64 KiB (an over-long directive is never truncated and parsed); or takes the size of the
-values the Task holds over the runtime's limit, which must be at least 1 MiB. The Task also fails if, when the action
+contains NUL, or is not exactly one JSON value; is on a line that is not valid UTF-8; is on a line longer than the
+runtime's line limit, which must be at least 64 KiB (65,536 bytes of UTF-8; an over-long directive is never truncated
+and parsed, and its discarded remainder is never recognized as a directive); has a `PATH` value that is relative or
+has no submission-context form (see below); or takes the size of the values the Task holds over the runtime's limit.
+That limit must be at least 1 MiB (1,048,576 bytes) per Task attempt, per Task of a chunk. The size counted is that
+of the values the Task currently holds, as the bytes that reported them (the inline `<JSON>` text without the
+whitespace around it, or the whole content of an `@` file): the `ONCE` value, the current `LAST` value (a value it
+replaces stops counting), and every `APPEND` element. For a `PATH` or `LIST[PATH]` value, or a `PATH` element under
+`APPEND`, the larger of its reported bytes and the [JSON serialization](#217-joboutputdefinition-extension-control_flow)
+of its stored form counts. When reading an `@` file, the runtime reads at most as many bytes as remain of that limit
+(not counting the current value of a `LAST` output that the directive replaces), plus one to detect a file that
+exceeds it. The Task also fails if, when the action
 exits, a `ONCE` or `LAST` output has no value or an `APPEND` output has fewer elements than its *minLength*. In a Job
 that lists `CONTROL_FLOW`, a directive printed by any action of the Job Template other than the `onRun` of a Task of a
 Step that declares *outputVariables* cancels and fails that action. Under `WRAP_ACTIONS`, a line from a wrap hook counts
@@ -1854,17 +1928,20 @@ A `PATH` value, or each element of a `LIST[PATH]` value, is stored in the **subm
 `PATH` Job Parameter values are given, by applying the Session's path mapping rules in reverse. A relative path is
 invalid. A URI is stored unchanged, and so is any absolute value when the Session has no path mapping rules. Otherwise
 the stored value must map forward, with the producing Session's rules, back to the reported path (compared after lexical
-normalization, a root keeping its separator, Windows paths case-insensitively with `\` or `/` separators, POSIX paths
-case-sensitively); if the runtime finds no such form, the value is invalid. How the inverse is computed is
-implementation-defined. The reference inverse matches each rule's `destination_path` against the path on a component
+normalization, a root keeping its separator, under the rules of the worker host's path format: Windows paths
+case-insensitively with `\` or `/` separators, POSIX paths case-sensitively); if the runtime finds no such form, the
+value is invalid. A runtime may find the stored form however it likes, and one with more knowledge of the farm's
+storage may do better than the rules alone, but a runtime that has only the rules should use this reference inverse. It
+matches each rule's `destination_path` against the path on a component
 boundary, tries the matching rules longest `destination_path` first and then in the order listed, replaces that prefix
 with the rule's `source_path`, converting separators to its `source_path_format`, and stores the first result that maps
-forward back to the reported path. A runtime that knows the submission path format should use only rules whose
+forward back to the reported path; if none does, the value is invalid. A runtime that knows the submission path format should use only rules whose
 `source_path_format` is that format or `URI`.
 
 The values are committed when the Task succeeds, and are retained by the render management system for the life of the
-Job. They may be forwarded as soon as they are reported, and displayed before then if marked as not yet committed. They are not redacted and must not be used to
-pass secrets.
+Job. They may be forwarded as soon as they are reported, and displayed before then if marked as not yet committed, but
+only committed values are visible to consumers through `Steps.*`. They are not redacted and must not be used to pass
+secrets.
 
 ### 3.8. `<StepLoop>` `@extension CONTROL_FLOW`
 
@@ -2009,6 +2086,12 @@ The type of `Steps.<LoopName>.Output.<name>`, where `T` is the expression type o
 `Steps.<LoopName>.TaskParam.*` and `Steps.<LoopName>.TaskRawParam.*` are not available: a loop has no Task
 parameters.
 
+A loop's outputs are committed, and its `Steps.<LoopName>.Output.*` and `RawOutput.*` values become concrete, when the
+loop succeeds or is skipped. A loop that fails commits no outputs. The render management system should show each
+iteration's values as they are evaluated, and may show a running loop's outputs so far if it marks them as not yet
+committed. Loop outputs and loop variables are stored and displayed, so they are not redacted and must not be used to
+pass secrets.
+
 #### 3.8.4. Scopes in and around a loop
 
 * A Step of a loop's body may reference, in any of its format strings, `Loop.*` and `RawLoop.*` (see
@@ -2033,21 +2116,48 @@ every loop output's *value* is evaluated; *until*, if present, is checked, and i
 variable's *next* is evaluated; *while*, if present, is checked with the new values, and if it is `false` the loop ends;
 and if the loop has run *maxIterations* iterations, it fails. A loop whose first *while* is `false` ends with zero
 iterations once its dependencies are satisfied. When a loop ends, each `APPEND` output's `minLength` is checked, and
-then the loop succeeds; this check is not a materialization expression and is never part of Job creation. The total
-size of the loop's variable and output values is checked after the *initial* values are evaluated (failing Job
-creation if they are evaluated then), and after each iteration once the outputs and once the *next* values are
-evaluated; a scheduler must accept at least 1 MiB. A failed Step in the iteration in progress, or an error in any of
-these expressions, fails the loop at once. Only a failure of the Tasks of a Step instance of the iteration in progress
-can be recovered, as any failed Step can: a loop whose failure is recoverable is `FAILED` until every failed body Step
-instance of the iteration in progress has succeeded after a retry or requeue of its Tasks; it then returns to
-`RUNNING`, and the iteration continues to its boundary. Until then the Steps that depend on it are blocked. Every
-other failure of a loop is final, and once one occurs the loop cannot return to `RUNNING`: an error in a
+then the loop succeeds; this check is not a materialization expression and is never part of Job creation.
+
+The limits of a loop are:
+
+1. *maxIterations* is at most 1,000, and an implementation must support every value from 1 to 1,000.
+2. An implementation's maximum number of Tasks per Step (see [3.4](#34-stepparameterspacedefinition)) applies to each
+   instance of a Step of the body. An implementation may also impose a maximum on the total number of Tasks of all
+   instances of a loop, or on the number of Step instances a loop creates. An instance whose parameter space would take
+   the loop over such a limit fails when its *parameterSpace* is evaluated, and an iteration that would take it over
+   the instance limit fails the loop when it would start; the message names the limit. The maximum total number of
+   Tasks per Job counts the Tasks of every Step instance of every iteration, and an instance that would take the Job
+   over it fails in the same way. A loop has no Tasks of its own, so it adds nothing to a Task count.
+3. A loop and each Step of its body count once each as a Step of the Job Template, as an element of *steps* does,
+   wherever this specification or an implementation counts the Steps of a Job Template. Step instances are not Steps
+   of the template, and the number of iterations does not change the count.
+4. An implementation must accept loop variable and loop output values totaling at least 1 MiB (1,048,576 bytes) per
+   loop at any moment, and may accept more. The size counted is that of the values the loop currently holds, each as
+   its [JSON serialization](#217-joboutputdefinition-extension-control_flow): the current value of each loop variable
+   (a value that *next* replaces stops counting), the current value of each `LAST` output (nothing before its first
+   iteration's value), and each element of each `APPEND` output, counted on its own, so the brackets and separators of
+   the list do not count. The total is checked after the *initial* values are evaluated (where exceeding it fails Job
+   creation if they are evaluated then), and after each iteration once the outputs and once the *next* values are
+   evaluated.
+
+A failed Step instance in the iteration in progress, or an error in any of the loop's expressions, fails the loop at
+once, and no further iteration starts. Other Step instances of the same iteration that do not depend on the failed
+one may still run, as independent Steps of a Job may after a Step fails. Only a failure of the Tasks of a Step instance
+of the iteration in progress can be recovered, as any failed Step can: a loop whose failure is recoverable is `FAILED`
+until every failed body Step instance of the iteration in progress has succeeded after a retry or requeue of its Tasks;
+it then returns to `RUNNING`, and the iteration continues to its boundary. Until then the Steps that depend on it are
+blocked, and a Job output that reads it is not evaluated. Every other failure of a loop is final: an error in a
 materialization expression of a Step instance or of the loop (its *enableIf*, *maxIterations*, an *initial*, or the
-first *while*), exceeding a limit, an error in *while*, *until*, *next*, or an output *value*, a violated constraint,
-including `minLength` when the loop ends, and reaching *maxIterations*. Any `Steps.*` output that a loop's *while*,
-*until*, *next*, *initial*, or output *value* references counts as consumed (a value a later expression has read, so
-a re-run that changes it fails), for re-runs of its Task, once that expression has been evaluated. A re-run of a body
-Task that has already succeeded leaves the Task and its Step instance `SUCCEEDED`
+first *while*), exceeding a limit of the list above, including an instance whose Tasks would take the loop or the Job
+over a Task limit, an error in *while*, *until*, *next*, or an output *value*, a violated constraint, including
+`minLength` when the loop ends, and reaching *maxIterations*. Once any final failure occurs, the loop cannot return to
+`RUNNING`, even if a failed Task of the iteration in progress is later retried or requeued and succeeds.
+
+Any `Steps.*` output that a loop's *while*, *until*, *next*, *initial*, or output *value* references counts as consumed
+(see [How Jobs Are Run](How-Jobs-Are-Run#step-states-and-step-input-binding)) once that expression has been evaluated,
+so a re-run of a Task of a completed iteration that succeeds with a different value for it fails. Loop variables and
+loop outputs are never evaluated again, and an iteration is never run again. A re-run of a body Task that has already
+succeeded leaves the Task and its Step instance `SUCCEEDED`
 (see [RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)),
 so it never fails the loop or changes its state, variables, or outputs, and the iteration boundary does not wait for
 it. Only a failed attempt of a Task that has not yet succeeded counts as a failure of a Step instance. The loop's
@@ -2079,13 +2189,18 @@ Where:
 3. *enableIf* — `@extension CONTROL_FLOW`. Whether the Environment is entered; the expression's target type is
    `bool`, and a `null` result is an error. A disabled Environment is not entered or exited in any Session, its
    *variables* are not set, and it is not part of the Session's Environment stack. If omitted, the Environment is always enabled. Constraints:
-    1. In a Job Environment, it may reference `Param.*` (except `PATH` parameters), `RawParam.*`, and `Job.Name`,
+    1. In a Job Environment, it may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, and `Job.Name`,
        and is evaluated at Job creation.
     2. In a Step Environment, it may also reference `Step.Name` and the `Steps.*` values of the enclosing Step's direct
        dependencies, and is evaluated with the last of the Step's materialization groups, which holds its
-       *stepEnvironments* and *script* fields (see [&lt;StepTemplate&gt;](#3-steptemplate)).
+       *stepEnvironments* and *script* fields (see [&lt;StepTemplate&gt;](#3-steptemplate)). In a Step of a loop's
+       body, it may also reference `Loop.*`, `RawLoop.*`, and the `Steps.*` values that
+       [3.8.4](#384-scopes-in-and-around-a-loop) allows.
     3. It may not reference `Session.*`, `Env.*`, or names bound by `let`.
     4. Not available in an Environment Template.
+
+   Sessions are matched to Tasks as if a disabled Environment were not defined. A disabled Job Environment is disabled
+   for every Session of the Job, and a disabled Step Environment for every Session that runs that Step's Tasks.
 4. *script* — The action that is taken by this Environment when it is run on a Worker host.
 5. *variables* — A set of environment variable name/value pairs, with the values being
    [Format Strings](#73-format-strings) that are resolved when entering the environment. The specified variables must be
@@ -2100,14 +2215,17 @@ The format string scopes available to format strings within an Environment are:
 3. `Env.*` — Scope of the environment entity itself. Values such as the embedded files defined within the Environment
    entity.
 4. Names bound by `let` in the enclosing `<EnvironmentScript>`. Available with the `EXPR` extension.
-   In a Step Environment with the `CONTROL_FLOW` extension, also the `Steps.*` values of the enclosing Step's direct
-   dependencies.
-5. `WrappedAction.*` — Available within `onWrapEnvEnter`, `onWrapTaskRun`, and `onWrapEnvExit` only. Carries
+5. `Steps.*` — In a Step Environment, the `Steps.*` values of the enclosing Step's direct dependencies. Available
+   with the `CONTROL_FLOW` extension. See [Value References](#731-value-references).
+6. `Loop.*` and `RawLoop.*` — In a Step Environment of a Step of a loop's body, the loop variables and
+   `Loop.Iteration` for the iteration, and there the `Steps.*` values of item 5 are those that
+   [3.8.4](#384-scopes-in-and-around-a-loop) allows. Available with the `CONTROL_FLOW` extension.
+7. `WrappedAction.*` — Available within `onWrapEnvEnter`, `onWrapTaskRun`, and `onWrapEnvExit` only. Carries
    the wrapped `<Action>`'s fields. Available with the `WRAP_ACTIONS` extension.
    See [Wrap hook template variables](#431-wrap-hook-template-variables) for the available fields.
-6. `WrappedEnv.Name` — Available within `onWrapEnvEnter` and `onWrapEnvExit` only. The name of the inner
+8. `WrappedEnv.Name` — Available within `onWrapEnvEnter` and `onWrapEnvExit` only. The name of the inner
    environment whose action is being wrapped. Available with the `WRAP_ACTIONS` extension.
-7. `WrappedStep.Name` — Available within `onWrapTaskRun` only. The name of the step whose task is being
+9. `WrappedStep.Name` — Available within `onWrapTaskRun` only. The name of the step whose task is being
    wrapped. Available with the `WRAP_ACTIONS` extension.
 
 Templates must not reference `WrappedAction.*` outside the three wrap hooks, `WrappedEnv.*` outside
@@ -2595,7 +2713,7 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`Step.Name`|The name of the current Step. This is a `string` type. Requires the `EXPR` extension.|Available within the Step Template scope: `stepEnvironments`, `hostRequirements`, `parameterSpace`, and `script`, and with the `CONTROL_FLOW` extension `enableIf`.|
 |`Session.HasPathMappingRules`|This value can be used to determine whether path mapping rules are available to the Session. Without the `EXPR` extension, it is string valued, with values "true" or "false". With the `EXPR` extension enabled, it is a `bool` type. "true"/`True` means that the path mapping JSON contains path mapping rules. "false"/`False` means that the contents of the path mapping JSON are the empty object.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
 |`Session.PathMappingRulesFile`|This is a string whose value is the location of a JSON file on the worker node's local disk that contains the path mapping rule substitutions for the Session.|This is available within all Environment Script Actions & Embedded Files, and all Step Script Actions and Embedded Files.|
-|`Steps.<StepName>.Output.<VarName>`|The value of output variable `<VarName>` of Step `<StepName>`. If the Step has no *parameterSpace* its type is the declared type `T`; otherwise it is `list[T]`, one element per Task in parameter-space iteration order. If the Step has an *enableIf*, the type is optional (`T?` or `list[T]?`) and the value is `null` when the Step was skipped. If `<StepName>` is a loop, `<VarName>` is one of its loop outputs, and its type is given by the table in [3.8.3](#383-loopoutputvariabledefinition). A `PATH` value has the consuming Session's path mapping rules applied. `<StepName>` must be an `<Identifier>`. Requires the `CONTROL_FLOW` extension.|Available in the Step Template scope (*enableIf*, *let*, *hostRequirements*, *parameterSpace* ranges and its other format strings, *stepEnvironments*, *script*) of a Step that lists `<StepName>` directly in its *dependencies*, and in the *value* of a `<JobOutputDefinition>` for any Step. A value whose type is or contains `path` only in format strings annotated `@fmtstring[host]`. Not available in *combination*, other job-level fields, or Environment Templates. Inside and around a loop, see [3.8.4](#384-scopes-in-and-around-a-loop): a Step of a loop's body reads its body dependencies and the loop's dependencies, a loop's *until*, *next*, and output *value*s read any Step of its body, and a Step of a loop's body is not available outside the loop.|
+|`Steps.<StepName>.Output.<VarName>`|The value of output variable `<VarName>` of Step `<StepName>`. If the Step has no *parameterSpace* its type is the declared type `T`; otherwise it is `list[T]`, one element per Task in parameter-space iteration order. If the Step has an *enableIf*, the type is optional (`T?` or `list[T]?`) and the value is `null` when the Step was skipped. If `<StepName>` is a loop, `<VarName>` is one of its loop outputs, and its type is given by the table in [3.8.3](#383-loopoutputvariabledefinition). A `PATH` value has the consuming Session's path mapping rules applied. `<StepName>` must be an `<Identifier>`. Requires the `CONTROL_FLOW` extension.|Available in the Step Template scope (*enableIf*, *let*, *hostRequirements*, *parameterSpace* ranges and its other format strings, *stepEnvironments*, *script*) of a Step that lists `<StepName>` directly in its *dependencies*, and in the *value* of a `<JobOutputDefinition>` for any Step except a Step of a loop's body. A value whose type is or contains `path` only in format strings annotated `@fmtstring[host]`. Not available in *combination*, other job-level fields, or Environment Templates. Inside and around a loop, see [3.8.4](#384-scopes-in-and-around-a-loop): a Step of a loop's body reads its body dependencies and the loop's dependencies, a loop's *until*, *next*, and output *value*s read any Step of its body, and a Step of a loop's body is not available outside the loop.|
 |`Steps.<StepName>.RawOutput.<VarName>`|The same value as `Steps.<StepName>.Output.<VarName>` with no path mapping applied: a `PATH` value is in the submission path context. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.Output.*`, including TEMPLATE-scope fields for `PATH` values.|
 |`Steps.<StepName>.TaskParam.<ParamName>`|A `list` of the values of Task parameter `<ParamName>` for every Task of Step `<StepName>`, in parameter-space iteration order, aligned element-for-element with the Step's `Output` lists. The element type is the Task parameter's type (`int` for `CHUNK[INT]`). Optional, and `null` when skipped, if the Step has an *enableIf*. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.Output.*`. For a `PATH` Task parameter, only in format strings annotated `@fmtstring[host]`, with path mapping rules applied.|
 |`Steps.<StepName>.TaskRawParam.<ParamName>`|The same values as `Steps.<StepName>.TaskParam.<ParamName>` with no path mapping applied. Requires the `CONTROL_FLOW` extension.|As for `Steps.<StepName>.RawOutput.*`.|
@@ -2603,6 +2721,22 @@ specification for the extended grammar, type system, and evaluation semantics.
 |`RawLoop.<VarName>`|The same value as `Loop.<VarName>` with no path mapping applied: a `PATH` value is in the submission path context. Requires the `CONTROL_FLOW` extension.|As for `Loop.<VarName>`, including TEMPLATE-scope fields for `PATH` values.|
 |`Loop.Iteration`|The index of the current iteration of the loop, an `int` starting at 0. Requires the `CONTROL_FLOW` extension.|As for `Loop.<VarName>`.|
 |`<name>` (let binding)|Names bound by `let` in `<StepTemplate>`, `<StepScript>`, `<SimpleAction>`, or `<EnvironmentScript>`. Names must start with a lowercase letter or underscore (see `<UserIdentifier>`). The type is determined by the expression. Available with the `EXPR` extension.|See [Let Binding Scope Summary](#362-let-binding-scope-summary) for detailed scoping rules.|
+
+With the `CONTROL_FLOW` extension, the `Steps.*` values become concrete as follows. Before then they are `unresolved`,
+and an expression that reads one waits (see [Template Processing Stages](#74-template-processing-stages)).
+
+* `Steps.<StepName>.Output.*` and `Steps.<StepName>.RawOutput.*` — when Step `<StepName>` is terminal and has not
+  failed: when it has succeeded, with the committed values of all of its Tasks, or when it is skipped, with the value
+  `null`. There are no partial values: a list is concrete only when every Task of the Step has succeeded, in
+  parameter-space iteration order whatever order the Tasks ran in, and only committed values are ever visible (see
+  [3.7.1](#371-reporting-output-values)). A Step with zero Tasks gives `[]`. For a loop, when the loop has succeeded,
+  with its collected outputs, or is skipped, with `null` (see [3.8.3](#383-loopoutputvariabledefinition)).
+* `Steps.<StepName>.TaskParam.*` and `Steps.<StepName>.TaskRawParam.*` — when Step `<StepName>`'s Tasks are known
+  (its *enableIf* is `true` and its *parameterSpace* has been evaluated) or it is skipped (with the value `null`),
+  which can be before the Step can run, and is at Job creation for a Step whose *enableIf* and *parameterSpace* read
+  only values concrete then.
+* A Step of a loop's body has its own values in each iteration, which become concrete by the same rules within that
+  iteration. `Loop.*` and `RawLoop.*` are concrete from the start of the iteration.
 
 ### 7.4. Template Processing Stages
 
@@ -2613,11 +2747,20 @@ different sets of values are known, which determines which format strings can be
 |-------|------|-------------|----------------|--------------|
 | **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Steps.*`, `Loop.*`, and `RawLoop.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `CONTROL_FLOW` extension: `Steps.*` values are available as `unresolved` values of the types derived from the producing Steps' *outputVariables* and Task parameters, and references to them are checked against the referencing Step's *dependencies*; `Loop.*` and `RawLoop.*` values are available as `unresolved` values of the loop variables' types (see [3.8.4](#384-scopes-in-and-around-a-loop)). |
 | **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated and expressions in TEMPLATE scope are fully evaluated (with the `CONTROL_FLOW` extension, only those of the materialization groups evaluated then, and the `let` bindings those groups use); `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose values are all concrete is evaluated; for each Step whose *enableIf* is then `true` or absent, every materialization group whose `Steps.*` values are all concrete is evaluated, and an error fails Job creation; the other groups wait for step input binding. A loop is treated as a Step here; nothing of a Step of a loop's body is evaluated at Job creation, and the `minLength` check of a loop's `APPEND` outputs is never part of it (see [3.8.5](#385-running-a-loop)). |
-| **Step input binding** (`CONTROL_FLOW` only) | Per materialization group of a Step (see [3](#3-steptemplate)), as soon as every `Steps.*` value it reads is concrete, with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The group's format strings are evaluated. If *enableIf* is `false` the Step is skipped, its parameter space is the empty set (its `Steps.*` values are `null`, not `[]`), and no other group is evaluated. When *parameterSpace* is evaluated the Step's Tasks are known, and when *hostRequirements* is, its host requirements are known, in either order. If any evaluation fails, or the Task count exceeds the implementation's limit, the Step fails at once, before any of its Tasks runs. Until every group has been evaluated the Step is pending inputs, and none of its Tasks is dispatched. |
+| **Step input binding** (`CONTROL_FLOW` only) | Per materialization group of a Step (see [3](#3-steptemplate)), as soon as every `Steps.*` value it reads is concrete, with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The group's format strings are evaluated. If *enableIf* is `false` the Step is skipped, its parameter space is the empty set (its `Steps.*` values are `null`, not `[]`), and no other group is evaluated. When *parameterSpace* is evaluated the Step's Tasks are known, and when *hostRequirements* is, its host requirements are known, in either order. If any evaluation fails, or the Task count exceeds the implementation's per-Step limit or would take the Job's total over its per-Job limit (see [3.4](#34-stepparameterspacedefinition)), the Step fails at once, before any of its Tasks runs. Until every group has been evaluated the Step is pending inputs, and none of its Tasks is dispatched. |
 | **Loop iteration start** (`CONTROL_FLOW` only) | When a loop starts an iteration (see [3.8.5](#385-running-a-loop)) | `Param.*`, `RawParam.*`, `Loop.*` for the iteration, the `Steps.*` values of the loop's dependencies | The values of the Steps of the iteration | A new instance of every Step of the loop's body is created. Each is bound as a Step is at step input binding; a group whose values are all concrete is evaluated now. |
 | **Loop iteration boundary** (`CONTROL_FLOW` only) | When every Step instance of an iteration has completed successfully or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for the iteration (for *while*, for the next iteration), the `Steps.*` values of the loop's dependencies and of the iteration's Steps | `Task.*`, `Session.*` | The loop outputs' *value*s, then *until*, then every *next*, then *while* with the new values, then the *maxIterations* bound. Any failure fails the loop. |
 | **Job output evaluation** (`CONTROL_FLOW` only) | Once per Job output, when every `Steps.*` value its *value* references is concrete, or at Job creation if it references none | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted to its type, and checked. A failure fails the Job. See [2.17](#217-joboutputdefinition-extension-control_flow). |
 | **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. With the `CONTROL_FLOW` extension: the `Steps.*` values of the Step's direct dependencies are concrete, and the `openjd_output_var:` directives that `onRun` prints are processed as they are printed, with `PATH` values mapped back to the submission path context (see [3.7.1](#371-reporting-output-values)). |
+
+With the `CONTROL_FLOW` extension, template validation must also emit a warning (not an error) where the Expression
+Language discards a `null` silently: an interpolation with text around it (which becomes the empty string, so
+`"--size {{Steps.P.Output.X}}"` becomes `"--size "`), a list item such as an entry of `args` (which is dropped), and
+an optional field (which is omitted). The warning applies to every interpolated expression in one of those positions
+whose static type includes `nulltype` and that references, directly or through a `let` binding, a `Steps.*` value of
+a Step that has an *enableIf*, or a `collect: LAST` output of a loop with *while*. It names the expression and suggests
+a conditional expression or an `or` default. An expression whose type has no `nulltype`, such as
+`'frames only' if x == null else string(x)`, draws no warning, and neither does *enableIf*, where `null` is an error.
 
 The `@fmtstring` and `@fmtstring[host]` annotations in this specification indicate which stage
 a format string is resolved in. A format string annotated `@fmtstring` (without `[host]`) is

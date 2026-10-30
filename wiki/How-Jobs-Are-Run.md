@@ -113,8 +113,8 @@ should evaluate it then, and must have evaluated every group before it schedules
    is **skipped**: it has zero Tasks, and none of its other fields is evaluated. A Step without `enableIf` is enabled
    at once.
 2. Then, independently and in whichever order their values arrive:
-   * its parameter space is evaluated and checked against the scheduler's limit on the number of Tasks, and the
-     Step's **Tasks are known**: they can be listed and counted;
+   * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
+     in the whole Job, and the Step's **Tasks are known**: they can be listed and counted;
    * its host requirements are evaluated, and its **host requirements are known**;
    * with a future task-task dependencies extension (`TASK_DEPENDENCIES`), the dependencies between its Tasks are
      evaluated and checked, once its Tasks, and the Tasks of the Steps those dependencies name, are known and the
@@ -140,9 +140,12 @@ The Step then becomes one of:
 * **Skipped** — Its `enableIf` was `false`. It runs nothing, and its output variables are `null` to the Steps that
   read them. A Step whose `enableIf` reads only values available at Job creation, such as Job Parameters, is
   decided at Job creation instead.
-* **Failed** — An expression in any group failed, its Task count exceeded the scheduler's limit, or (with a future
-  `TASK_DEPENDENCIES` extension) the dependencies between its Tasks have a cycle. It fails as soon as the group with
-  the error is evaluated, without waiting for the values its other groups read, and none of its Tasks runs.
+* **Failed** — An expression in any group failed, its Task count exceeded the scheduler's per-Step limit or would take
+  the Job over its per-Job limit, or (with a future `TASK_DEPENDENCIES` extension) the dependencies between its Tasks
+  have a cycle or an index out of range. It fails as soon as the group with the error is evaluated, without waiting
+  for the values its other groups read, and none of its Tasks runs. Such a Step has no failed Tasks to retry, so it
+  stays failed. A Step that failed because one of its Tasks failed can still succeed if a retry or requeue of its
+  failed Tasks succeeds.
 
 No Task of a Step is scheduled until every group has been evaluated, so evaluating groups early changes when a Step's
 Tasks and host requirements can be seen, not when its Tasks run.
@@ -152,10 +155,30 @@ once its own dependencies are satisfied, so skipping a Step never lets later wor
 of it. A failed Step does not satisfy dependencies, and a pending Step whose producer fails never runs, as with any
 dependency on a failed Step today.
 
-A re-run of a Task that has already succeeded never moves the Task or its Step out of succeeded, for dependencies or
-for Step success. Only a re-run that succeeds and commits new values changes anything: the Step's outputs change, the
-Job outputs that read them are evaluated again, and the Job fails if one of those fails (see
-[RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)).
+A re-run of a Task that has already succeeded, whether or not its Step declares outputs, leaves the Task succeeded for
+every purpose while the re-run is pending or running, and after it fails (including cancellation or timeout) or is
+rejected: for dependencies, for the completeness of its Step's output lists, for Step and Job success, and for loop
+iteration completion. A scheduler may show the re-run attempt's own status separately. A retry of a failed attempt
+starts with no values, because a failed attempt commits nothing.
+
+An output of a Step is **consumed** once a Step that references it has evaluated a group whose inputs include it, or
+has started a Task (for loops, see [Step Loops](#step-loops)). Job outputs do not count as consumers. A scheduler that
+allows re-running a Task that already succeeded must apply these rules to each of the re-run Task's own output values:
+
+1. If the output has not been consumed, a successful re-run's value replaces the earlier one.
+2. If the output has been consumed and the re-run succeeds with the same value, nothing changes.
+3. If the output has been consumed and the re-run succeeds with a different value, the re-run attempt is reported as
+   failed, with a message that names the output and a consumer that has consumed it. The Task keeps its earlier
+   succeeded state and all of its committed values, so the Step and its consumers are unaffected.
+4. If the re-run fails (including cancellation or timeout) or is rejected, it commits nothing, and the Task keeps its
+   earlier succeeded state and all of its committed values, as in rule 3.
+
+The check is all or nothing: if any output falls under rule 3, nothing from the re-run is committed, and in a chunked
+Step it covers every Task of the re-run chunk. Values are the same if their converted, typed values are equal. So a
+metric that no Step reads never blocks a re-run. Because a scheduler should, not must, evaluate a group as soon as its
+values are available, an eager and a lazy scheduler may disagree on whether an output has been consumed. When a re-run
+commits new values, the Job outputs that read the Step are evaluated again, and the Job fails if one of those fails
+(see [RFC 0012 §Retries and re-runs](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md#retries-and-re-runs)).
 
 A scheduler may create a pending Step's Tasks only when it is bound, when its Tasks are known, or create the Step at
 submission and fill in its Tasks later. The three are equivalent to a Job's author.
@@ -202,7 +225,9 @@ every `collect: APPEND` output is checked, and then the loop succeeds. This chec
 is never part of Job creation. When a loop succeeds, its outputs are available to the Steps that depend on it: a
 `collect: LAST` output is the value of the last iteration (`null` after zero iterations), and a `collect: APPEND` output
 is the list of every iteration's value, in order. A failed Step instance in the iteration in progress, or an error in
-any of the loop's expressions, fails the loop at once, and the Steps that depend on it do not run while it is failed.
+any of the loop's expressions, fails the loop at once, no further iteration starts, and the Steps that depend on it do
+not run while it is failed. Other Step instances of the same iteration that do not depend on the failed one may still
+run.
 Only a failure of the Tasks of a Step instance of the iteration in progress can be recovered: a loop whose failure is
 recoverable is `FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry
 or requeue of its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. A re-run of a body
@@ -215,8 +240,18 @@ error in a Step instance's or the loop's own materialization expressions, exceed
 loop's expressions at an iteration boundary or a violated constraint, including `minLength` when the loop ends, and
 reaching `maxIterations`.
 
-A scheduler should show each iteration with its index, the loop variable values it ran with, and its Step instances
-and their Tasks. A loop's total number of Tasks is not known until it ends. A Session holds the Step Environments of
+Any Step output that a loop's `while`, `until`, `next`, `initial`, or output `value` references is consumed, for the
+re-run rules of [Step States and Step Input Binding](#step-states-and-step-input-binding), once that expression has
+been evaluated, so a re-run of a Task of a completed iteration that succeeds with a different value for it fails. Loop
+variables and loop outputs are never evaluated again, and an iteration is never run again.
+
+The scheduler's per-Step Task limit applies to each Step instance, and its per-Job Task limit counts the Tasks of every
+Step instance of every iteration; it may also limit the Tasks of all of a loop's instances, or the number of instances a
+loop creates. A loop must be able to hold at least 1 MiB of loop variable and loop output values at any moment.
+Exceeding a limit fails the loop finally.
+
+A scheduler should show each iteration with its index, the loop variable values it ran with, its Step instances
+and their Tasks, and the loop outputs evaluated at its end. A loop's total number of Tasks is not known until it ends. A Session holds the Step Environments of
 one Step instance at a time, as it does for one Step. See the
 [Template Schemas](2023-09-Template-Schemas#38-steploop-extension-control_flow).
 
