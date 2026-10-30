@@ -77,10 +77,11 @@ The `CONTROL_FLOW` extension adds the following, each specified in the section l
   [RFC 0012 §Output emission](0012-step-output-variables.md#output-emission).
 * **Reading outputs.** The `Steps.<StepName>.Output.<VarName>` and `Steps.<StepName>.TaskParam.<ParamName>` symbols,
   available in Steps that depend directly on the producer: [The `Steps.*` scope](#the-steps-scope).
-* **Late-bound structure.** Parameter-space ranges, step `let` bindings, host requirements, and Step Environment
-  fields that reference `Steps.*` are evaluated at a new stage, step input binding, while the Step waits in a new
-  `PENDING_INPUTS` state. Each group of fields is evaluated as soon as the values it reads exist, so a waiting Step's
-  Tasks and host requirements become known before it can run: [Step input binding](#step-input-binding).
+* **Late-bound structure.** Parameter-space ranges, step `let` bindings, host requirements, Step Environment fields, and
+  the TEMPLATE-scope fields of a Step's script that reference `Steps.*` are evaluated at a new stage, step input
+  binding, while the Step waits in a new `PENDING_INPUTS` state. Each group of fields is evaluated as soon as the values
+  it reads exist, so a waiting Step's Tasks and host requirements become known before it can run:
+  [Step input binding](#step-input-binding).
 * **Conditional execution.** An `enableIf` predicate on Steps and Environments, decided at Job creation or at step
   input binding. A disabled Step is `SKIPPED`: [`enableIf`](#conditional-execution-enableif).
 * **Fan-in.** A multi-Task producer's outputs are ordered lists in parameter-space iteration order, reduced with
@@ -102,9 +103,10 @@ The `CONTROL_FLOW` extension adds the following, each specified in the section l
 
 **Fixed step graph, late-bound width.** The set of Steps, their names, their dependencies, and the types of their
 outputs are in the template, so a validator can check every reference before submission. What may depend on a value
-produced at run time is how many Tasks a Step has, the values those Tasks receive, and whether a Step or Environment
-runs. Steps never create new Steps. A loop (RFC 0013) repeats a fixed group of Steps a late-bound number of times,
-within a declared bound, which is the same kind of late binding as a Task count.
+produced at run time is how many Tasks a Step has, the values those Tasks receive, its host requirements and its other
+TEMPLATE-scope fields, and whether a Step or Environment runs. Steps never create new Steps. A loop (RFC 0013) repeats a
+fixed group of Steps a late-bound number of times, within a declared bound, which is the same kind of late binding as a
+Task count.
 
 **Output variables are control data.** An output is a small typed value that shapes the rest of the Job: a count, a
 list of keys, a score, an adjacency list. Bulk data keeps flowing through files and `PATH` job parameters.
@@ -1169,7 +1171,7 @@ Changed semantics of existing properties:
   symbols of the Step's direct dependencies. A format string among them that is resolved at Job creation (not
   annotated `@fmtstring[host]`) and references `Steps.*` is evaluated at step input binding instead, when the
   inputs of its materialization group are concrete. See [Step input binding](#step-input-binding). In a body Step
-  of a loop, they may also read `Loop.*` and the `Steps.*` symbols that RFC 0013 allows (see
+  of a loop, they may also read `Loop.*`, `RawLoop.*`, and the `Steps.*` symbols that RFC 0013 allows (see
   [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope) and
   [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
 
@@ -1622,25 +1624,19 @@ the limits below, are in [RFC 0013 §Limits](0013-step-loops.md#limits). This RF
    materialized parameter space that exceeds the Step limit, or that would take the Job's total over the Job limit, is
    an error when the Step's Task enumeration group is evaluated, before any of its Tasks runs, with a message that names
    the limit: it fails Job creation if that group is evaluated then, and the Step otherwise. The Job's total is the sum
-   of the Task counts of every top-level Step whose Tasks are known and, with RFC 0013, of every body Step instance
-   whose Tasks are known, whatever its state; retries and re-runs add no Tasks to it. When two Steps' Tasks become known
+   of the Task counts of every Step outside a loop body whose Tasks are known and, with RFC 0013, of every body Step
+   instance whose Tasks are known, whatever its state; retries and re-runs add no Tasks to it. With `TASK_CHUNKING`,
+   Tasks are counted, not chunks. When two Steps' Tasks become known
    after Job creation, which of them exceeds the Job limit can depend on the order in which their groups are evaluated.
 2. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
 
 Where these RFCs measure a value by its **JSON serialization** (job outputs in [Job outputs](#job-outputs) item 7,
 loop values in [RFC 0013 §Limits](0013-step-loops.md#limits) item 4, and the stored form of a `PATH` value in
-[RFC 0012 §Limits](0012-step-output-variables.md#limits) item 2), its size is the number of UTF-8 bytes of this
-canonical form, with no whitespace between tokens:
-
-* A `string`, `path`, or `range_expr` is a JSON string of its stored text (for a `range_expr`, the text RFC 0012's
-  conversion gives, such as `1-10:2`), in raw UTF-8. Only `"`, `\`, and U+0000 to U+001F are escaped: as `\"`, `\\`,
-  `\b`, `\f`, `\n`, `\r`, and `\t` where those apply, and otherwise as `\u00XX` with lowercase hexadecimal digits.
-* An `int` is in plain decimal, with `-` only when negative.
-* A `float` is written with the fewest significant digits that read back as the same 64-bit value. It has no fraction
-  when it is integral (`2`), and an exponent only where that is shorter, written as a lowercase `e` with `-` only when
-  negative and no leading zeros (`1e300`, `1.5e-7`).
-* `true`, `false`, and `null` are written as such, and a list as `[`, its elements separated by `,`, and `]`.
-
+[RFC 0012 §Limits](0012-step-output-variables.md#limits) item 2), its size is the number of bytes of its serialization
+under the JSON Canonicalization Scheme ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785)): no whitespace, a `string`
+or `path` as a UTF-8 JSON string with that scheme's escapes, and a `float` in its ECMAScript number form (`2`,
+`1.5e-7`, `1e+300`). There are two exceptions. An `int` is written in plain decimal, because that scheme's numbers are
+64-bit floats, and a `range_expr` is a JSON string of its canonical form, the text EXPR's `string()` gives it (`1-5`).
 An implementation may store values in any form, but measures them this way. RFC 0012 otherwise measures a Task's
 values by the bytes that reported them, so a value built from a Task output can measure differently here: a `FLOAT`
 reported as `1.50` counts as `1.5`.
@@ -1790,8 +1786,9 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
 8. The Step dependency graph is acyclic, as today.
 9. *jobOutputDefinitions*: 1 to 50 elements; names are unique `<Identifier>`s; types and constraint properties as for
     *outputVariables*; each *value* type-checks against its type, made optional, and references only the symbols
-    [`<JobOutputDefinition>`](#joboutputdefinition) allows: the `Steps.*` symbols of any Step except a loop's body Step
-    (see [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)), and values whose
+    [`<JobOutputDefinition>`](#joboutputdefinition) allows; in particular, it may read the `Steps.*` symbols of any Step
+    except a loop's body Step (see
+    [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)), and reads values whose
     type is or contains `path` only through `RawOutput` and `TaskRawParam`.
 
 **At step input binding** (by the scheduler, group by group as each group's inputs become concrete, and before any Task
@@ -1802,7 +1799,8 @@ its indices are in range. The first failure fails the Step at once. In a Step wh
 Job creation, a group whose inputs are concrete then is checked then, and a failure fails Job creation.
 
 **At job output evaluation** (by the scheduler, as each job output's inputs become concrete): the *value* evaluates,
-converts to the declared type, satisfies its constraint properties, and fits the size limit; a failure fails the Job.
+converts to the declared type and satisfies its constraint properties, and the total of the Job's output values stays
+within the size limit of [Job outputs](#job-outputs) item 7; a failure fails the Job.
 
 ## Prior Art
 

@@ -56,13 +56,14 @@ reports on a Linux worker reaches a Windows submitter in a form it can use.
 
 ### How it fits with RFC 0011
 
-RFC 0011 defines the extension name, the `Steps.<StepName>.Output.<VarName>` symbols through which other Steps and
-job outputs read the values this RFC produces, the types those symbols have, and the stage, step input binding, at
-which the values are read. A Task's committed values are its contribution to those symbols: for a Step with a
-`parameterSpace`, `Steps.<StepName>.Output.<VarName>` is the list of its Tasks' values in parameter-space iteration
-order (see [RFC 0011 §Reductions](0011-control-flow.md#reductions)). Nothing in this RFC depends on whether any Step
-reads an output. [RFC 0013](0013-step-loops.md)'s loop variables and loop outputs use the types and constraint
-properties defined here, and its loop outputs the `LAST` and `APPEND` collect modes.
+RFC 0011 defines the extension name, the `Steps.<StepName>.Output.<VarName>` symbols through which other Steps and job
+outputs read the values this RFC produces, the types those symbols have, and the evaluation stages at which the values
+are read (see [RFC 0011 §Evaluation stages](0011-control-flow.md#evaluation-stages)). A Task's committed values are its
+contribution to those symbols: for a Step with a `parameterSpace`, `Steps.<StepName>.Output.<VarName>` is the list of
+its Tasks' values in parameter-space iteration order (see [RFC 0011 §Reductions](0011-control-flow.md#reductions)).
+Nothing in this RFC depends on whether any Step reads an output. [RFC 0013](0013-step-loops.md)'s loop variables and
+loop outputs use the types and constraint properties defined here, and its loop outputs the `LAST` and `APPEND` collect
+modes.
 
 ## Basic Examples
 
