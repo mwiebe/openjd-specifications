@@ -5,8 +5,8 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 411 tests: 3 in `env_templates`, 199 in `job_templates`, and 209 in
-> `jobs`. All 411 pass on Linux against the openjd-rs prototype (branch
+> **Status.** There are 416 tests: 4 in `env_templates`, 199 in `job_templates`, and 213 in
+> `jobs`. All 416 pass on Linux against the openjd-rs prototype (branch
 > `control-flow-prototype`, commit `6553952`), the only implementation that has run them.
 > The tests were written from the RFC text, and the prototype was developed against them.
 > If a test and the RFC disagree, the RFC wins: fix the test, or raise the question on the
@@ -38,10 +38,12 @@ and its section.
 
 - **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `EXPR`; every new
   field and symbol requires `CONTROL_FLOW`; Environment Templates can't declare
-  `CONTROL_FLOW`, use `enableIf`, or reference `Steps.*`. Because an Environment Template
-  can't list `CONTROL_FLOW`, the last two are also run beside a Job that lists it
-  (`jobs/*-in-environment-template-with-control-flow-job`), with
-  `jobs/4--environment-template-in-control-flow-job-runs` as their valid companion.
+  `CONTROL_FLOW`, use `enableIf`, or reference `Steps.*` or `Loop.*`. An Environment
+  Template can't list `CONTROL_FLOW`, so these rules give the same result as extension
+  gating; the `jobs/*-in-environment-template-with-control-flow-job` tests check that a
+  Job's `CONTROL_FLOW` doesn't make `enableIf` or `Steps.*` available to the Environment
+  Templates used with it, with `jobs/4--environment-template-in-control-flow-job-runs` as
+  their valid companion.
 - **`<OutputVariableDefinition>`** (`job_templates/3.7--*`): each `<OutputVariableType>`,
   case-insensitive type names, 1 to 32 outputs with unique `<Identifier>` names,
   `LIST[LIST[INT]]` only without a `parameterSpace`, no `default`/`userInterface`/`dataFlow`,
@@ -151,8 +153,10 @@ and its section.
   parameter outside 1 to 1,000, and an `initial` that reads only parameters and fails,
   fail Job creation (with a valid companion); an `initial` that fails, is `null`, or
   violates a constraint, and a first `while` that fails or is `null`, fail the loop before
-  iteration 0. At the boundary, a `fail(...)` in `until` or `while` and a `null` `until`,
-  `while`, `next`, or loop output `value` fail the loop. A body Step whose range fails at
+  iteration 0. At the boundary, a `fail(...)` in `until` or `while`, a `null` `until`,
+  `while`, `next`, or loop output `value`, a `LAST` output's constraint, an `APPEND`
+  output's `item` constraint or `maxLength`, and its `minLength` when `until` ends the loop
+  fail the loop. A body Step whose range fails at
   the start of an iteration fails the loop. Size: loop values totaling exactly 1 MiB are
   accepted, with each `APPEND` element counted on its own and replaced loop variable and
   `LAST` output values not counted.
@@ -294,9 +298,9 @@ Items 9 and later concern loops (RFC 0013).
    job parameters accept `1`; EXPR coercion has no `int` to `bool`. The tests follow
    RFC 0012's EXPR coercion rule (`B=1` is invalid; `N="12"` is the INT 12).
 7. **The 64 KiB line floor (RFC 0012 §Limits)**: whether it includes the line terminator.
-   The test uses a line of exactly 65,536 bytes, not counting the terminator, which is the
-   reading under which the floor applies to the same text as RFC 0012's grammar, whose
-   terminator is not part of the directive.
+   `3.7.1--directive-line-64kib` uses a line of exactly 65,536 bytes not counting the
+   terminator, so a runtime whose 65,536-byte limit includes the terminator fails it. The
+   RFC could say which it means.
 8. **`@` file read time (RFC 0012 §File values)**: no bound on how soon a runtime must
    process a flushed line.
 9. **Other body Steps after a failure (RFC 0013 §Failure).** RFC 0013 lets instances of

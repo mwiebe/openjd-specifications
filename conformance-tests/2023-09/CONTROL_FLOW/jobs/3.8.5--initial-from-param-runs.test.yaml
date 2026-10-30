@@ -1,6 +1,7 @@
-# RFC 0013 §Loop binding item 3: the companion of 3.8.5--initial-error-fails-job-creation,
-# the same template with N = 2, so a runtime that rejects the template outright fails this
-# test. The start group is evaluated at Job creation and the loop runs iterations 0 to 4.
+# RFC 0013 §Loop binding item 3: the companion of
+# 3.8.5--error-in-initial-fails-job-creation, the same template with N = 2, so a runtime
+# that rejects the template outright fails this test. The start group is evaluated at Job
+# creation and the loop runs iterations 0 to 4.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

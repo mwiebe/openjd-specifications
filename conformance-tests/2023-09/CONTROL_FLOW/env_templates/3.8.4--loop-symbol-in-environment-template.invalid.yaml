@@ -1,0 +1,16 @@
+# RFC 0013 §The Loop.* scope, Where available item 3: Loop.* is not available in an
+# Environment Template. An Environment Template can't list CONTROL_FLOW, so this rule and
+# extension gating give the same result.
+specificationVersion: environment-2023-09
+extensions:
+- EXPR
+environment:
+  name: Env
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print({{Loop.Iteration}})

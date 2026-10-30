@@ -1,5 +1,6 @@
-# RFC 0011 §<Environment> enableIf constraint 4: enableIf is permitted only in a Job
-# Template, even when the Job's template lists CONTROL_FLOW. The Environment Template's
+# RFC 0011 §<Environment> enableIf constraint 4 and §Extension name and dependencies: enableIf
+# is permitted only in a Job Template, and a Job's CONTROL_FLOW doesn't make it available to
+# the Environment Templates used with it. The Environment Template's
 # enableIf is true, so a runtime that allowed it would enter the Environment and run the
 # Steps. The template is rejected before anything runs. This run fails before any Task;
 # expected.taskFailure is used because the runner ignores forbidden markers in .invalid

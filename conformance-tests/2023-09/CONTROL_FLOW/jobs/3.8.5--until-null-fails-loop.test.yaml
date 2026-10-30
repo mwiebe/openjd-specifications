@@ -1,5 +1,6 @@
-# RFC 0013 §The iteration boundary: a null result of until (RFC 0013 §<LoopDefinition> item 3) fails the loop at once at the boundary where it
-# is evaluated (after iteration 1), so no later iteration starts and C never runs.
+# RFC 0013 §The iteration boundary: a null result of until (RFC 0013 §<LoopDefinition> item
+# 3) fails the loop at once at the boundary where it is evaluated (after iteration 1), so no
+# later iteration starts and C never runs.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
