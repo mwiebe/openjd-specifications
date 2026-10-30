@@ -1,0 +1,56 @@
+# RFC 0013 §Loop binding item 3 and §Failure: the first while is part of the loop's start
+# group, and an error in it fails the loop before iteration 0 starts. It reads the loop's
+# dependency, so it is evaluated at loop binding after P succeeds.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V=1'); print('P_' + 'RAN')
+  - name: L
+    dependencies:
+    - dependsOn: P
+    loop:
+      while: '{{fail(''bad while'') if Steps.P.Output.V == 1 else Loop.Iteration < 2}}'
+      maxIterations: 10
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - P_RAN
+  forbidden:
+  - IT_0
+  - C_RAN

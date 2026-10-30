@@ -19,7 +19,7 @@ template:
           args:
           - -c
           - |-
-            print('P_' + 'RAN'); print('openjd_output_var: V=1')
+            print('openjd_output_var: V=1'); print('P_' + 'RAN')
   - name: L
     dependencies:
     - dependsOn: P

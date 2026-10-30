@@ -1,8 +1,9 @@
 # RFC 0011 §<Environment> enableIf constraint 4: enableIf is permitted only in a Job
 # Template; an <Environment> in an Environment Template may not have it. An Environment
-# Template can't list CONTROL_FLOW, so a validator could also reject this as an unknown
-# field; jobs/4--enableif-in-environment-template-with-control-flow-job checks the rule
-# beside a Job that lists CONTROL_FLOW.
+# Template can't list CONTROL_FLOW, so this rule and extension gating give the same result
+# and no template can tell them apart.
+# jobs/4--enableif-in-environment-template-with-control-flow-job checks that a Job's
+# CONTROL_FLOW doesn't make enableIf available to the Environment Templates used with it.
 specificationVersion: environment-2023-09
 extensions:
 - EXPR

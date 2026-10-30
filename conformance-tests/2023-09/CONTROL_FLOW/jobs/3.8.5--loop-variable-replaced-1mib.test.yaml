@@ -2,8 +2,8 @@
 # loop variable's value that next replaces stops counting. S holds a JSON string of
 # 1,048,574 characters and its quotes (1,048,576 bytes) in every iteration, and next
 # replaces it twice; a runtime that kept counting replaced values would fail the loop. The
-# loop has no other variables and no outputs, and W does not print S, which would not fit
-# on a command line.
+# loop has no other variables and no outputs, and W does not print S, which would not fit on
+# a command line.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

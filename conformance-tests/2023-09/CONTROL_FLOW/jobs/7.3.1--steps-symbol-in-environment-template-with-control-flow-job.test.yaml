@@ -1,5 +1,6 @@
-# RFC 0011 §The Steps.* scope: Steps.* is not available anywhere in an Environment Template,
-# even when the Job's template lists CONTROL_FLOW. The reference is in onExit, so a runtime
+# RFC 0011 §The Steps.* scope and §Extension name and dependencies: Steps.* is not available
+# anywhere in an Environment Template, and a Job's CONTROL_FLOW doesn't make it available to
+# the Environment Templates used with it. The reference is in onExit, so a runtime
 # that resolved it from the Session's Step would print E_RAN on entering the Environment
 # before it failed or succeeded. The template is rejected before anything runs. This run
 # fails before any Task; expected.taskFailure is used because the runner ignores forbidden

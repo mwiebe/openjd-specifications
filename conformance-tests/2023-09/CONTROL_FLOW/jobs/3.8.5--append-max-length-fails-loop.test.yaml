@@ -1,0 +1,50 @@
+# RFC 0013 §<LoopOutputVariableDefinition> item 6: under APPEND, maxLength is checked as
+# each element is added, and a violation fails the loop at once. H has maxLength 2, so
+# adding the third element at the boundary of iteration 2 fails the loop.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 4}}'
+      maxIterations: 10
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+    outputVariables:
+    - name: H
+      type: LIST[INT]
+      collect: APPEND
+      value: '{{Loop.Iteration}}'
+      maxLength: 2
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - IT_0
+  - IT_1
+  - IT_2
+  forbidden:
+  - IT_3
+  - C_RAN
