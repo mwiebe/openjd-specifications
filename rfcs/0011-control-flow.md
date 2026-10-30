@@ -1627,15 +1627,23 @@ the limits below, are in [RFC 0013 §Limits](0013-step-loops.md#limits). This RF
    after Job creation, which of them exceeds the Job limit can depend on the order in which their groups are evaluated.
 2. Expressions over output values are evaluated under EXPR's existing memory and operation limits.
 
-Where these RFCs measure a value by its **JSON serialization** (job outputs in [Job outputs](#job-outputs) item 7, loop
-values in [RFC 0013 §Limits](0013-step-loops.md#limits) item 4, and the stored form of a `PATH` value in
+Where these RFCs measure a value by its **JSON serialization** (job outputs in [Job outputs](#job-outputs) item 7,
+loop values in [RFC 0013 §Limits](0013-step-loops.md#limits) item 4, and the stored form of a `PATH` value in
 [RFC 0012 §Limits](0012-step-output-variables.md#limits) item 2), its size is the number of UTF-8 bytes of this
-canonical form: no whitespace between tokens; a `string` or `path` as a JSON string of its characters in raw UTF-8,
-escaping only `"`, `\`, and U+0000 to U+001F; an `int` in plain decimal; a `float` as the fewest decimal digits that
-read back as the same 64-bit value, with an exponent (`1e300`) only where that is shorter; `true`, `false`, and `null`;
-and a list as `[`, its elements separated by `,`, and `]`. An implementation may store values in any form, but measures
-them this way. RFC 0012 otherwise measures a Task's values by the bytes that reported them, so a value built from a Task
-output can measure differently here: a `FLOAT` reported as `1.50` counts as `1.5`.
+canonical form, with no whitespace between tokens:
+
+* A `string`, `path`, or `range_expr` is a JSON string of its stored text (for a `range_expr`, the text RFC 0012's
+  conversion gives, such as `1-10:2`), in raw UTF-8. Only `"`, `\`, and U+0000 to U+001F are escaped: as `\"`, `\\`,
+  `\b`, `\f`, `\n`, `\r`, and `\t` where those apply, and otherwise as `\u00XX` with lowercase hexadecimal digits.
+* An `int` is in plain decimal, with `-` only when negative.
+* A `float` is written with the fewest significant digits that read back as the same 64-bit value. It has no fraction
+  when it is integral (`2`), and an exponent only where that is shorter, written as a lowercase `e` with `-` only when
+  negative and no leading zeros (`1e300`, `1.5e-7`).
+* `true`, `false`, and `null` are written as such, and a list as `[`, its elements separated by `,`, and `]`.
+
+An implementation may store values in any form, but measures them this way. RFC 0012 otherwise measures a Task's
+values by the bytes that reported them, so a value built from a Task output can measure differently here: a `FLOAT`
+reported as `1.50` counts as `1.5`.
 
 ### Job outputs
 
@@ -1780,10 +1788,11 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
    optional-typed expression that reads a conditional Step's `Steps.*` symbol, or a `while` loop's `LAST` output (RFC
    0013), where EXPR discards `null`.
 8. The Step dependency graph is acyclic, as today.
-9. *jobOutputDefinitions*: 1 to 50 elements; names are unique `<Identifier>`s; types and constraint properties as
-    for *outputVariables*; each *value* type-checks against its type, made optional, and references only the symbols
-    [`<JobOutputDefinition>`](#joboutputdefinition) allows: the `Steps.*` symbols of any Step except a loop's body
-    Step (RFC 0013), and values whose type is or contains `path` only through `RawOutput` and `TaskRawParam`.
+9. *jobOutputDefinitions*: 1 to 50 elements; names are unique `<Identifier>`s; types and constraint properties as for
+    *outputVariables*; each *value* type-checks against its type, made optional, and references only the symbols
+    [`<JobOutputDefinition>`](#joboutputdefinition) allows: the `Steps.*` symbols of any Step except a loop's body Step
+    (see [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)), and values whose
+    type is or contains `path` only through `RawOutput` and `TaskRawParam`.
 
 **At step input binding** (by the scheduler, group by group as each group's inputs become concrete, and before any Task
 of the Step runs): *enableIf* evaluates to `true` or `false`, not `null`; then, once it is `true`, every other
@@ -1866,8 +1875,8 @@ other than the current one without overloading `Step`.
   them forward in host-scope format strings as it does `PATH` job parameters.
 - **Rust (openjd-rs)**: The same model changes. Two existing behaviors change under the extension: a computed range
   may be empty, and the 1024-element cap that `crates/openjd-model/src/job/create_job/ranges.rs` applies to computed list ranges
-  (`max_task_param_range_len`) applies only to YAML list literals, with a scheduler-supplied Task count limit taking
-  its place.
+  (`max_task_param_range_len`) applies only to YAML list literals, with scheduler-supplied per-Step and per-Job Task
+  limits taking its place.
 - **CLI (`openjd run`)**: Runs Steps in dependency order already. After each Step finishes, and after a pending
   Step's Tasks become known, it advances the binding of every pending Step that reads it, so a Step whose evaluation
   fails, fails then. It prints each job output as soon as it is evaluated. When it runs only
@@ -1973,8 +1982,8 @@ are in [RFC 0012 §Open Questions](0012-step-output-variables.md#open-questions)
    *value*s also read `Steps.*` (see
    [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
 6. **Range length.** This draft lifts the 1024-element cap for ranges given as format strings in `CONTROL_FLOW`
-   templates, in favor of the scheduler's Task-count limit, as `<IntRangeExpr>` already does. Should the relaxation
-   apply only to ranges that read `Steps.*`?
+   templates, in favor of the scheduler's per-Step and per-Job Task limits, as `<IntRangeExpr>` already does. Should the
+   relaxation apply only to ranges that read `Steps.*`?
 7. **Empty parameter spaces.** A zero-Task success; range strings still can't be empty. Separately from this RFC,
    the specification and implementations disagree on a descending range such as `1-0`: §3.4.1.1.1 defines it as
    `[1]`, and openjd-rs rejects it. That should be settled on its own.
