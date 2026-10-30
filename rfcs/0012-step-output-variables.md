@@ -115,7 +115,7 @@ steps:
         collect: APPEND         # one directive per one-second segment
         unit: mm
         description: Error of each one-second segment, in order.
-        maxLength: 20000        # keeps the list well under the guaranteed 1 MiB per Task
+        maxLength: 20000        # keeps the list well under the guaranteed 1 MiB per Task attempt
     python:
       script: |
         from pipeline import extract_hand_actions, score_against_hot3d
@@ -987,9 +987,9 @@ and for `PATH` outputs in [§9](../docs/control-flow-investigation/04-design-spa
    selector name the parameter as well (`[Frame=12]`) in case a Step ever allows more than one `CHUNK[INT]`
    parameter? Committing the outputs of some Tasks of a failed chunk is out of scope here; it belongs with the
    per-Task progress of #169.
-4. **Limits.** At least 1 MiB per Task attempt, constraints checked at the producer, an optional scheduler Task-count
-   limit checked when the Step's Tasks become known ([RFC 0011 §Limits](0011-control-flow.md#limits) item 1). Is 1 MiB
-   the right floor?
+4. **Limits.** At least 1 MiB per Task attempt, constraints checked at the producer, and optional scheduler per-Step
+   and per-Job Task limits checked when the Step's Tasks become known
+   ([RFC 0011 §Limits](0011-control-flow.md#limits) item 1). Is 1 MiB the right floor?
 5. **Re-runs.** A differing re-run after consumption fails; cascade recompute is a possible scheduler capability.
    Is "fail the re-run" acceptable to render-farm operators?
 6. **`@` file encoding.** UTF-8 only, with a leading BOM ignored. Should UTF-16 with a BOM be accepted, given
