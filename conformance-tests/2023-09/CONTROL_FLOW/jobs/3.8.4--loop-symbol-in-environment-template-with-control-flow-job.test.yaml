@@ -1,0 +1,70 @@
+# RFC 0013 §The Loop.* scope, Where available item 3, and RFC 0011 §Extension name and
+# dependencies: Loop.* is not available in an Environment Template, and a Job's CONTROL_FLOW
+# doesn't make it available to the Environment Templates used with it. The reference is in
+# onExit, so a runtime that resolved it from the Session's loop would print E_RAN on
+# entering the Environment. The template is rejected before anything runs. This run fails
+# before any Task; expected.taskFailure is used because the runner ignores forbidden markers
+# in .invalid tests. env_templates/3.8.4--loop-symbol-in-environment-template checks the
+# template alone, and 4--environment-template-in-control-flow-job-runs is the companion
+# without the symbol.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: L
+    dependencies:
+    - dependsOn: P
+    loop:
+      until: '{{Loop.Iteration >= 0}}'
+      maxIterations: 1
+      steps:
+      - name: C
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('C_' + 'RAN', {{Steps.P.Output.N}})
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  environment:
+    name: EnvTemplate
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('E_' + 'RAN')
+        onExit:
+          command: python
+          args:
+          - -c
+          - |-
+            print({{Loop.Iteration}})
+expected:
+  taskFailure: {}
+  forbidden:
+  - E_RAN
+  - P_RAN
+  - C_RAN
