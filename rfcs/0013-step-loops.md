@@ -1054,11 +1054,11 @@ says for any Step, within its iteration.
 |---|---|---|---|---|
 | **Template validation** | as today | as today | as today, and `Loop.*`, `RawLoop.*` | Every rule of [Validation](#validation) is checked, with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. |
 | **Job creation** | as today | as today | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated, and the `minLength` check of the loop's `APPEND` outputs is never part of Job creation. |
-| **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011, and for a body Step instance, `Loop.*` | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
+| **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011, and for a body Step instance, `Loop.*` and `RawLoop.*` | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
 | **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each body Step, `Loop.*` and `RawLoop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' `Steps.*` values, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
 | **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` and `RawLoop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
 | **Job output evaluation** | as RFC 0011 | as RFC 0011 | as RFC 0011 | A job output may read a loop's `Steps.*` symbols, and not a body Step's. |
-| **Task execution** | as today | as today, and `Loop.*` for a body Step instance | *(none)* | As RFC 0011. |
+| **Task execution** | as today | as today, and `Loop.*` and `RawLoop.*` for a body Step instance | *(none)* | As RFC 0011. |
 
 ### Running a loop
 

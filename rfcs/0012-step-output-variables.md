@@ -190,7 +190,7 @@ A Task reports an output by printing `openjd_output_var: <Name>=<JSON>`, as disc
   the scheduler when the Task ends, with nothing left to read after it exits, which shortens the time between a producer
   finishing and its consumers being bound. A scheduler can also show a running figure, such as a metric, live.
 * **`@file` removes the line-length limit.** Stdout lines are bounded (64 KiB in openjd-rs's `openjd-sessions`). A value of any
-  size up to the per-Task limit goes through a file, and the directive that names it is short.
+  size up to the per-Task-attempt limit goes through a file, and the directive that names it is short.
 
 An earlier draft of this RFC used a session-supplied output file instead (`Task.OutputFile`, like GitHub Actions'
 `$GITHUB_OUTPUT`), on the grounds that text printed by third-party tools could forge an output. That argument does
@@ -258,7 +258,7 @@ often change after the Job has run, and may reasonably differ between schedulers
 
 ### 4. Limits are enforced at the producer
 
-Output values are bounded per Task, and a producer's declared constraints (`maxLength: 5000`, `minValue: 1`) are
+Output values are bounded per Task attempt, and a producer's declared constraints (`maxLength: 5000`, `minValue: 1`) are
 checked as its Tasks report values. A discovery Step that finds a million keys fails itself, next to the cause, with
 a message naming the constraint, rather than producing a consumer that fails later with a less obvious error.
 Airflow's `max_map_length`, which fails the producing task, is the precedent.
@@ -743,7 +743,8 @@ Output values are stored, logged, and may be displayed, so they are not redacted
    (the inline `<JSON>` text without the `<WS>` around it, or the whole content of an `@` file): the `ONCE` value, the
    current `LAST` value (a value it replaces stops counting), and every `APPEND` element. For a `PATH` or `LIST[PATH]`
    value, or a `PATH` element under `APPEND`, the larger of its reported bytes and the JSON serialization of its stored
-   form counts. A directive that takes the size over the runtime's limit is invalid.
+   form (see [RFC 0011 §Limits](0011-control-flow.md#limits)) counts. A directive that takes the size over the runtime's
+   limit is invalid.
 3. A producer's constraint properties bound its values. A scheduler SHOULD encourage authors to declare `maxLength` on
    list outputs that feed a parameter space, and on `APPEND` outputs.
 
