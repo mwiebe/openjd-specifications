@@ -1,0 +1,62 @@
+# RFC 0011 §Extension name and dependencies: an Environment Template used with a Job whose
+# template lists CONTROL_FLOW is an ordinary Environment Template. The companion of
+# 4--enableif-in-environment-template-with-control-flow-job and
+# 7.3.1--steps-symbol-in-environment-template-with-control-flow-job: the same Job and
+# Environment Template without the forbidden field or symbol run, so a runtime that
+# rejected every Environment Template beside a CONTROL_FLOW Job fails this test.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN', {{Steps.P.Output.N}})
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  environment:
+    name: EnvTemplate
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('E_' + 'RAN')
+        onExit:
+          command: python
+          args:
+          - -c
+          - |-
+            print('X_' + 'EXIT')
+expected:
+  output:
+  - E_RAN
+  - P_RAN
+  - C_RAN 1
+  - X_EXIT

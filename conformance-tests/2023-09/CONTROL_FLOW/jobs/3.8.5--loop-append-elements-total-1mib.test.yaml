@@ -1,0 +1,48 @@
+# RFC 0013 §Limits item 4: a scheduler MUST accept loop values totaling 1 MiB (1,048,576
+# bytes) per loop, and each element of an APPEND output counts on its own, as its JSON
+# serialization, without the list's brackets and separators. H gets two elements, each a
+# JSON string of 524,286 characters and its quotes (524,288 bytes), so the total is exactly
+# 1,048,576 bytes; with the list's brackets and comma it would be 3 bytes over. The loop has
+# no variables and no other outputs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 1}}'
+      maxIterations: 5
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+    outputVariables:
+    - name: H
+      type: LIST[STRING]
+      collect: APPEND
+      value: '{{''a'' * 524286}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json([len(x) for x in Steps.L.Output.H]))}})))
+expected:
+  output:
+  - IT_0
+  - IT_1
+  - GOT:[524286, 524286]

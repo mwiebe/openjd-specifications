@@ -1,0 +1,47 @@
+# RFC 0013 §Limits item 4: a LAST loop output counts at its current value. O is a JSON
+# string of 1,048,574 characters and its quotes (1,048,576 bytes) in each of three
+# iterations, so each iteration's value replaces the last; a runtime that kept counting
+# replaced values would fail the loop. The loop has no variables and no other outputs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: '{{Loop.Iteration >= 2}}'
+      maxIterations: 5
+      steps:
+      - name: W
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('IT' + '_' + str({{Loop.Iteration}}))
+    outputVariables:
+    - name: O
+      type: STRING
+      collect: LAST
+      value: '{{(''b'' if Loop.Iteration % 2 == 0 else ''a'') * 1048574}}'
+  - name: C
+    dependencies:
+    - dependsOn: L
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(string(len(Steps.L.Output.O)) + ':' + Steps.L.Output.O[0]))}})))
+expected:
+  output:
+  - IT_0
+  - IT_1
+  - IT_2
+  - 'GOT:"1048574:b"'

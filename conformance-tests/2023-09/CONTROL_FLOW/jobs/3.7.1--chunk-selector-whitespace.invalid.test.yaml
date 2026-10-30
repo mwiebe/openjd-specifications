@@ -1,0 +1,44 @@
+# RFC 0012 §The openjd_output_var directive: there is no whitespace inside the selector's
+# brackets, so X[ 12]=5 doesn't match the grammar and is invalid. X is LAST and first gets a
+# valid value, so only the line under test can fail the run: a runtime that accepted the
+# whitespace or ignored the line would succeed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  - TASK_CHUNKING
+  name: TestJob
+  steps:
+  - name: P
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Frame
+        type: CHUNK[INT]
+        range: '12'
+        chunks:
+          defaultTaskCount: 1
+          rangeConstraint: CONTIGUOUS
+    outputVariables:
+    - name: X
+      type: INT
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: X[12]=1'); print('openjd_output_var: X[ 12]=5')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(Steps.P.Output.X))}})))

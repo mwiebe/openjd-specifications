@@ -1,6 +1,7 @@
 # RFC 0012 §Processing a directive: the runtime MUST cancel the Action as soon as it reads
-# an invalid directive, so the line printed after a 30 s sleep never appears. A runner
-# should apply a timeout well under 30 s to catch a runtime that waits for exit.
+# an invalid directive, so the line printed after a 30 s sleep never appears. A runtime that
+# waits for the Action to exit prints that line and fails the test; a runner timeout under
+# 30 s only saves time and isn't needed to catch the failure.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

@@ -1,0 +1,142 @@
+# RFC 0013 §<LoopVariableDefinition> item 2 and §Validation item 5: a loop variable of each
+# of the 12 types accepts every constraint property of RFC 0012's table for that type (BOOL
+# has none). LIST[LIST[INT]] is allowed. PATH variables' next reads RawLoop.* (TEMPLATE
+# scope).
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    variables:
+    - name: I
+      type: INT
+      initial: '{{1}}'
+      next: '{{Loop.I}}'
+      allowedValues:
+      - 1
+      - 2
+      minValue: 0
+      maxValue: 10
+    - name: F
+      type: FLOAT
+      initial: '{{0.5}}'
+      next: '{{Loop.F}}'
+      allowedValues:
+      - 0.5
+      - 1.5
+      minValue: 0.0
+      maxValue: 2.0
+    - name: S
+      type: STRING
+      initial: '{{''a''}}'
+      next: '{{Loop.S}}'
+      allowedValues:
+      - a
+      - b
+      minLength: 1
+      maxLength: 8
+    - name: Pa
+      type: PATH
+      initial: '{{''/a''}}'
+      next: '{{RawLoop.Pa}}'
+      objectType: FILE
+      allowedValues:
+      - /a
+      - /b
+      minLength: 1
+      maxLength: 100
+    - name: B
+      type: BOOL
+      initial: '{{true}}'
+      next: '{{Loop.B}}'
+    - name: R
+      type: RANGE_EXPR
+      initial: '{{''1-3''}}'
+      next: '{{Loop.R}}'
+      minLength: 1
+      maxLength: 100
+    - name: LI
+      type: LIST[INT]
+      initial: '{{[1]}}'
+      next: '{{Loop.LI}}'
+      minLength: 1
+      maxLength: 4
+      item:
+        allowedValues:
+        - 1
+        - 2
+        minValue: 0
+        maxValue: 9
+    - name: LF
+      type: LIST[FLOAT]
+      initial: '{{[0.5]}}'
+      next: '{{Loop.LF}}'
+      minLength: 1
+      maxLength: 4
+      item:
+        allowedValues:
+        - 0.5
+        - 1.5
+        minValue: 0.0
+        maxValue: 2.0
+    - name: LS
+      type: LIST[STRING]
+      initial: '{{[''a'']}}'
+      next: '{{Loop.LS}}'
+      minLength: 1
+      maxLength: 4
+      item:
+        allowedValues:
+        - a
+        - b
+        minLength: 1
+        maxLength: 8
+    - name: LP
+      type: LIST[PATH]
+      initial: '{{[''/a'']}}'
+      next: '{{RawLoop.LP}}'
+      objectType: DIRECTORY
+      minLength: 1
+      maxLength: 4
+      item:
+        allowedValues:
+        - /a
+        - /b
+        minLength: 1
+        maxLength: 100
+    - name: LB
+      type: LIST[BOOL]
+      initial: '{{[true]}}'
+      next: '{{Loop.LB}}'
+      minLength: 1
+      maxLength: 3
+    - name: LL
+      type: LIST[LIST[INT]]
+      initial: '{{[[1]]}}'
+      next: '{{Loop.LL}}'
+      minLength: 1
+      maxLength: 4
+      item:
+        minLength: 1
+        maxLength: 3
+        item:
+          allowedValues:
+          - 1
+          - 2
+          minValue: 0
+          maxValue: 9
+    until: '{{Loop.Iteration >= 0}}'
+    maxIterations: 1
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('W_' + 'RAN')

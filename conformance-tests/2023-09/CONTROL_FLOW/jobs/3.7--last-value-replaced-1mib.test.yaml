@@ -1,0 +1,41 @@
+# RFC 0012 §Limits item 2: the size counted is that of the values the Task currently holds,
+# and a LAST value that a later directive replaces stops counting. P reports V twice, each
+# from an @ file of exactly 1,048,576 bytes (a JSON string of 1,048,574 characters and its
+# quotes); a runtime that kept counting the first value would reject the second directive.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: STRING
+      collect: LAST
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json
+            with open('a.json', 'w') as f: json.dump('a' * 1048574, f)
+            with open('b.json', 'w') as f: json.dump('b' * 1048574, f)
+            print('openjd_output_var: V=@a.json'); print('openjd_output_var: V=@b.json')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(string(len(Steps.P.Output.V)) + ':' + Steps.P.Output.V[0]))}})))
+expected:
+  output:
+  - 'GOT:"1048574:b"'

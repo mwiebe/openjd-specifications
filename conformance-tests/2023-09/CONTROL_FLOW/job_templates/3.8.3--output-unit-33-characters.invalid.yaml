@@ -1,0 +1,28 @@
+# RFC 0013 §<LoopOutputVariableDefinition> item 5 and RFC 0012 §<OutputVariableDefinition>
+# item 5: a loop output's unit is at most 32 characters.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    until: '{{Loop.Iteration >= 0}}'
+    maxIterations: 1
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('W_' + 'RAN')
+  outputVariables:
+  - name: O
+    type: INT
+    collect: LAST
+    value: '{{Loop.Iteration}}'
+    unit: uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
