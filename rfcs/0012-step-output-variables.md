@@ -825,9 +825,9 @@ The rules this RFC adds, and when each is checked, in the form of
 1. *outputVariables*: 1 to 32 elements; with a `CHUNK[INT]` parameter whose `range` is a literal list, its values are
    distinct (a range expression cannot repeat a value, since its sub-ranges may not overlap, and computed ranges are
    checked when materialized); names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint
-   properties are valid for the type; *collect* is an `<OutputCollectMode>`, and `APPEND` only with a `LIST[...]`
-   type; *unit* is 1 to 32 characters with no control characters; no `LIST[LIST[INT]]` on a Step with a
-   `parameterSpace`.
+   properties are valid for the type, and there is no `default`, `userInterface`, or `dataFlow`; *collect* is an
+   `<OutputCollectMode>`, and `APPEND` only with a `LIST[...]` type; *unit* is 1 to 32 characters with no control
+   characters; no `LIST[LIST[INT]]` on a Step with a `parameterSpace`.
 
 **At step input binding** (by the scheduler, when the Step's Task enumeration group is evaluated): `CHUNK[INT]` values
 are distinct in a Step that declares *outputVariables*. A failure fails the Step at once, or Job creation if the group
