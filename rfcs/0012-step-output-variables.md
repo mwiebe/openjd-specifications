@@ -822,7 +822,8 @@ The rules this RFC adds, and when each is checked, in the form of
 **At template validation** (by the model library, before submission):
 
 1. *outputVariables*: 1 to 32 elements; with a `CHUNK[INT]` parameter whose `range` is a literal list, its values are
-   distinct (computed ranges are checked when materialized); names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint
+   distinct (a range expression cannot repeat a value, since its sub-ranges may not overlap, and computed ranges are
+   checked when materialized); names are unique `<Identifier>`s; types are `<OutputVariableType>`s; constraint
    properties are valid for the type; *collect* is an `<OutputCollectMode>`, and `APPEND` only with a `LIST[...]`
    type; *unit* is 1 to 32 characters with no control characters; no `LIST[LIST[INT]]` on a Step with a
    `parameterSpace`.
@@ -849,7 +850,7 @@ The survey of comparable systems, and a table comparing how each declares, emits
   between submitter and worker forms. This survey found no system that specifies the reverse direction for values a
   task produces; this RFC defines it in terms of the existing rules.
 * **Limits with a guaranteed minimum.** GitHub Actions allows 1 MB of outputs per job, Step Functions 256 KiB per
-  state, Tekton 4 KB per TaskRun by default. This RFC guarantees at least 1 MiB per Task.
+  state, Tekton 4 KB per TaskRun by default. This RFC guarantees at least 1 MiB per Task attempt.
 
 What this RFC does differently:
 
@@ -986,8 +987,9 @@ and for `PATH` outputs in [§9](../docs/control-flow-investigation/04-design-spa
    selector name the parameter as well (`[Frame=12]`) in case a Step ever allows more than one `CHUNK[INT]`
    parameter? Committing the outputs of some Tasks of a failed chunk is out of scope here; it belongs with the
    per-Task progress of #169.
-4. **Limits.** At least 1 MiB per Task, constraints checked at the producer, an optional scheduler Task-count limit
-   checked when the Step's Tasks become known ([RFC 0011 §Limits](0011-control-flow.md#limits) item 1). Is 1 MiB the right floor?
+4. **Limits.** At least 1 MiB per Task attempt, constraints checked at the producer, an optional scheduler Task-count
+   limit checked when the Step's Tasks become known ([RFC 0011 §Limits](0011-control-flow.md#limits) item 1). Is 1 MiB
+   the right floor?
 5. **Re-runs.** A differing re-run after consumption fails; cascade recompute is a possible scheduler capability.
    Is "fail the re-run" acceptable to render-farm operators?
 6. **`@` file encoding.** UTF-8 only, with a leading BOM ignored. Should UTF-16 with a BOM be accepted, given
