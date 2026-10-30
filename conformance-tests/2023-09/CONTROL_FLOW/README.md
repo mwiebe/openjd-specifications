@@ -5,8 +5,8 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 416 tests: 4 in `env_templates`, 199 in `job_templates`, and 213 in
-> `jobs`. All 416 pass on Linux against the openjd-rs prototype (branch
+> **Status.** There are 418 tests: 4 in `env_templates`, 199 in `job_templates`, and 215 in
+> `jobs`. All 418 pass on Linux against the openjd-rs prototype (branch
 > `control-flow-prototype`, commit `6553952`), the only implementation that has run them.
 > The tests were written from the RFC text, and the prototype was developed against them.
 > If a test and the RFC disagree, the RFC wins: fix the test, or raise the question on the
@@ -41,9 +41,9 @@ and its section.
   `CONTROL_FLOW`, use `enableIf`, or reference `Steps.*` or `Loop.*`. An Environment
   Template can't list `CONTROL_FLOW`, so these rules give the same result as extension
   gating; the `jobs/*-in-environment-template-with-control-flow-job` tests check that a
-  Job's `CONTROL_FLOW` doesn't make `enableIf` or `Steps.*` available to the Environment
-  Templates used with it, with `jobs/4--environment-template-in-control-flow-job-runs` as
-  their valid companion.
+  Job's `CONTROL_FLOW` doesn't make `enableIf`, `Steps.*`, or `Loop.*` available to the
+  Environment Templates used with it, with
+  `jobs/4--environment-template-in-control-flow-job-runs` as their valid companion.
 - **`<OutputVariableDefinition>`** (`job_templates/3.7--*`): each `<OutputVariableType>`,
   case-insensitive type names, 1 to 32 outputs with unique `<Identifier>` names,
   `LIST[LIST[INT]]` only without a `parameterSpace`, no `default`/`userInterface`/`dataFlow`,
@@ -155,8 +155,8 @@ and its section.
   violates a constraint, and a first `while` that fails or is `null`, fail the loop before
   iteration 0. At the boundary, a `fail(...)` in `until` or `while`, a `null` `until`,
   `while`, `next`, or loop output `value`, a `LAST` output's constraint, an `APPEND`
-  output's `item` constraint or `maxLength`, and its `minLength` when `until` ends the loop
-  fail the loop. A body Step whose range fails at
+  output's `item` constraint or `maxLength`, and its `minLength` when `until` or `while`
+  ends the loop fail the loop. A body Step whose range fails at
   the start of an iteration fails the loop. Size: loop values totaling exactly 1 MiB are
   accepted, with each `APPEND` element counted on its own and replaced loop variable and
   `LAST` output values not counted.
