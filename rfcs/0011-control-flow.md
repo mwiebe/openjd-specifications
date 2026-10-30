@@ -1508,18 +1508,19 @@ Tasks may be known even though none of them will run.
 
 #### When groups are evaluated
 
-* **At Job creation**, the scheduler MUST decide every Step's *enableIf* (and every Job Environment's) whose inputs
-  are concrete and, for each Step whose *enableIf* is then `true` or absent, evaluate every group whose inputs are
-  concrete, as it resolves every TEMPLATE-scope format string today. It works through the Steps in dependency order,
-  because a Step decided `SKIPPED` there makes its `null` symbols concrete, and a Step whose Tasks become known there
-  makes its `TaskParam` symbols concrete, for the Steps that read them. An *enableIf* whose inputs are concrete at Job
-  creation is one that references no `Steps.*` symbol, or only symbols that are concrete then. If an evaluation or
-  check fails there, Job creation fails, as it does for a job output evaluated at Job creation. A Step all of whose
-  groups evaluate is bound at Job creation, as every Step is today. Every other Step that is not `SKIPPED` enters
-  `PENDING_INPUTS`. A Step whose *enableIf* is not decided at Job creation evaluates nothing else then, so an error in
-  one of its other groups fails it only once its *enableIf* is decided `true`. A loop is a Step for these rules,
-  and nothing of a loop's body Steps is evaluated at Job creation: an instance of each body Step is created when its
-  iteration starts and is bound progressively within it (see [RFC 0013 §Iterations](0013-step-loops.md#iterations) and
+* **At Job creation**, the scheduler MUST decide every Step's *enableIf* (and every Job Environment's) whose inputs are
+  concrete and, for each Step whose *enableIf* is then `true` or absent, evaluate every group whose inputs are concrete,
+  as it resolves every TEMPLATE-scope format string today. It works through the Steps in dependency order, because a
+  Step decided `SKIPPED` there makes its `null` symbols concrete, and a Step whose Tasks become known there makes its
+  `TaskParam` symbols concrete, for the Steps that read them. An *enableIf* whose inputs are concrete at Job creation is
+  one that references no `Steps.*` symbol, or only symbols that are concrete then. If an evaluation or check fails
+  there, Job creation fails, as it does for a job output evaluated at Job creation. A Step all of whose groups evaluate
+  is bound at Job creation, as every Step is today. Every other Step that is not `SKIPPED` enters `PENDING_INPUTS`. A
+  Step whose *enableIf* is not decided at Job creation evaluates nothing else then, so an error in one of its other
+  groups fails it only once its *enableIf* is decided `true`. A loop is a Step for these rules, with the groups of
+  [RFC 0013 §Loop binding](0013-step-loops.md#loop-binding), and nothing of a loop's body Steps is evaluated at Job
+  creation: an instance of each body Step is created when its iteration starts and is bound progressively within it (see
+  [RFC 0013 §Iterations](0013-step-loops.md#iterations) and
   [RFC 0013 §Template processing stages](0013-step-loops.md#template-processing-stages)).
 * **After Job creation**, a scheduler SHOULD evaluate each group of a `PENDING_INPUTS` Step as soon as its inputs
   become concrete, and MUST have evaluated every group before it dispatches any of the Step's Tasks. A `Steps.*`
