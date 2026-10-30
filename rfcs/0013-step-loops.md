@@ -926,9 +926,10 @@ Where:
    violation fails the loop.
 
 A loop variable's value is converted to its type as a job output's value is (see
-[RFC 0011 §Job outputs](0011-control-flow.md#job-outputs)). A `PATH` or `LIST[PATH]` variable's expressions read
-`PATH` values in the submission path context, through `RawParam.*`, `RawOutput`, `TaskRawParam`, and `RawLoop.*`, so
-its value is in the submission path context, and `Loop.<name>` maps it forward in the consuming Session.
+[RFC 0011 §`<JobOutputDefinition>`](0011-control-flow.md#joboutputdefinition) item 3). A `PATH` or `LIST[PATH]`
+variable's expressions read `PATH` values in the submission path context, through `RawParam.*`, `RawOutput`,
+`TaskRawParam`, and `RawLoop.*`, so its value is in the submission path context, and `Loop.<name>` maps it forward in
+the consuming Session.
 
 ##### `<LoopOutputVariableDefinition>`
 
@@ -985,10 +986,12 @@ CONTROL_FLOW adds three value references for loops:
 
 **Where available.** For loop `L`:
 
-1. In every format string of a body Step of `L`: its *enableIf*, *let*, *hostRequirements*, *parameterSpace*
-   (except *combination*), *stepEnvironments*, *script*, and, with `TASK_DEPENDENCIES`, the subspace ranges of its
-   *dependencies*. There, the values are those of the iteration that the
-   body Step instance belongs to.
+1. In a body Step of `L`, in the fields where
+   [RFC 0011 §The `Steps.*` scope](0011-control-flow.md#the-steps-scope) *Where available* rule 3 allows `Steps.*`:
+   its *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter `range`s and the other format strings of
+   *parameterSpace* (not *combination*), *stepEnvironments* (any format string, including their *enableIf*), *script*,
+   and, with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies*. There, the values are those of the
+   iteration that the body Step instance belongs to.
 2. In `L`'s *while*, where the values are those of the iteration about to start; and in `L`'s *until*, *next*, and
    loop output *value*s, where the values are those of the iteration that just finished. See
    [The iteration boundary](#the-iteration-boundary).
@@ -1216,16 +1219,21 @@ says, so it never fails the loop and the boundary does not wait for it (see [Fai
    each body Step instance. A scheduler MAY also impose a maximum on the total number of Tasks of all instances of a
    loop, or on the number of body Step instances a loop creates. An instance whose materialized parameter space would
    take the loop over such a limit fails when its Task enumeration group is evaluated, and an iteration that would
-   take it over the instance limit fails the loop when it would start; the message names the limit. These failures
-   are final (see [Failure](#failure)).
-3. A body Step counts once as a Step of the template, wherever the base specification or a scheduler counts the Steps
-   of a Job Template. Its instances are not Steps of the template.
-4. A scheduler MUST accept loop variable and loop output values totaling at least 1 MiB per loop at any moment,
-   measured as their JSON serialization, with every element of an `APPEND` output counted, and MAY accept more.
-   The total is checked after the *initial* values are evaluated, at loop binding (at Job creation if the start group
-   is evaluated then, where exceeding the limit fails Job creation), and at each iteration boundary after step 1 (loop
-   outputs) and after step 3 (*next*) of [The iteration boundary](#the-iteration-boundary). Exceeding its limit fails
-   the loop.
+   take it over the instance limit fails the loop when it would start; the message names the limit. A scheduler's
+   limit on the total number of Tasks of a Job counts the Tasks of every body Step instance of every iteration, and
+   an instance whose materialized parameter space would take the Job over it fails in the same way. A loop has no
+   Tasks of its own, so it adds nothing to a Task count. These failures are final (see [Failure](#failure)).
+3. A loop and each of its body Steps count once each as a Step of the template, as a top-level Step does, wherever
+   the base specification or a scheduler counts the Steps of a Job Template. Body Step instances are not Steps of the
+   template, and the number of iterations does not change the count.
+4. A scheduler MUST accept loop variable and loop output values totaling at least 1 MiB (1,048,576 bytes) per loop at
+   any moment, and MAY accept more. The size counted is that of the values the loop currently holds, each as its JSON
+   serialization: the current value of each loop variable (a value that *next* replaces stops counting), the current
+   value of each `LAST` loop output (nothing before its first iteration's value), and each element of each `APPEND` loop
+   output, counted on its own, so the brackets and separators of the list do not count. The total is checked after the
+   *initial* values are evaluated, at loop binding (at Job creation if the start group is evaluated then, where
+   exceeding the limit fails Job creation), and at each iteration boundary after step 1 (loop outputs) and after step 3
+   (*next*) of [The iteration boundary](#the-iteration-boundary). Exceeding its limit fails the loop.
 5. Expressions in a loop are evaluated under EXPR's existing memory and operation limits.
 
 #### Composition with other extensions
@@ -1351,23 +1359,19 @@ What this RFC does differently:
   values supplied with its other symbols, and with `PATH` values marked as paths so that the Session maps them.
 - **CLI (`openjd run`)**: Runs a loop's iterations in order, each iteration's body Steps in dependency order, prints
   each iteration's index, loop variable values, and loop outputs, and fails the run as the loop fails. `openjd run
-  --step` naming a loop runs the whole loop. `--tasks`, `--task-param`, and `--maximum-tasks` choose which Tasks of
-  the selected Step run, and a loop has no Task parameters or Tasks of its own, so `--tasks` and `--task-param` are
-  rejected with an error whenever the selected Step is a loop, whether named by `--step` or selected as the Job's
-  only top-level Step. Only the rejection of an explicitly given `--maximum-tasks` is limited to an explicit `--step`
-  naming a loop; this needs the CLI to tell a given `--maximum-tasks` from its default. In every other run that
-  includes a loop, including a full run, the CLI's selection of a single top-level loop, and `--run-dependencies`
-  for a `--step` that is not a loop, `--maximum-tasks` applies to each body Step instance as it does to any Step. A
-  body Step instance that did not run all its Tasks is incomplete. The other instances of its iteration follow the
-  CLI's usual rule for an incomplete producer: only the Steps that read the incomplete instance's outputs are
-  blocked. A failure of another instance of the iteration fails the loop as usual. The iteration never completes, so
-  the boundary is not evaluated, the loop is reported as blocked by an incomplete body Step instance, and every Step
-  that depends on the loop is blocked behind it, as for a blocked dependency. With `--step L` for a loop `L`,
-  `--step-inputs` supplies the values of the outputs of `L`'s dependencies that the loop and its body read. For a
-  Step that depends on a loop, `--step-inputs` supplies each loop output it reads in that output's declared type, a
-  single value under `LAST` or the whole list under `APPEND`, not one value per Task, since a loop has no Tasks.
-  `--step` naming a body Step is rejected with an error that names its loop, because a body Step runs only within its
-  loop's iterations. `openjd summary` reports a loop's bound and body.
+  --step` naming a loop runs the whole loop. `--tasks`, `--task-param`, and `--maximum-tasks` choose which Tasks of the
+  selected Step run, and a loop has no Task parameters or Tasks of its own, so `--tasks` and `--task-param` are rejected
+  with an error whenever the selected Step is a loop, whether named by `--step` or selected as the Job's only top-level
+  Step. Only the rejection of an explicitly given `--maximum-tasks` is limited to an explicit `--step` naming a loop;
+  this needs the CLI to tell a given `--maximum-tasks` from its default. In every other run that includes a loop,
+  including a full run, the CLI's selection of a single top-level loop, and `--run-dependencies` for a `--step` that is
+  not a loop, `--maximum-tasks` applies to each body Step instance as it does to any Step. A body Step instance that did
+  not run all its Tasks is incomplete. The other instances of its iteration follow the CLI's usual rule for an
+  incomplete producer: only the Steps that read the incomplete instance's outputs are blocked. A failure of another
+  instance of the iteration fails the loop as usual. The iteration never completes, so the boundary is not evaluated,
+  the loop is reported as blocked by an incomplete body Step instance, and every Step that depends on the loop is
+  blocked behind it, as for a blocked dependency. `--step` naming a body Step is rejected with an error that names its
+  loop, because a body Step runs only within its loop's iterations. `openjd summary` reports a loop's bound and body.
 - **Schedulers**: Creating body Step instances as iterations start, running iterations in order, evaluating the
   boundary, storing the loop variables and outputs, and showing iterations. A scheduler whose Jobs have a fixed set
   of Steps from submission must add the ability to create Steps while a Job runs, or represent each iteration's

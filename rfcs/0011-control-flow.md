@@ -43,8 +43,9 @@ that depend on it use those values in EXPR expressions through a new `Steps.<Nam
 its parameter space (**dynamic fan-out**), decide whether it runs at all (**conditional execution** with `enableIf`),
 and reduce the values of every Task of a multi-Task Step (**fan-in**) with the existing EXPR function library. The
 Job's Steps and their dependencies stay fixed and are validated before submission; only Task counts, Task parameter
-values, and enablement are late-bound, in one new evaluation stage called **step input binding**. A **loop** repeats
-a group of Steps until a condition holds, carrying typed state from one iteration to the next. Output variables
+values, and enablement are late-bound, at a new per-Step evaluation stage called **step input binding**. A **loop**
+repeats a group of Steps until a condition holds, within a declared bound, carrying typed state from one iteration to
+the next, with evaluation stages of its own at the start and end of each iteration. Output variables
 are also how a Task reports **metrics**, such as an error score or a frame rate, for a scheduler to show beside the
 Task's parameters: a metric is an output variable that no Step reads. A Job can also declare **job outputs**, typed
 values computed from its parameters and its Steps' outputs, which complement job parameters by reporting results
@@ -110,15 +111,18 @@ list of keys, a score, an adjacency list. Bulk data keeps flowing through files 
 reads them, so a Step that reports measurements declares them as output variables like any other. There is one
 reporting mechanism with one set of rules.
 
-**One new stage, two new states.** EXPR evaluates format strings at template validation, Job creation, and Task
-execution. CONTROL_FLOW inserts a fourth stage per Step, between Job creation and Task execution, at which the Step's
-TEMPLATE-scope expressions that read `Steps.*` symbols not yet concrete are evaluated. A Step waiting for that stage
-is in the `PENDING_INPUTS` state, and a Step whose `enableIf` is false ends in the `SKIPPED` state. A Step that has no
-`enableIf` and reads no `Steps.*` symbol in those fields that is not concrete at Job creation never enters either
-state and behaves exactly as today. The stage is progressive: once a pending Step's `enableIf` is decided `true`, its
-Tasks become known as soon as the values its parameter space reads exist, and its host requirements as soon as the
-values they read exist, so a scheduler can show and plan for them early. None of its Tasks is dispatched until all of
-those fields are evaluated.
+**New stages, two new states.** EXPR evaluates format strings at template validation, Job creation, and Task execution.
+CONTROL_FLOW inserts a fourth stage per Step, step input binding, between Job creation and Task execution, at which the
+Step's TEMPLATE-scope expressions that read `Steps.*` symbols not yet concrete are evaluated. Job outputs are evaluated
+at a stage of their own, each as soon as the values it reads are concrete (see [Job outputs](#job-outputs)), and
+RFC 0013 adds a loop's iteration start and iteration boundary (see
+[RFC 0013 §Evaluation stages](0013-step-loops.md#evaluation-stages)). A Step waiting for step input binding is in the
+`PENDING_INPUTS` state, and a Step whose `enableIf` is false ends in the `SKIPPED` state. A Step that has no `enableIf`
+and reads no `Steps.*` symbol in those fields that is not concrete at Job creation never enters either state and behaves
+exactly as today. Step input binding is progressive: once a pending Step's `enableIf` is decided `true`, its Tasks
+become known as soon as the values its parameter space reads exist, and its host requirements as soon as the values they
+read exist, so a scheduler can show and plan for them early. None of its Tasks is dispatched until all of those fields
+are evaluated.
 
 **Types first.** Every `Steps.*` symbol has a type known at template validation, derived from the producer's
 declarations. EXPR's existing `unresolved[T]` placeholders type-check expressions that use them, so no second type
@@ -127,7 +131,10 @@ checker is needed.
 ### Evaluation stages
 
 RFC 0005 defines three stages. CONTROL_FLOW adds step input binding, which runs, group by group, for each Step that
-needs it:
+needs it, and job output evaluation, which runs for each job output once its inputs are concrete (see
+[Template processing stages](#template-processing-stages)). RFC 0013 adds iteration start and the iteration boundary
+for loops (see [RFC 0013 §Evaluation stages](0013-step-loops.md#evaluation-stages)). The diagram shows the stages of a
+Step:
 
 ```
   Template            Job Creation         Step Input Binding          Task Execution
@@ -904,8 +911,9 @@ Steps. A reference does not create an edge: a missing edge is a validation error
 (`needs`) and Argo make the same choice, and it keeps the template's explicit `dependencies` the only source of
 edges.
 
-Job outputs are the exception: a job output's *value* may read any Step. A job output is not scheduled, so there is
-no edge to declare, and the Job is the consumer of all of its Steps.
+Job outputs are the exception: a job output's *value* may read any Step, except a loop's body Step, which RFC 0013
+keeps inside its loop (see [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
+A job output is not scheduled, so there is no edge to declare, and the Job is the consumer of all of its Steps.
 
 ### 4. Output shape is determined by the template
 
@@ -1027,11 +1035,11 @@ reported at submission on every scheduler.
 
 * **Portable.** A scheduler that doesn't implement the extension rejects the template rather than mis-running it. The
   directive is the stdout protocol every runtime already implements, on Linux, macOS, and Windows and through
-  `WRAP_ACTIONS`, and a relative `@` path resolves against the Session's Working Directory wherever the Action runs.
-  The observable contract of
-  binding allows both deferred-creation and create-then-update schedulers. The tension is that this is the most
-  demanding extension for schedulers so far (persisted values, a new stage, two new states, and with RFC 0013, Steps
-  instantiated per loop iteration); keeping task-task dependencies out of it keeps the minimum smaller.
+  `WRAP_ACTIONS`, and a relative `@` path resolves against the Session's Working Directory wherever the Action runs. The
+  observable contract of binding allows both deferred-creation and create-then-update schedulers. The tension is that
+  this is the most demanding extension for schedulers so far (persisted values, new evaluation stages, two new states,
+  and with RFC 0013, Steps instantiated per loop iteration); keeping task-task dependencies out of it keeps the minimum
+  smaller.
 * **Expressive.** One mechanism, typed outputs read by EXPR expressions at a defined stage, covers fan-out,
   conditions, reductions, and (with `TASK_DEPENDENCIES`) computed DAGs. The fixed step graph rules out PDG-style work
   by design, as #22 accepted.
@@ -1103,7 +1111,9 @@ The terms *output directive*, *collect mode*, and *submission path context* are 
   steps: [<StepTemplate>, ...]
 ```
 
-Extension list addition to item 3 (*extensions*): `CONTROL_FLOW` (this RFC). New property:
+Extension list addition to item 3 (*extensions*): `CONTROL_FLOW` (this RFC). RFC 0013 also lets *steps* hold
+`<StepLoop>` entries (see [RFC 0013 §Job Template](0013-step-loops.md#job-template) and
+[RFC 0013 §`<StepLoop>`](0013-step-loops.md#steploop)). New property:
 
 * *jobOutputDefinitions* — The Job's outputs: typed values computed from the Job's parameters and its Steps' outputs,
   for the submitter and other callers to read. See [`<JobOutputDefinition>`](#joboutputdefinition) and
@@ -1140,8 +1150,8 @@ New property:
   Step Environments are not entered, its `Steps.*` symbols are `null`, and it satisfies the `dependsOn` of the Steps
   that depend on it once its own dependencies are satisfied. If omitted, the Step is always enabled. See
   [Conditional execution](#conditional-execution-enableif). Constraints:
-    1. It may reference `Param.*` (except `PATH` parameters, which are available only on the worker host),
-       `RawParam.*`, `Job.Name`, `Step.Name`, and the `Steps.*` symbols of the Step's direct dependencies (see
+    1. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters, which are available only on the worker
+       host), `RawParam.*`, `Job.Name`, `Step.Name`, and the `Steps.*` symbols of the Step's direct dependencies (see
        [The `Steps.*` scope](#the-steps-scope)).
     2. It may not reference names bound by the Step's own `let`, `Task.*`, or `Session.*`.
 
@@ -1179,9 +1189,10 @@ Where:
 3. *value* — The value, as a format string whose target type is the expression type of *type*, made optional: an
    expression that reads a conditional Step can evaluate to `null`, which means the output has no value. It may
    reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name`, and the `Steps.*`
-   symbols of any Step of the Job, with values whose type is or contains `path` read through `RawOutput` and
-   `TaskRawParam`. It may not reference `Step.Name`,
-   `Task.*`, `Session.*`, or names bound by `let`.
+   symbols of any Step of the Job except a loop's body Step (see
+   [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)), with values whose type
+   is or contains `path` read through `RawOutput` and `TaskRawParam`. It may not reference `Step.Name`, `Task.*`,
+   `Session.*`, or names bound by `let`.
 4. *description* and *unit* — For display, as on `<OutputVariableDefinition>`.
 5. Constraint properties — Checked against the value when it is evaluated. A violation fails the Job. A `null`
    value is not checked.
@@ -1257,8 +1268,8 @@ New property:
 * *enableIf* — Whether the Environment is entered. The expression's target type is `bool`, and a `null` result is an
   error, as for a Step's *enableIf*. If it evaluates to `false`, the Environment is disabled: it is not entered or exited in any Session, its `variables` are not set, and
   it is not part of the Session's Environment stack. If omitted, the Environment is always enabled. Constraints:
-    1. In a Job Environment (`jobEnvironments`), it may reference `Param.*` (except `PATH` parameters), `RawParam.*`,
-       and `Job.Name`, and is evaluated at Job creation.
+    1. In a Job Environment (`jobEnvironments`), it may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters),
+       `RawParam.*`, and `Job.Name`, and is evaluated at Job creation.
     2. In a Step Environment (`stepEnvironments`), it may also reference `Step.Name` and the `Steps.*` symbols of the
        enclosing Step's direct dependencies, and is evaluated in the Step's remaining materialization group (see
        [Materialization groups](#materialization-groups)).
@@ -1305,6 +1316,10 @@ Step are defined before they are grouped into chunks.
 Element `i` of an `Output` list and element `i` of every `TaskParam` list of the same Step belong to the same Task:
 the `i`-th Task in the Step's parameter-space iteration order (see [Reductions](#reductions)).
 
+A loop's outputs have types of their own, given by their *collect* mode and by whether the loop has *while* or
+*enableIf*: for example `T?` for a `LAST` output of a loop with *while*, which is `null` after zero iterations. See
+[RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop).
+
 **Where available.** A `Steps.<StepName>.*` symbol is available in a format string of Step `S` if and only if all of
 the following hold:
 
@@ -1313,14 +1328,15 @@ the following hold:
 2. `<StepName>` is not `S` itself.
 3. The format string is in one of `S`'s *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter
    `range`s and the other format strings of *parameterSpace*, *stepEnvironments* (any format string, including their
-   *enableIf*), or *script*.
+   *enableIf*), *script*, or, with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies* (see
+   [Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies)).
 
 For a Step in a loop's body, for a loop's own expressions, and for the Steps and job outputs that read a loop, these
 rules, including the job output rule below, are modified by
 [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop).
 
 In addition, the *value* of a [`<JobOutputDefinition>`](#joboutputdefinition) may read the `Steps.*` symbols of any
-Step of the Job, with no dependency required (see [Job outputs](#job-outputs)).
+Step of the Job except a loop's body Step, with no dependency required (see [Job outputs](#job-outputs)).
 
 `Steps.*` is not available in the Job Template's `name`, in `jobEnvironments`, in `parameterDefinitions`, in a
 `combination` expression, or anywhere in an Environment Template.
@@ -1354,7 +1370,7 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
 | Stage | When | Known Values | Unknown Values | What Happens |
 |---|---|---|---|---|
 | **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every template-validation rule of [Validation](#validation) and of [RFC 0012 §Validation](0012-step-output-variables.md#validation) and [RFC 0013 §Validation](0013-step-loops.md#validation) is checked. |
-| **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, every materialization group whose inputs are concrete; a failure fails Job creation. A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
+| **Job creation** | as today | as today | as today, and `Steps.*` symbols that are not yet concrete | With `CONTROL_FLOW`, in Step dependency order: every Step's *enableIf* (and every Job Environment's) whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, every materialization group whose inputs are concrete; a failure fails Job creation. Nothing of a loop's body Steps is evaluated: they are bound per iteration (see [RFC 0013 §Template processing stages](0013-step-loops.md#template-processing-stages)). A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
 | **Step input binding** (new, `CONTROL_FLOW` only) | Per materialization group of a Step, once its inputs are concrete (with `TASK_DEPENDENCIES`, the Task graph group also once the Tasks of every Step its subspace dependencies name are known), with *enableIf* first | `Param.*`, `RawParam.*`, the referenced `Steps.*` | `Task.*`, `Session.*` | The group's expressions are evaluated and checked. *enableIf* `false` makes the Step `SKIPPED`; Task enumeration makes its Tasks known; host selection makes its host requirements known; a failure makes it `FAILED` at once; when every group has evaluated, it is bound and `READY`. See [Step input binding](#step-input-binding). |
 | **Job output evaluation** (new, `CONTROL_FLOW` only) | Per job output, once every `Steps.*` symbol its *value* references is concrete | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted, and checked; a failure fails the Job. See [Job outputs](#job-outputs). |
 | **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies | *(none)* | As today. With `CONTROL_FLOW`, the runtime processes `onRun`'s output directives as they are printed, reverse-maps `PATH` values, and commits the values when the Task succeeds. |
@@ -1489,7 +1505,10 @@ Tasks may be known even though none of them will run.
   check fails there, Job creation fails, as it does for a job output evaluated at Job creation. A Step all of whose
   groups evaluate is bound at Job creation, as every Step is today. Every other Step that is not `SKIPPED` enters
   `PENDING_INPUTS`. A Step whose *enableIf* is not decided at Job creation evaluates nothing else then, so an error in
-  one of its other groups fails it only once its *enableIf* is decided `true`.
+  one of its other groups fails it only once its *enableIf* is decided `true`. A loop is a Step for these rules,
+  and nothing of a loop's body Steps is evaluated at Job creation: an instance of each body Step is created and bound
+  when its iteration starts (see [RFC 0013 §Iterations](0013-step-loops.md#iterations) and
+  [RFC 0013 §Template processing stages](0013-step-loops.md#template-processing-stages)).
 * **After Job creation**, a scheduler SHOULD evaluate each group of a `PENDING_INPUTS` Step as soon as its inputs
   become concrete, and MUST have evaluated every group before it dispatches any of the Step's Tasks. A `Steps.*`
   symbol becomes concrete when a producer succeeds or is skipped, and, for `TaskParam`, when a producer's Tasks become
@@ -1585,7 +1604,9 @@ let:
 ### Limits
 
 Limits on output values, which a producer's Tasks report, are in
-[RFC 0012 §Limits](0012-step-output-variables.md#limits). This RFC adds two that concern the Steps that read them:
+[RFC 0012 §Limits](0012-step-output-variables.md#limits), and limits on loops, including how body Steps and their
+Tasks count toward this section's limits, are in [RFC 0013 §Limits](0013-step-loops.md#limits). This RFC adds two that
+concern the Steps that read them:
 
 1. A scheduler MAY impose a maximum number of Tasks per Step. A materialized parameter space that exceeds it is an
    error when the Step's Task enumeration group is evaluated, before any of its Tasks runs, with a message that names
@@ -1733,8 +1754,8 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
 8. The Step dependency graph is acyclic, as today.
 9. *jobOutputDefinitions*: 1 to 50 elements; names are unique `<Identifier>`s; types and constraint properties as
     for *outputVariables*; each *value* type-checks against its type, made optional, and references only the symbols
-    [`<JobOutputDefinition>`](#joboutputdefinition) allows, with any Step's `Steps.*` symbols, values whose type
-    is or contains `path` only through `RawOutput` and `TaskRawParam`.
+    [`<JobOutputDefinition>`](#joboutputdefinition) allows, with the `Steps.*` symbols of any Step except a loop's
+    body Step (RFC 0013), values whose type is or contains `path` only through `RawOutput` and `TaskRawParam`.
 
 **At step input binding** (by the scheduler, group by group as each group's inputs become concrete, and before any
 Task of the Step runs): *enableIf* evaluates to `true` or `false`, not `null`; then, once it is `true`, every other
@@ -1919,7 +1940,10 @@ are in [RFC 0012 §Open Questions](0012-step-output-variables.md#open-questions)
 4. **Correlating a reduced value with its Task.** `Steps.*.TaskParam` lists now, and a separate RFC 0006 addendum for
    `argmin`/`argmax`, or a list `index`, or `zip`. Which is preferred?
 5. **Fields that may reference outputs.** The materialization expressions plus host-scope script fields, and job
-   output *value*s, which may read any Step; not `combination`, other job-level fields, or Environment Templates.
+   output *value*s, which may read any Step except a loop's body Step; not `combination`, other job-level fields, or
+   Environment Templates. With RFC 0013, a loop's *enableIf*, *initial*, *while*, *until*, *next*, and loop output
+   *value*s also read `Steps.*` (see
+   [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
 6. **Range length.** This draft lifts the 1024-element cap for ranges given as format strings in `CONTROL_FLOW`
    templates, in favor of the scheduler's Task-count limit, as `<IntRangeExpr>` already does. Should the relaxation
    apply only to ranges that read `Steps.*`?
