@@ -242,16 +242,20 @@ reaching `maxIterations`.
 
 Any Step output that a loop's `while`, `until`, `next`, `initial`, or output `value` references is consumed, for the
 re-run rules of [Step States and Step Input Binding](#step-states-and-step-input-binding), once that expression has
-been evaluated, so a re-run of a Task of a completed iteration that succeeds with a different value for it fails. Loop
+been evaluated, so a re-run of a Task of a completed iteration that succeeds with a different value for it is reported
+as a failed attempt under rule 3, and the Task keeps its earlier values. Loop
 variables and loop outputs are never evaluated again, and an iteration is never run again.
 
 The scheduler's per-Step Task limit applies to each Step instance, and its per-Job Task limit counts the Tasks of every
 Step instance of every iteration; it may also limit the Tasks of all of a loop's instances, or the number of instances a
 loop creates. A loop must be able to hold at least 1 MiB of loop variable and loop output values at any moment.
-Exceeding a limit fails the loop finally.
+Exceeding a limit fails the loop finally, or fails Job creation if the initial values exceed it when they are evaluated
+then.
 
 A scheduler should show each iteration with its index, the loop variable values it ran with, its Step instances
-and their Tasks, and the loop outputs evaluated at its end. A loop's total number of Tasks is not known until it ends. A Session holds the Step Environments of
+and their Tasks, and the loop outputs evaluated at its end, and for the loop as a whole the iteration in progress, the
+number of iterations completed, and `maxIterations`. A loop's total number of Tasks is not known until it ends; a
+scheduler reports it as not yet known, with the Tasks of the iterations so far. A Session holds the Step Environments of
 one Step instance at a time, as it does for one Step. See the
 [Template Schemas](2023-09-Template-Schemas#38-steploop-extension-control_flow).
 
