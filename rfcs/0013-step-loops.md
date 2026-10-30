@@ -132,7 +132,7 @@ bound, and through each iteration's body Steps, the Task counts RFC 0011 already
 
 ### Evaluation stages
 
-A loop adds two evaluation points to the stages of
+A loop adds two evaluation stages to those of
 [RFC 0011 §Evaluation stages](0011-control-flow.md#evaluation-stages), both after the loop is bound:
 
 ```
@@ -1055,7 +1055,7 @@ says for any Step, within its iteration.
 | **Template validation** | as today | as today | as today, and `Loop.*`, `RawLoop.*` | Every rule of [Validation](#validation) is checked, with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. |
 | **Job creation** | as today | as today | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated, and the `minLength` check of the loop's `APPEND` outputs is never part of Job creation. |
 | **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011, and for a body Step instance, `Loop.*` | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
-| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Loop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' values | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
+| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' `Steps.*` values, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
 | **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
 | **Job output evaluation** | as RFC 0011 | as RFC 0011 | as RFC 0011 | A job output may read a loop's `Steps.*` symbols, and not a body Step's. |
 | **Task execution** | as today | as today, and `Loop.*` for a body Step instance | *(none)* | As RFC 0011. |
@@ -1160,7 +1160,7 @@ for loop variables.
   Step fails.
 * An error in one of the loop's own groups (*enableIf*, *maxIterations*, an *initial*, or the first *while*) fails the
   loop at once, or fails Job creation if the group is evaluated then (see [Loop binding](#loop-binding)).
-* Exceeding a limit of [Limits](#limits) items 2 and 4 fails the loop; for item 4 checked at Job creation, it fails Job
+* Exceeding a limit of [Limits](#limits) item 2 or 4 fails the loop; for item 4 checked at Job creation, it fails Job
   creation.
 * An error at the iteration boundary fails the loop at once (see
   [The iteration boundary](#the-iteration-boundary)).
@@ -1219,9 +1219,9 @@ says, so it never fails the loop and the boundary does not wait for it (see [Fai
    each body Step instance. A scheduler MAY also impose a maximum on the total number of Tasks of all instances of a
    loop, or on the number of body Step instances a loop creates. An instance whose materialized parameter space would
    take the loop over such a limit fails when its Task enumeration group is evaluated, and an iteration that would
-   take it over the instance limit fails the loop when it would start; the message names the limit. A scheduler's
-   limit on the total number of Tasks of a Job counts the Tasks of every body Step instance of every iteration, and
-   an instance whose materialized parameter space would take the Job over it fails in the same way. A loop has no
+   take it over the instance limit fails the loop when it would start; the message names the limit. RFC 0011's
+   maximum total number of Tasks per Job counts the Tasks of every body Step instance of every iteration, and an
+   instance whose materialized parameter space would take the Job over it fails in the same way. A loop has no
    Tasks of its own, so it adds nothing to a Task count. These failures are final (see [Failure](#failure)).
 3. A loop and each of its body Steps count once each as a Step of the template, as a top-level Step does, wherever
    the base specification or a scheduler counts the Steps of a Job Template. Body Step instances are not Steps of the
@@ -1258,7 +1258,8 @@ loop's outputs and decides, from `until` or `while`, whether another iteration r
 of the Tasks of a body Step instance of the iteration in progress is recoverable: a loop whose failure is recoverable is
 `FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry or requeue of
 its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. A re-run of a body Task that has
-already succeeded leaves the Task `SUCCEEDED`, under the re-run rules of Step outputs, so it never fails the loop or
+already succeeded leaves the Task `SUCCEEDED`, under
+[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs), so it never fails the loop or
 changes its state, variables, or outputs, and the iteration boundary does not wait for it. Only a failed attempt of a
 Task that has not yet succeeded counts as a body Step instance failure. Every other loop failure, including an
 expression or constraint error in the loop or at an iteration boundary, a binding error of a body Step instance,
