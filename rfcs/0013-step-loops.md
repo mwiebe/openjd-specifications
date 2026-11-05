@@ -999,7 +999,9 @@ CONTROL_FLOW adds three value references for loops:
    loop output *value*s, where the values are those of the iteration that just finished. See
    [The iteration boundary](#the-iteration-boundary).
 3. Nowhere else: not in `L`'s *enableIf*, *maxIterations*, or *initial*; not in another loop or its body; not in a
-   top-level Step, a job output, a Job Environment, or an Environment Template.
+   top-level Step, a job output, a Job Environment, or an Environment Template; and, with RFC 0010's `ENV_PARAMS`, not
+   in an `environment:` entry of a body Step's *dependencies*, directly or through a *let* binding (see
+   [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) item 2).
 
 A `Loop.<VarName>` whose type is or contains `path` is available only in format strings resolved on the worker host,
 as a `PATH` `Param.*` is. Format strings resolved earlier, including all of `L`'s own expressions and every
@@ -1095,8 +1097,11 @@ When a loop starts iteration `N`:
    `N = 0`) or from the last boundary's *next*, and `Loop.Iteration` is `N`.
 2. An instance of every body Step is created. Each instance is a Step for every rule of RFC 0011 and RFC 0012: it has
    the states of a Step, is bound progressively, has its own Tasks and outputs, and its *enableIf*, when present, is
-   decided first. An instance's `dependencies` are the instances of the same iteration of the body Steps it names,
-   and are satisfied as RFC 0011 says. An instance with no dependencies is gated only by its own binding.
+   decided first. With `ENV_PARAMS`, an instance's Environment selection is made once its *enableIf* is `true`, as [RFC
+   0011 §`<Environment>`](0011-control-flow.md#environment) item 3 says, and has the same result in every iteration,
+   because it reads no `Loop.*` or `Steps.*` symbol. An instance's `dependencies` are the instances of the same
+   iteration of the body Steps it names, and are satisfied as RFC 0011 says. An instance with no dependencies is gated
+   only by its own binding.
 3. Each instance's groups whose inputs are concrete at the start of the iteration MUST be evaluated then, as a
    Step's groups whose inputs are concrete at Job creation are. An error in one fails the instance, and so the loop,
    finally (see [Failure](#failure)).
@@ -1197,7 +1202,10 @@ later retried or requeued and succeeds.
 A body Step instance is a Step for the rules of Sessions: a Session holds the Step Environments of one Step, so a
 Session that runs Tasks of two instances, of the same body Step in two iterations or of two body Steps, exits the
 first instance's Step Environments and enters the second's. A scheduler MAY run instances of different iterations in
-one Session under those rules, keeping its Job Environments entered, but need not.
+one Session under those rules, keeping its Job Environments entered, but need not. With RFC 0010's `ENV_PARAMS`, a
+Session runs a Step's Tasks only if it entered that Step's Environments with that Step's parameter values, and the
+instances of one body Step always have the same Job Environments, attached Environments, and values (see
+[RFC 0011 §`<Environment>`](0011-control-flow.md#environment) item 7).
 
 #### Retries and re-runs
 
