@@ -111,7 +111,9 @@ should evaluate it then, and must have evaluated every group before it schedules
 
 1. `enableIf` is always decided first. Nothing else of the Step is evaluated until it is. If it is `false`, the Step
    is **skipped**: it has zero Tasks, and none of its other fields is evaluated. A Step without `enableIf` is enabled
-   at once.
+   at once. With the `ENV_PARAMS` extension, once the Step is enabled the scheduler decides at once which of the Job's
+   Environments and attached Environments its Sessions enter, with which parameter values, since those depend only on
+   values known when the Job is created. A skipped Step enters none.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
@@ -120,7 +122,8 @@ should evaluate it then, and must have evaluated every group before it schedules
    * with a future task-task dependencies extension (`TASK_DEPENDENCIES`), the dependencies between its Tasks are
      evaluated and checked, once its Tasks, and the Tasks of the Steps those dependencies name, are known and the
      values they read are available;
-   * the rest of its fields, such as its Step Environments and action timeouts, are evaluated.
+   * the rest of its fields, such as its Step Environments (with `ENV_PARAMS`, including whether each is entered)
+     and action timeouts, are evaluated.
 
    A `let` binding of the Step is evaluated with the first group that uses it, and every one is evaluated before
    the Step is bound.
