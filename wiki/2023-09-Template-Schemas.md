@@ -1051,25 +1051,28 @@ Where:
 10. *script* — The action that is taken by this Step's Tasks when they are run on a Worker host.
 
 With the `CONTROL_FLOW` extension, the Step's format strings that are resolved at Job creation (those not annotated
-`@fmtstring[host]`, in *enableIf*, *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, and *script*) are
-the Step's *materialization expressions*. They may reference the `Steps.*` values of the Step's direct dependencies.
-They are divided into *materialization groups*. *enableIf* is decided first; after it is `true` (or if it is
-absent), each other group can be evaluated as soon as the `Steps.*` values it reads (directly or through the *let*
-bindings it uses) are concrete, and should be evaluated then. Every group whose values are concrete at Job creation
-is evaluated then, only in a Step whose *enableIf* is `true` or absent at Job creation. The groups are listed below.
-When more than one group can be evaluated at the same moment, they are evaluated in this order:
+`@fmtstring[host]`, in *enableIf*, *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, and *script*), and
+with the `ENV_PARAMS` extension the *enableIf* of its *stepEnvironments* and the fields of its Environment selection
+(see [&lt;Environment&gt;](#4-environment)), are the Step's *materialization expressions*. They may reference the
+`Steps.*` values of the Step's direct dependencies. They are divided into *materialization groups*. *enableIf* is
+decided first; after it is `true` (or if it is absent), each other group can be evaluated as soon as the `Steps.*`
+values it reads (directly or through the *let* bindings it uses) are concrete, and should be evaluated then. Every group
+whose values are concrete at Job creation is evaluated then, only in a Step whose *enableIf* is `true` or absent at Job
+creation. The groups are listed below. When more than one group can be evaluated at the same moment, they are evaluated
+in this order:
 
 1. *enableIf*, which is decided before any other group is evaluated, followed, once it is `true` and with the
    `ENV_PARAMS` extension, by the Step's Environment selection (see [&lt;Environment&gt;](#4-environment));
 2. *parameterSpace* (the `range` of each Task parameter in declaration order, then its other format strings, such as
    the `chunks` fields of `TASK_CHUNKING`); once it is evaluated, the Step's Tasks are known;
-3. *hostRequirements*; once it is evaluated, the Step's host requirements are known;
+3. *hostRequirements*, and with `ENV_PARAMS` the forming and checking of the Step's combined host requirements; once
+   it is evaluated, the Step's host requirements are known;
 4. with a future task-task dependencies extension (`TASK_DEPENDENCIES`) only, the subspace ranges of its
    *dependencies* and the checks of the Task-level dependency graph built from them, evaluated once the Step's Tasks,
    and the Tasks of every Step those dependencies name, are known;
-5. every other materialization expression: the format strings of each of its *stepEnvironments*, in order, each starting
-   with its *enableIf* (`ENV_PARAMS`), and those of its *script*, such as an action's `timeout` and `cancelation`
-   fields.
+5. every other materialization expression: for each of its *stepEnvironments*, in order, its *enableIf*
+   (`ENV_PARAMS`) and then, unless that is `false`, its format strings; and the format strings of its *script*, such as
+   an action's `timeout` and `cancelation` fields.
 
 A *let* binding is evaluated with the first group that uses it, and the last group uses every *let* binding. An
 evaluation error in any group fails the Step as soon as that group is evaluated (or Job creation, for a group
@@ -2262,32 +2265,38 @@ Where:
 5. At least one of "script" or "variables" must be provided.
 
 The `ENV_PARAMS` extension gives an Environment, and a Step's *environment* dependency entry, an *enableIf*, decided
-for each Step when the Job is created. In a Job Template that lists both `ENV_PARAMS` and `CONTROL_FLOW`, these rules
-also apply:
+for each Step when the Job is created, except as follows in a Job Template that also lists `CONTROL_FLOW`:
 
 1. The *enableIf* of a Step Environment may also reference the `Steps.*` values of the enclosing Step's direct
    dependencies, directly or through the Step's *let* bindings. In a Step of a loop's body, it may also reference
    `Loop.*`, `RawLoop.*`, and the `Steps.*` values that [3.8.4](#384-scopes-in-and-around-a-loop) allows. It is
    evaluated with the last of the Step's materialization groups, which holds its *stepEnvironments* and *script*
-   fields (see [&lt;StepTemplate&gt;](#3-steptemplate)), and a failure, including a `null` result, fails the Step, or
-   Job creation for a group evaluated then. No other Environment field of `ENV_PARAMS` may reference `Steps.*`,
+   fields (see [&lt;StepTemplate&gt;](#3-steptemplate)), before the Environment's format strings, which are not
+   evaluated if it is `false`. A failure, including a `null` result, fails the Step, or Job creation for a group
+   evaluated then. No other Environment field of `ENV_PARAMS` may reference `Steps.*`,
    `Loop.*`, or `RawLoop.*`.
 2. An *environment* entry's *parameters* values and *enableIf* may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`,
    directly or through a *let* binding that does.
-3. What `ENV_PARAMS` does for a Step when the Job is created, other than evaluating the *enableIf* of its Step
-   Environments, is the Step's *Environment selection*: which of the Job's Environments and attached Environments its
-   Sessions enter, with which parameter values, and the checks of them, including `exclusiveGroup` and the
-   resolution of their *hostRequirements*. It is made once the Step's own *enableIf* is `true`, before any other
-   materialization group of the Step is evaluated, which is when the Job is created for a Step whose *enableIf* is
-   absent or decided then. A skipped Step has none, so no Environment is entered or checked for it, apart from the
-   checks of an *environment* entry as written. Until a Step's *enableIf* is decided, it is one more undetermined
-   field for the checks that are made before the Job is created only when they hold whatever every undetermined field
-   resolves to, unless it is absent or `true`.
+3. What `ENV_PARAMS` does for one Step when the Job is created is the Step's *Environment selection*: evaluating its
+   entries' *enableIf*, deciding which of the Job's Environments and attached Environments its Sessions enter and with
+   which parameter values, applying `exclusiveGroup`, checking constraint 7 and the values, and resolving the
+   Environments' *hostRequirements*. The *enableIf* of its Step Environments (rule 1), its combined host requirements
+   (rule 4), and checks over its whole set of Environments (rule 5) are not part of it. It is made once the Step's own
+   *enableIf* is `true`, before any other materialization group of the Step is evaluated, which is when the Job is
+   created for a Step whose *enableIf* is absent or decided then. The work that does not depend on which Steps enter
+   an Environment stays at Job creation: attaching the Environment Templates, resolving every *environment* entry
+   that names no Job Environment against them, and the checks of an entry as written (its keys, the forms of its
+   values, and a name that matches two attached Environments). A skipped Step has no Environment selection, so no
+   Environment is entered, and no entry or Environment *enableIf* evaluated or other check made, for it. A check that
+   `ENV_PARAMS` makes for one Step at template validation, other than those of an entry as written, is made then only
+   if the Step's *enableIf* is absent or the literal `true`, and otherwise in its Environment selection, or never if
+   the Step is skipped.
 4. A Step's combined host requirements are formed, and checked, when its *hostRequirements* are evaluated, and its
    host requirements are known when they are.
-5. The `WRAP_ACTIONS` single-layer rule ([&lt;EnvironmentActions&gt;](#43-environmentactions)) is checked for a Step
-   when the last of its materialization groups is evaluated, or earlier where the violation holds whatever every
-   undetermined *enableIf* resolves to.
+5. A check over the whole set of Environments a Step's Sessions enter, such as the `WRAP_ACTIONS` single-layer rule
+   ([&lt;EnvironmentActions&gt;](#43-environmentactions)), is made, from Job creation on, as soon as its outcome no
+   longer depends on an *enableIf* that is not yet evaluated, the Step's own included: at the latest when the last of
+   the Step's materialization groups is evaluated.
 
 An error in the Step's Environment selection, its combined host requirements, or the single-layer rule fails the
 Step at once, or fails Job creation if it is found then.
@@ -2838,7 +2847,7 @@ different sets of values are known, which determines which format strings can be
 |-------|------|-------------|----------------|--------------|
 | **Template validation** | `openjd check` or equivalent | Literal values, parameter type declarations | `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` `Steps.*`, `Loop.*`, and `RawLoop.*` | Syntax validation, structural checks. With the `EXPR` extension: type checking of expressions using declared parameter types. `Job.Name` and `Step.Name` are available as `unresolved[string]`. With the `CONTROL_FLOW` extension: `Steps.*` values are available as `unresolved` values of the types derived from the producing Steps' *outputVariables* and Task parameters, and references to them are checked against the referencing Step's *dependencies*; `Loop.*` and `RawLoop.*` values are available as `unresolved` values of the loop variables' types (see [3.8.4](#384-scopes-in-and-around-a-loop)). |
 | **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*`, and with `CONTROL_FLOW`, for a loop's first *while*, `Loop.*` and `RawLoop.*` for iteration 0 | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete and every value of a Step of a loop's body | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated and expressions in TEMPLATE scope are fully evaluated (with the `CONTROL_FLOW` extension, only those of the materialization groups evaluated then, and the `let` bindings those groups use); `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension, in Step dependency order: every Step's *enableIf* whose values are all concrete is evaluated; for each Step whose *enableIf* is then `true` or absent, its Environment selection (`ENV_PARAMS`, see [4](#4-environment)) is made and every materialization group whose `Steps.*` values are all concrete is evaluated, and an error fails Job creation; the other groups wait for step input binding. A loop is treated as a Step here; nothing of a Step of a loop's body is evaluated at Job creation, and the `minLength` check of a loop's `APPEND` outputs is never part of it (see [3.8.5](#385-running-a-loop)). |
-| **Step input binding** (`CONTROL_FLOW` only) | Per materialization group of a Step (see [3](#3-steptemplate)), as soon as every `Steps.*` value it reads is concrete, with *enableIf* first | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name`, the referenced `Steps.*`, in a Step instance of a loop's body `Loop.*` and `RawLoop.*`, and for a loop's first *while* `Loop.*` and `RawLoop.*` for iteration 0 | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The group's format strings are evaluated. If *enableIf* is `false` the Step is skipped, its parameter space is the empty set (its `Steps.*` values are `null`, not `[]`), and no other group is evaluated. When *parameterSpace* is evaluated the Step's Tasks are known, and when *hostRequirements* is, its host requirements are known, in either order. If any evaluation fails, or the Task count exceeds the implementation's per-Step limit or would take the Job's total over its per-Job limit (see [3.4](#34-stepparameterspacedefinition)), the Step fails at once, before any of its Tasks runs. Until every group has been evaluated the Step is pending inputs, and none of its Tasks is dispatched. |
+| **Step input binding** (`CONTROL_FLOW` only) | Per materialization group of a Step (see [3](#3-steptemplate)), as soon as every `Steps.*` value it reads is concrete, with *enableIf* first | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name`, the referenced `Steps.*`, in a Step instance of a loop's body `Loop.*` and `RawLoop.*`, and for a loop's first *while* `Loop.*` and `RawLoop.*` for iteration 0 | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The group's format strings are evaluated. If *enableIf* is `false` the Step is skipped, its parameter space is the empty set (its `Steps.*` values are `null`, not `[]`), and no other group is evaluated; if it is `true`, with the `ENV_PARAMS` extension the Step's Environment selection is made at once (see [4](#4-environment)). When *parameterSpace* is evaluated the Step's Tasks are known, and when *hostRequirements* is, its host requirements are known, in either order. If any evaluation fails, or with `ENV_PARAMS` the Step's Environment selection, combined host requirements, or a check over its set of Environments fails, or the Task count exceeds the implementation's per-Step limit or would take the Job's total over its per-Job limit (see [3.4](#34-stepparameterspacedefinition)), the Step fails at once, before any of its Tasks runs. Until every group has been evaluated the Step is pending inputs, and none of its Tasks is dispatched. |
 | **Loop iteration start** (`CONTROL_FLOW` only) | When a loop starts an iteration (see [3.8.5](#385-running-a-loop)) | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each Step of the body, `Loop.*` and `RawLoop.*` for the iteration, the `Steps.*` values of the loop's dependencies | The `Steps.*` values of the Step instances of the iteration that are not yet concrete, `Task.*`, `Session.*` | A new instance of every Step of the loop's body is created. Each is bound as a Step is at step input binding; a group whose values are all concrete is evaluated now. |
 | **Loop iteration boundary** (`CONTROL_FLOW` only) | When every Step instance of an iteration has completed successfully or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` and `RawLoop.*` for the iteration (for *while*, for the next iteration), the `Steps.*` values of the loop's dependencies and of the iteration's Steps | `Step.Name`, `Task.*`, `Session.*` | The loop outputs' *value*s, then *until*, then every *next*, then *while* with the new values, then the *maxIterations* bound. Any failure fails the loop. |
 | **Job output evaluation** (`CONTROL_FLOW` only) | Once per Job output, when every `Steps.*` value its *value* references is concrete, or at Job creation if it references none | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted to its type, and checked. A failure fails the Job. See [2.17](#217-joboutputdefinition-extension-control_flow). |

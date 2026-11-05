@@ -147,11 +147,12 @@ The Step then becomes one of:
   read them. A Step whose `enableIf` reads only values available at Job creation, such as Job Parameters, is
   decided at Job creation instead.
 * **Failed** — An expression in any group failed, its Task count exceeded the scheduler's per-Step limit or would take
-  the Job over its per-Job limit, or (with a future `TASK_DEPENDENCIES` extension) the dependencies between its Tasks
-  have a cycle or an index out of range. It fails as soon as the group with the error is evaluated, without waiting
-  for the values its other groups read, and none of its Tasks runs. Such a Step has no failed Tasks to retry, so it
-  stays failed. A Step that failed because one of its Tasks failed can still succeed if a retry or requeue of its
-  failed Tasks succeeds.
+  the Job over its per-Job limit, (with the `ENV_PARAMS` extension) a check of the Environments it enters or of its
+  combined host requirements failed, or (with a future `TASK_DEPENDENCIES` extension) the dependencies between its Tasks
+  have a cycle or an index out of range. It fails as soon as the group with the error is evaluated, without waiting for
+  the values its other groups read, and none of its Tasks runs. Such a Step has no failed Tasks to retry, so it stays
+  failed. A Step that failed because one of its Tasks failed can still succeed if a retry or requeue of its failed Tasks
+  succeeds.
 
 No Task of a Step is scheduled until every group has been evaluated, so evaluating groups early changes when a Step's
 Tasks and host requirements can be seen, not when its Tasks run.
