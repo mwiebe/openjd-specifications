@@ -115,8 +115,9 @@ should evaluate it then, and must have evaluated every group before it schedules
    Environments and attached Environments its Sessions enter, with which parameter values. They depend only on values
    known when the Job is created, but are decided only once the Step is enabled: when the Job is created for a Step
    enabled then, otherwise when it is enabled, and for a Step in a loop's body, in each iteration. Whether each of its
-   Step Environments is entered is decided later, with its other fields. An error in them that would reject the Job when
-   the Job is created fails only that Step when it is found later. A skipped Step enters none.
+   Step Environments is entered is decided later, with its other fields. An error in that choice, which would reject the
+   Job if found when the Job is created, fails only that Step when found later (and for a Step in a loop's body, so the
+   loop). A skipped Step enters none.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and

@@ -921,10 +921,10 @@ Where:
    expression types, and constraint properties. `LIST[LIST[INT]]` is allowed.
 3. *value* — The output's value, whose target type is the expression type of *type*, made optional: a `null` result
    means the output has no value, which is not an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]`
-   parameters), `RawParam.*`, `Job.Name`, and the `Steps.*` values of any Step of the Job except a Step of a loop's body (see
-   [3.8.4](#384-scopes-in-and-around-a-loop)), with values whose type is or
-   contains `path` read through `Steps.<StepName>.RawOutput.*` and `Steps.<StepName>.TaskRawParam.*`. It may not reference `Step.Name`, `Task.*`,
-   `Session.*`, or names bound by `let`.
+   parameters), `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), and the `Steps.*` values of any Step
+   of the Job except a Step of a loop's body (see [3.8.4](#384-scopes-in-and-around-a-loop)), with values whose type is
+   or contains `path` read through `Steps.<StepName>.RawOutput.*` and `Steps.<StepName>.TaskRawParam.*`. It may not
+   reference `Step.Name`, `Task.*`, `Session.*`, or names bound by `let`.
 4. *description*, *unit* — For display only, as on `<OutputVariableDefinition>`.
 5. Constraint properties — Checked against the value when it is evaluated. A `null` value is not checked.
 
@@ -1005,10 +1005,11 @@ Where:
    `Steps.<name>.*` value of the Step (see [Value References](#731-value-references)) is `null`. A skipped Step
    satisfies the dependencies of the Steps that depend on it once its own dependencies are satisfied. If omitted, the
    Step is always enabled. Constraints:
-    1. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name`, `Step.Name`, and the
-       `Steps.*` values of the Step's direct dependencies. In a Step of a loop's body, it may also reference `Loop.*`,
-       `RawLoop.*`, and the `Steps.*` values that [3.8.4](#384-scopes-in-and-around-a-loop) allows. It may not
-       reference names bound by the Step's own *let*, `Task.*`, or `Session.*`.
+    1. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with
+       `ENV_PARAMS`, also `Job.EnvNames`), `Step.Name`, and the `Steps.*` values of the Step's direct dependencies. In a
+       Step of a loop's body, it may also reference `Loop.*`, `RawLoop.*`, and the `Steps.*` values that
+       [3.8.4](#384-scopes-in-and-around-a-loop) allows. It may not reference names bound by the Step's own *let*,
+       `Task.*`, or `Session.*`.
     2. If every value it references is concrete at Job creation (it references no `Steps.*` value, or only values
        concrete then, such as those of a Step skipped at Job creation), it is evaluated at Job creation. A Step
        disabled at Job creation is still part of the Job and is shown as skipped, so every Job created from a template
@@ -1025,7 +1026,7 @@ Where:
     * Maximum number of elements: There is no maximum defined, though implementations may choose to constrain the number of
     dependencies.
     * With the `CONTROL_FLOW` extension, listing a Step here is also what makes its `Steps.*` values available to this
-      Step. In a Step of a loop's body, this list names only Steps of the same body (see
+      Step. In a Step of a loop's body, the entries of this list that name a Step name only Steps of the same body (see
       [&lt;StepLoop&gt;](#38-steploop-extension-control_flow)).
 6. *stepEnvironments* — An ordered list of the environments that are required to run Tasks in this Step.
   These are entered in the order provided at the start of every Session for Tasks in the Step, and exited in the reverse
@@ -2050,18 +2051,19 @@ Where:
     * Maximum number of elements: 32.
     * No two elements in this list may have the same value for the `name` property.
 2. *while* — Checked before each iteration, including the first: the iteration runs only if it is `true`. If it is
-   `false` before the first iteration, the loop runs zero iterations and, once its dependencies are satisfied,
-   succeeds if every `APPEND` output's `minLength` holds for `[]`. Its target type is `bool`, and a `null` result is
-   an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`,
-   `Job.Name`, `Loop.*` and `RawLoop.*`, and the `Steps.*` values of the loop's *dependencies*, but not the Steps of
-   the loop's body.
+   `false` before the first iteration, the loop runs zero iterations and, once its dependencies are satisfied, succeeds
+   if every `APPEND` output's `minLength` holds for `[]`. Its target type is `bool`, and a `null` result is an error. It
+   may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with `ENV_PARAMS`,
+   also `Job.EnvNames`), `Loop.*` and `RawLoop.*`, and the `Steps.*` values of the loop's *dependencies*, but not the
+   Steps of the loop's body.
 3. *until* — Checked after each iteration: if it is `true`, it ends the loop, which succeeds if every `APPEND`
    output's `minLength` holds. A loop with *until* runs at
    least once. Its target type is `bool`, and a `null` result is an error. It may reference everything *while* may,
    and the `Steps.*` values of every Step of the loop's body, for the iteration that just finished.
 4. *maxIterations* — The most iterations the loop may run, an integer from 1 to 1,000. A format string here may
-   reference only `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, and `Job.Name`. A loop that
-   would start another iteration after running *maxIterations* iterations fails.
+   reference only `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, and `Job.Name` (with
+   `ENV_PARAMS`, also `Job.EnvNames`). A loop that would start another iteration after running *maxIterations*
+   iterations fails.
 5. *steps* — The loop's body: one or more `<StepTemplate>`s (see [&lt;StepTemplate&gt;](#3-steptemplate)). A
    `<StepLoop>` may not appear here: loops do not nest. The *dependencies* of a Step of the body name only Steps of the
    same body, and must not form a cycle.
@@ -2085,9 +2087,10 @@ Where:
    `Iteration`. See: [&lt;Identifier&gt;](#71-identifier).
 2. *type* — The variable's type. See: [&lt;OutputVariableDefinition&gt;](#37-outputvariabledefinition-extension-control_flow):
    the same types, expression types, and constraint properties. `LIST[LIST[INT]]` is allowed.
-3. *initial* — The value for the first iteration. Its target type is the expression type of *type*, and a `null`
-   result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`,
-   `Job.Name`, and the `Steps.*` values of the loop's *dependencies*. It may not reference `Loop.*` or `RawLoop.*`.
+3. *initial* — The value for the first iteration. Its target type is the expression type of *type*, and a `null` result
+   is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with
+   `ENV_PARAMS`, also `Job.EnvNames`), and the `Steps.*` values of the loop's *dependencies*. It may not reference
+   `Loop.*` or `RawLoop.*`.
 4. *next* — The value for the next iteration, evaluated at each iteration boundary at which *until*, if present, did
    not end the loop, before *while* and the *maxIterations* bound; so a loop with *while* evaluates it at its final
    boundary too. Its target type and `null` rule are those of *initial*. It may reference everything *until* may.
@@ -2301,27 +2304,29 @@ lists `CONTROL_FLOW`:
    once the Step's own *enableIf* is `true`, before any other materialization group of the Step is evaluated: when the
    Job is created for a Step outside a loop's body whose *enableIf* is absent or decided `true` then, when its
    *enableIf* is decided `true` for any other such Step, and within its iteration for each instance of a Step of a
-   loop's body, whether or not that Step has an *enableIf* (see [3.8.5](#385-running-a-loop)).
+   loop's body, once the instance's *enableIf* is `true` or at once if it has none (see [3.8.5](#385-running-a-loop)).
 
    The work that does not depend on which Steps enter an Environment stays at Job creation, whatever any Step's
    *enableIf*, and comes before any Step's Environment selection: attaching the Environment Templates and making
-   `Job.EnvNames` concrete, resolving every *environment* entry that names no Job Environment against them and
-   rejecting a name that matches two of them, checking that a PATH or LIST[PATH] literal `default` is absolute or a
-   URI, and rejecting an attached `ALWAYS` Environment with the name of a Job Environment and a parameter without a
-   `default`. A skipped Step has no Environment selection, so no Environment is entered, no entry or Environment
-   *enableIf* is evaluated, and none of the checks of Environment selection is made for it.
+   `Job.EnvNames` concrete, before any Step's *enableIf* is evaluated, resolving every *environment* entry that names no
+   Job Environment against them and rejecting a name that matches two of them, checking that a PATH or LIST[PATH]
+   literal `default` is absolute or a URI, and rejecting an attached `ALWAYS` Environment with the name of a Job
+   Environment and a parameter without a `default`. A skipped Step has no Environment selection, so no Environment is
+   entered, no entry or Environment *enableIf* is evaluated, and none of the checks of Environment selection or of
+   `CONTROL_FLOW` rule 5 is made for it.
 
-   Every check that `ENV_PARAMS` makes at template validation is made whatever any Step's *enableIf*, including the
+   Every check that `ENV_PARAMS` makes before the Job is created is made whatever any Step's *enableIf*, including the
    checks of an entry's form ([&lt;StepDependency&gt;](#32-stepdependency) constraints 1 to 4, 8, and 9, and that each
    value is one of the forms of an `<EnvironmentParameterValue>`), except a check whose outcome depends on whether a
-   Step's Sessions enter an Environment: the keys and values of an entry that names a Job Environment (constraints 5
-   and 6, where constraint 6 includes a value's type, such as the rule that a value for a list-typed parameter is a
-   list literal or a single `{{ }}` expression), constraint 7 for a Job Environment, a disabled entry that names an
-   `ALWAYS` Job Environment, an *enableIf* whose result depends on a missing value, and the checks over a Step's whole
-   set of Environments. Such a check is made at template validation only for a Step known to be enabled: its
-   *enableIf* is absent or the boolean `true`, not a format string, and for a Step of a loop's body the loop's
-   *enableIf* is too and the loop has no *while*. Otherwise it is made in the Step's Environment selection, or never if
-   the Step is skipped.
+   Step runs or on which Environments its Sessions enter: the keys and values of an entry (constraints 5 and 6, where
+   constraint 6 includes a value's type, such as the rule that a value for a list-typed parameter is a list literal or a
+   single `{{ }}` expression), constraint 7, a disabled entry that names an `ALWAYS` Environment, an *enableIf* whose
+   result depends on a missing value, and the checks over a Step's whole set of Environments, wherever `ENV_PARAMS`
+   makes them before the Job is created, including for an external entry when a validator is given the Environment
+   Templates. Such a check is made then only for a Step known to be enabled: its *enableIf* is absent or the boolean
+   `true`, not a format string, and for a Step of a loop's body the loop's *enableIf* is too and the loop has no
+   *while*. Otherwise it is made in the Step's Environment selection (or, for a check of `CONTROL_FLOW` rule 5, as that
+   rule says), or never if the Step is skipped.
 4. A Step's combined host requirements are completed when its *hostRequirements* are evaluated: its own requirements
    that resolve to nothing are discarded, an *anyOf* or *allOf* of its own that resolves to no values is rejected, the
    rest are combined with the Environments' combined requirements, and the result is checked. Its host requirements are
@@ -2329,7 +2334,8 @@ lists `CONTROL_FLOW`:
 5. A check over the whole set of Environments a Step's Sessions enter, other than constraint 7 and the value checks,
    such as the `WRAP_ACTIONS` single-layer rule ([&lt;EnvironmentActions&gt;](#43-environmentactions)), is made, from
    Job creation on, as soon as its outcome no longer depends on an *enableIf* whose value is not yet known, the Step's
-   own included: at the latest when the last of the Step's materialization groups is evaluated. A literal `true` or
+   own included: at the latest when the Step's group of *stepEnvironments* and *script* fields (group 5) is
+   evaluated. A literal `true` or
    `false` is known. For a Step of a loop's body, it is made for each instance, at the earliest when the instance's
    Environment selection is made.
 
@@ -2887,8 +2893,8 @@ different sets of values are known, which determines which format strings can be
 | **Job creation** | Job submission with parameter values | `Param.*`, `RawParam.*`, and with `CONTROL_FLOW`, for a loop's first *while*, `Loop.*` and `RawLoop.*` for iteration 0 | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, and with `CONTROL_FLOW` the `Steps.*` values that are not yet concrete and every value of a Step of a loop's body | Parameter values are bound. Format strings not annotated `@fmtstring[host]` are resolved (e.g., `name`, `parameterSpace` ranges). PATH and `LIST[PATH]` parameter defaults must be relative and are joined with the job template directory (see [§2.2](#22-jobpathparameterdefinition)); relative PATH and `LIST[PATH]` parameter values are joined with the current working directory. With the `EXPR` extension: `let` bindings in `<StepTemplate>` are evaluated and expressions in TEMPLATE scope are fully evaluated (with the `CONTROL_FLOW` extension, only those of the materialization groups evaluated then, and the `let` bindings those groups use); `Job.Name` and `Step.Name` are concrete. With the `CONTROL_FLOW` extension, in Step dependency order: every Step's *enableIf* whose values are all concrete is evaluated; for each Step whose *enableIf* is then `true` or absent, its Environment selection (`ENV_PARAMS`, see [4](#4-environment)) is made and every materialization group whose `Steps.*` values are all concrete is evaluated, and an error fails Job creation; the other groups wait for step input binding. With the `ENV_PARAMS` extension, the effective values, Environment set, and Environments' host requirements of a Step are known only once its Environment selection is made (see [4](#4-environment)), and the work of that extension that does not depend on which Steps enter an Environment is done here whatever any Step's *enableIf*. A loop is treated as a Step here; nothing of a Step of a loop's body is evaluated at Job creation, and the `minLength` check of a loop's `APPEND` outputs is never part of it (see [3.8.5](#385-running-a-loop)). |
 | **Step input binding** (`CONTROL_FLOW` only) | Per materialization group of a Step (see [3](#3-steptemplate)), as soon as every `Steps.*` value it reads is concrete, with *enableIf* first | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name`, the referenced `Steps.*`, in a Step instance of a loop's body `Loop.*` and `RawLoop.*`, for a loop's first *while* `Loop.*` and `RawLoop.*` for iteration 0, and with `ENV_PARAMS` `Job.EnvNames` and the values that extension lets its fields read | `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*` | The group's format strings are evaluated. If *enableIf* is `false` the Step is skipped, its parameter space is the empty set (its `Steps.*` values are `null`, not `[]`), and no other group is evaluated; if it is `true`, with the `ENV_PARAMS` extension the Step's Environment selection is made at once (see [4](#4-environment)). When *parameterSpace* is evaluated the Step's Tasks are known, and when *hostRequirements* is, its host requirements are known, in either order. If any evaluation fails, or with `ENV_PARAMS` the Step's Environment selection, combined host requirements, or a check over its set of Environments fails, or the Task count exceeds the implementation's per-Step limit or would take the Job's total over its per-Job limit (see [3.4](#34-stepparameterspacedefinition)), the Step fails at once, before any of its Tasks runs. Until every group has been evaluated the Step is pending inputs, and none of its Tasks is dispatched. |
 | **Loop iteration start** (`CONTROL_FLOW` only) | When a loop starts an iteration (see [3.8.5](#385-running-a-loop)) | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each Step of the body, `Loop.*` and `RawLoop.*` for the iteration, the `Steps.*` values of the loop's dependencies, and with `ENV_PARAMS` `Job.EnvNames` and the values that extension lets its fields read | The `Steps.*` values of the Step instances of the iteration that are not yet concrete, `Task.*`, `Session.*` | A new instance of every Step of the loop's body is created. Each is bound as a Step is at step input binding; a group whose values are all concrete is evaluated now. |
-| **Loop iteration boundary** (`CONTROL_FLOW` only) | When every Step instance of an iteration has completed successfully or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` and `RawLoop.*` for the iteration (for *while*, for the next iteration), the `Steps.*` values of the loop's dependencies and of the iteration's Steps | `Step.Name`, `Task.*`, `Session.*` | The loop outputs' *value*s, then *until*, then every *next*, then *while* with the new values, then the *maxIterations* bound. Any failure fails the loop. |
-| **Job output evaluation** (`CONTROL_FLOW` only) | Once per Job output, when every `Steps.*` value its *value* references is concrete, or at Job creation if it references none | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted to its type, and checked. A failure fails the Job. See [2.17](#217-joboutputdefinition-extension-control_flow). |
+| **Loop iteration boundary** (`CONTROL_FLOW` only) | When every Step instance of an iteration has completed successfully or been skipped | `Param.*`, `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), `Loop.*` and `RawLoop.*` for the iteration (for *while*, for the next iteration), the `Steps.*` values of the loop's dependencies and of the iteration's Steps | `Step.Name`, `Task.*`, `Session.*` | The loop outputs' *value*s, then *until*, then every *next*, then *while* with the new values, then the *maxIterations* bound. Any failure fails the loop. |
+| **Job output evaluation** (`CONTROL_FLOW` only) | Once per Job output, when every `Steps.*` value its *value* references is concrete, or at Job creation if it references none | `Param.*`, `RawParam.*`, `Job.Name`, with `ENV_PARAMS` `Job.EnvNames`, the referenced `Steps.*` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted to its type, and checked. A failure fails the Job. See [2.17](#217-joboutputdefinition-extension-control_flow). |
 | **Task execution** | On the worker host | All values: `Param.*`, `Task.Param.*`, `Session.*`, `Task.File.*`, `Env.File.*`, path mapping rules | *(none)* | Format strings annotated `@fmtstring[host]` are resolved. Path mapping rules are applied to PATH-type parameters. Embedded files are written. With the `EXPR` extension: `let` bindings in `<StepScript>` and `<EnvironmentScript>` are evaluated; all remaining expressions are fully evaluated. With the `CONTROL_FLOW` extension: the `Steps.*` values of the Step's direct dependencies are concrete (and for a Step instance of a loop's body, `Loop.*`, `RawLoop.*`, and the `Steps.*` values of the loop's dependencies), and the `openjd_output_var:` directives that `onRun` prints are processed as they are printed, with `PATH` values mapped back to the submission path context (see [3.7.1](#371-reporting-output-values)). |
 
 With the `CONTROL_FLOW` extension, template validation must also emit a warning (not an error) where the Expression
