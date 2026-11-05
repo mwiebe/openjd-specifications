@@ -2287,24 +2287,26 @@ lists `CONTROL_FLOW`:
    (see [&lt;StepTemplate&gt;](#3-steptemplate)), before the Environment's format strings, which are not evaluated if it
    is `false`. The Step's *let* bindings are still evaluated, so a binding that only a disabled Step Environment needs
    must allow for the missing value. A failure, including a `null` result, fails the Step, or Job creation for a group
-   evaluated then. No other Environment field of `ENV_PARAMS` may reference `Steps.*`, `Loop.*`, or `RawLoop.*`.
+   evaluated then. The *enableIf* of a Job Environment or an attached Environment, every Environment's
+   *hostRequirements*, and Environment parameter `default`s may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`.
 2. An *environment* entry's *parameters* values and *enableIf* may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`,
    directly or through a *let* binding that does.
 3. What `ENV_PARAMS` does for one Step when the Job is created is the Step's *Environment selection*: evaluating its
    entries' *enableIf*; checking its enabled entries' keys, and rejecting an enabled entry with `required: true` that
    resolves to no Environment; deciding which of the Job's Environments and attached Environments its Sessions enter,
-   with which parameter values, and applying `exclusiveGroup`; applying the `ALWAYS` rules; for the Environments not
-   disabled for the Step, checking constraint 7 and the Step's effective values (see
-   [&lt;StepDependency&gt;](#32-stepdependency) constraint 6), including a non-literal `default` that the Step takes;
-   resolving those Environments' *hostRequirements* with the Step's values, discarding requirements that resolve to
-   nothing, rejecting an *anyOf* or *allOf* that resolves to no values, and checking each Environment's requirements as
-   one source; and combining the Environments' requirements with each other and checking the combination. The
-   *enableIf* of its Step Environments (`CONTROL_FLOW` rule 1), the Step's own host requirements (`CONTROL_FLOW` rule
-   4), and the other checks over its whole set of Environments (`CONTROL_FLOW` rule 5) are not part of it. It is made
-   once the Step's own *enableIf* is `true`, before any other materialization group of the Step is evaluated: when the
-   Job is created for a Step outside a loop's body whose *enableIf* is absent or decided `true` then, when its
-   *enableIf* is decided `true` for any other such Step, and within its iteration for each instance of a Step of a
-   loop's body, once the instance's *enableIf* is `true` or at once if it has none (see [3.8.5](#385-running-a-loop)).
+   with which parameter values, and applying `exclusiveGroup`; rejecting a disabled entry for, or a `false` *enableIf*
+   of, an `ALWAYS` Environment; for the Environments not disabled for the Step, checking constraint 7 and the Step's
+   effective values (see [&lt;StepDependency&gt;](#32-stepdependency) constraint 6), including a non-literal `default`
+   that the Step takes; resolving those Environments' *hostRequirements* with the Step's values, discarding requirements
+   that resolve to nothing, rejecting an *anyOf* or *allOf* that resolves to no values, and checking each Environment's
+   requirements as one source; and combining the Environments' requirements with each other and checking the
+   combination. The *enableIf* of its Step Environments (`CONTROL_FLOW` rule 1), the Step's own host requirements
+   (`CONTROL_FLOW` rule 4), and the other checks over its whole set of Environments (`CONTROL_FLOW` rule 5) are not part
+   of it. It is made once the Step's own *enableIf* is `true`, before any other materialization group of the Step is
+   evaluated: when the Job is created for a Step outside a loop's body whose *enableIf* is absent or decided `true`
+   then, when its *enableIf* is decided `true` for any other such Step, and within its iteration for each instance of a
+   Step of a loop's body, once the instance's *enableIf* is `true` or at once if it has none (see
+   [3.8.5](#385-running-a-loop)).
 
    The work that does not depend on which Steps enter an Environment stays at Job creation, whatever any Step's
    *enableIf*, and comes before any Step's Environment selection: attaching the Environment Templates and making
@@ -2334,10 +2336,9 @@ lists `CONTROL_FLOW`:
 5. A check over the whole set of Environments a Step's Sessions enter, other than constraint 7 and the value checks,
    such as the `WRAP_ACTIONS` single-layer rule ([&lt;EnvironmentActions&gt;](#43-environmentactions)), is made, from
    Job creation on, as soon as its outcome no longer depends on an *enableIf* whose value is not yet known, the Step's
-   own included: at the latest when the Step's group of *stepEnvironments* and *script* fields (group 5) is
-   evaluated. A literal `true` or
-   `false` is known. For a Step of a loop's body, it is made for each instance, at the earliest when the instance's
-   Environment selection is made.
+   own included: at the latest when the Step's group of *stepEnvironments* and *script* fields (group 5) is evaluated. A
+   literal `true` or `false` is known. For a Step of a loop's body, it is made for each instance, at the earliest when
+   the instance's Environment selection is made.
 
 An error in the Step's Environment selection, its combined host requirements, or a check of `CONTROL_FLOW` rule 5
 fails the Step at once, or fails Job creation if it is found then.

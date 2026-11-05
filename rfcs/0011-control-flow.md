@@ -15,10 +15,11 @@
   * RFC 0007, Extended Parameter Types
   * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft,
     https://github.com/OpenJobDescription/openjd-specifications/pull/210), for the *enableIf* of an `<Environment>`,
-    which this RFC extends (see [`<Environment>`](#environment)). Only that part of this RFC depends on RFC 0010,
-    which is to be accepted first. If this RFC were accepted first, `CONTROL_FLOW` would have no Environment
-    *enableIf* until RFC 0010 is accepted. The wiki text of that part refers to RFC 0010's wiki edits, so it is to be
-    merged after them.
+    which this RFC extends (see [`<Environment>`](#environment)). Only that part of this RFC depends on RFC 0010, which
+    is to be accepted first. If this RFC were accepted first, `CONTROL_FLOW` would have no Environment *enableIf* until
+    RFC 0010 is accepted. The wiki text of that part refers to RFC 0010's wiki edits, so it is to be merged after them,
+    and RFC 0010's How Jobs Are Run text, which says every Environment decision is made when the Job is created, is then
+    to be qualified for `CONTROL_FLOW` as `<Environment>` item 7 says.
 * Related:
   * Discussion #111, variable data flow along step dependencies, the seed idea for this RFC
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/111)
@@ -1074,11 +1075,12 @@ Templates, and is decided per Step with the Step's Environment parameter values.
   10), and a `SKIPPED` Step has no Sessions, so RFC 0010's checks of the Environments its Sessions would enter do not
   apply to it. The selection reads only values known at Job creation, so it is made as soon as the Step's *enableIf*
   is `true`: at submission for every Step outside a loop's body whose *enableIf* is absent or decided `true` then.
-* **A disabled Step Environment's fields are not evaluated.** A Step Environment is often disabled because the value
-  it would use is missing, such as the `null` output of a skipped producer, and its other fields read the same value.
+* **A disabled Step Environment's fields are not evaluated.** A Step Environment is often disabled because the value it
+  would use is missing, such as the `null` output of a skipped producer, and its other fields read the same value.
   Evaluating them anyway would fail the Step for a Step Environment it never enters, as evaluating a skipped Step's
-  fields would. RFC 0010 does not say whether a disabled Environment's fields are resolved, which Open Question 15
-  raises.
+  fields would. RFC 0010 resolves an Environment's *hostRequirements* only for the Steps that enter it, but makes no
+  exception for a disabled Environment's other TEMPLATE-scope format strings, such as action timeouts, which Open
+  Question 15 raises.
 * **The cost.** For a Step whose *enableIf* is not decided at Job creation, and for every body Step of a loop, an error
   that RFC 0010 alone would report at Job creation, such as constraint 7 or a missing `required: true` external
   Environment, is reported only once the Step is enabled, which may be after other Steps have run, and never if the Step
@@ -1141,7 +1143,7 @@ Template whose `extensions` list includes `CONTROL_FLOW`.
 | **Host requirements known** | A fact about a Step that is not `SKIPPED`: its *enableIf* is `true` and its host selection group has evaluated (with `ENV_PARAMS`, its combined host requirements are then known). It does not apply to a `SKIPPED` Step, which runs nothing. |
 | **Bound** | A Step is bound when its *enableIf* is `true` and every one of its materialization groups has evaluated successfully. Only a bound Step's Tasks may be dispatched. |
 | **Conditional Step** | A Step that has an `enableIf`. |
-| **Environment selection** | With `ENV_PARAMS`, the work that RFC 0010 does for one Step at Job creation: deciding which of the Job's Environments and attached Environments its Sessions enter, with which Environment parameter values, and checking them. Part of the Step's enablement group. See [`<Environment>`](#environment) item 3. |
+| **Environment selection** | With `ENV_PARAMS`, the work that RFC 0010 does for one Step at Job creation, less the parts [`<Environment>`](#environment) item 3 places elsewhere: deciding which of the Job's Environments and attached Environments its Sessions enter, with which Environment parameter values, and checking them. Part of the Step's enablement group. See [`<Environment>`](#environment) item 3. |
 | **Job output** | A typed value declared in the Job Template's `jobOutputDefinitions`, computed from job parameters and `Steps.*`, and reported to the Job's callers. |
 | **`PENDING_INPUTS`** | The state of a Step that is not yet bound and is neither `SKIPPED` nor `FAILED`: its *enableIf* is undecided, or at least one of its materialization groups has not been evaluated yet, usually because an input is not concrete. Its Tasks, and separately its host requirements, may already be known. |
 | **`SKIPPED`** | The terminal state of a Step whose `enableIf` evaluated to `false`. |
@@ -1366,14 +1368,14 @@ except where they say otherwise:
    Step without *enableIf*, since nothing of a body Step is evaluated at Job creation. Item 2 makes its inputs concrete
    by then. An error in it fails the Step at once, or fails Job creation if it is made then.
     * **What stays at Job creation.** This RFC 0010 work is done when the Job is created, whatever any Step's
-      *enableIf*, before any Step's Environment selection: attaching the Environment Templates and making
-      `Job.EnvNames` concrete (step 1); resolving every entry that names no Job Environment against the attached
-      Environments, enabled or disabled (step 3), and rejecting a name that matches two of them; checking that a
-      PATH or LIST[PATH] literal `default` is absolute or a URI; and rejecting an attached `ALWAYS` Environment that
-      has the name of a Job Environment and a parameter without a `default`, which RFC 0010 says always rejects the
-      submission. RFC 0010 evaluates an entry's *enableIf* before resolving its name; resolving every entry first, as
-      here, gives the same result, because disabled entries are resolved too and a disabled entry that matches nothing
-      has no effect.
+      *enableIf*, before any Step's Environment selection: attaching the Environment Templates and making `Job.EnvNames`
+      concrete (step 1); resolving every entry that names no Job Environment against the attached Environments, enabled
+      or disabled (step 3), and rejecting a name that matches two of them; checking that a PATH or LIST[PATH] literal
+      `default` is absolute or a URI and meets its constraints against the unmapped value; and rejecting an attached
+      `ALWAYS` Environment that has the name of a Job Environment and a parameter without a `default`, which RFC 0010
+      says always rejects the submission. RFC 0010 evaluates an entry's *enableIf* before resolving its name; resolving
+      every entry first, as here, gives the same result, because disabled entries are resolved too and a disabled entry
+      that matches nothing has no effect.
     * **A `SKIPPED` Step** has no Environment selection. It has no Sessions, so no entry *enableIf* or Environment
       *enableIf* is evaluated for it, and none of the checks of Environment selection or of item 6 is made for it:
       not constraints 5 to 7, not the checks of its Environment parameter values, not the `ALWAYS` errors, not
@@ -1386,29 +1388,29 @@ except where they say otherwise:
       forms of an `<EnvironmentParameterValue>`. (RFC 0010's Template Schemas §3.2.2 item 4 also holds a disabled
       Environment to constraint 5, which here is part of Environment selection, since it applies only to an enabled
       entry.) The checks excepted are constraints 5 and 6 for an entry, wherever RFC 0010 makes them before Job creation
-      (for an entry that names a Job Environment, and for an external entry when a validator is given the Environment
-      Templates), and constraint 6 includes a value's type, such as the rule that a value for a list-typed parameter is
-      a list literal or a single `{{ }}` expression (RFC 0010's Template Schemas §3.2.2 item 3); constraint 7 for an
-      Environment, wherever RFC 0010 checks it before Job creation; the error for a disabled entry that names an
-      `ALWAYS` Environment; an *enableIf* whose result depends on a missing value (§3.2.2 item 5); and the checks over a
-      Step's whole set of Environments. RFC 0010 reports some of them early only when the violation holds whatever every
-      undetermined *enableIf* resolves to. Each of them is made before Job creation only for a Step known to be enabled,
-      and otherwise in the Step's Environment selection (for the checks over the Step's whole set of Environments, as
-      item 6 says), or never if the Step is skipped. A Step is known to be enabled before Job creation when its
-      *enableIf* is absent or the boolean `true` (not a format string, whatever its value), and, for a body Step of a
-      loop, when also the loop's *enableIf* is absent or the boolean `true` and the loop has no *while*, so that it runs
-      at least once.
+      (for example, for an entry that names a Job Environment, the literal type check of an external entry, and every
+      check of an external entry when a validator is given the Environment Templates), and constraint 6 includes a
+      value's type, such as the rule that a value for a list-typed parameter is a list literal or a single `{{ }}`
+      expression (RFC 0010's Template Schemas §3.2.2 item 3); constraint 7 for an Environment, wherever RFC 0010 checks
+      it before Job creation; the error for a disabled entry that names an `ALWAYS` Environment; an *enableIf* whose
+      result depends on a missing value (§3.2.2 item 5); and the checks over a Step's whole set of Environments. RFC
+      0010 reports some of them early only when the violation holds whatever every undetermined *enableIf* resolves to.
+      Each of them is made before Job creation only for a Step known to be enabled, and otherwise in the Step's
+      Environment selection (for the checks over the Step's whole set of Environments, as item 6 says), or never if the
+      Step is skipped. A Step is known to be enabled before Job creation when its *enableIf* is absent or the boolean
+      `true` (not a format string, whatever its value), and, for a body Step of a loop, when also the loop's *enableIf*
+      is absent or the boolean `true` and the loop has no *while*, so that it runs at least once.
 4. **Step Environments.** The *enableIf* of a Step Environment is evaluated in the Step's remaining group (see
    [Materialization groups](#materialization-groups)), before that Environment's TEMPLATE-scope format strings, rather
    than in the Step's Environment selection. If it is `false`, those format strings are not evaluated, so an error in
-   one of them does not fail the Step. RFC 0010 does not say whether a disabled Environment's format strings are
-   resolved; with `CONTROL_FLOW` they are not, because they may read the `Steps.*` symbols that disabled it, such as
-   the `null` outputs of a skipped producer (see Open Question 15). The Step's *let* bindings are still evaluated,
-   since the remaining group uses every binding, so a binding that only a disabled Step Environment needs must itself
-   allow for the missing value, for example with `or`. RFC 0010 permits none of `activation`, `exclusiveGroup`,
-   *hostRequirements*, and *envParameterDefinitions* on a Step Environment, so this later decision changes no
-   Environment parameter value, supersession, constraint 7 result, or host requirement. A failure, including a `null`
-   result, fails the Step at once, or fails Job creation if the group is evaluated then.
+   one of them does not fail the Step. RFC 0010 makes no exception for a disabled Environment's TEMPLATE-scope format
+   strings; with `CONTROL_FLOW` a disabled Step Environment's are not resolved, because they may read the `Steps.*`
+   symbols that disabled it, such as the `null` outputs of a skipped producer (see Open Question 15). The Step's *let*
+   bindings are still evaluated, since the remaining group uses every binding, so a binding that only a disabled Step
+   Environment needs must itself allow for the missing value, for example with `or`. RFC 0010 permits none of
+   `activation`, `exclusiveGroup`, *hostRequirements*, and *envParameterDefinitions* on a Step Environment, so this
+   later decision changes no Environment parameter value, supersession, constraint 7 result, or host requirement. A
+   failure, including a `null` result, fails the Step at once, or fails Job creation if the group is evaluated then.
 5. **Combined host requirements.** A Step's own *hostRequirements* may be evaluated at step input binding, so its
    combined host requirements ([RFC 0010 §Host requirements](0010-environment-parameters.md#host-requirements)) are
    completed when its host selection group is evaluated: the Step's own requirements that resolve to nothing are
@@ -1420,20 +1422,21 @@ except where they say otherwise:
 6. **Checks over a Step's whole set of Environments.** A check over the whole set of Environments a Step's Sessions
    enter (in step 7 of RFC 0010's Template Schemas §7.4.1, other than constraint 7 and the value checks), such as the
    `WRAP_ACTIONS` single-layer rule, needs the Step Environments the Step enters, which are known once its remaining
-   group has been evaluated. From Job creation on, the check MUST be made as soon as its outcome is determined: when the
-   Job is created, when the Step's Environment selection is made, or when its remaining group is evaluated, whichever
-   comes first. For a body Step of a loop, nothing beyond item 3's Job-level work is done at Job creation, so the check
-   is made for each instance, at the earliest when its Environment selection is made. Its outcome is determined when it
-   holds, or fails, whatever every *enableIf* whose value is not yet known resolves to, the Step's own included. A
-   literal `true` or `false` is known (RFC 0010's Template Schemas §7.5 rule 5). Before Job creation, item 3 applies. A
-   violation fails the Step at once, or fails Job creation if it is found then.
+   group has been evaluated. For a Step outside a loop's body, from Job creation on, the check MUST be made as soon as
+   its outcome is determined: when the Job is created, when the Step's Environment selection is made, or when its
+   remaining group is evaluated, whichever comes first. For a body Step of a loop, nothing beyond item 3's Job-level
+   work is done at Job creation, so the check is made for each instance, at the earliest when its Environment selection
+   is made. Its outcome is determined when it holds, or fails, whatever every *enableIf* whose value is not yet known
+   resolves to, the Step's own included, so a violation is never determined before the Step's own *enableIf* is `true`.
+   A literal `true` or `false` is known (RFC 0010's Template Schemas §7.5 rule 5). Before Job creation, item 3 applies.
+   A violation fails the Step at once, or fails Job creation if it is found then.
 7. **Sessions.** RFC 0010's rule that a Session runs a Step's Tasks only if it entered exactly that Step's Environments,
    with that Step's values, is unchanged. Which Step Environments a Step enters is part of its set of Environments, so a
    Step Environment's *enableIf* can decide which Sessions may run the Step's Tasks. No Task of a Step is dispatched
    before the Step is bound, by which time its Environment selection and every Step Environment *enableIf* are decided,
-   so the rule is applied to a fixed set, as RFC 0010 says. By item 2, the instances of one body Step have the same Job
-   Environments, attached Environments, and Environment parameter values in every iteration; their Step Environments may
-   differ, since a Step Environment's *enableIf* may read `Loop.*` (see [RFC 0013
+   so the rule is applied to a fixed set, as RFC 0010 says. By items 1 and 2, the instances of one body Step have the
+   same Job Environments, attached Environments, and Environment parameter values in every iteration; their Step
+   Environments may differ, since a Step Environment's *enableIf* may read `Loop.*` (see [RFC 0013
    §Sessions](0013-step-loops.md#sessions)).
 8. **`exclusiveGroup`.** It is applied per Step within the Step's Environment selection, as RFC 0010 says: an
    Environment superseded for the Step is not entered and its *enableIf* is not evaluated for the Step, and a
@@ -1441,10 +1444,11 @@ except where they say otherwise:
    by items 1 and 2 which member a Step enters never depends on run-time data, and a Step Environment *enableIf*
    decided later never changes it.
 
-`Job.EnvNames` is unchanged: it lists the Job's Environments whether or not any Step enters them, and is concrete at
-Job creation before anything else is evaluated. RFC 0010 makes it available in every format string and expression
-field resolved at Job creation or later, so with `ENV_PARAMS` the fields this RFC and RFC 0013 add may read it too:
-a Step's and a loop's *enableIf*, a loop's other expressions, and a job output's *value*.
+`Job.EnvNames` is unchanged: it lists the Job's Environments whether or not any Step enters them, and is concrete at Job
+creation before anything else is evaluated. RFC 0010 makes it available, except in an Environment parameter `default`
+and the Job's `name`, in every format string and expression field resolved at Job creation or later, so with
+`ENV_PARAMS` the fields this RFC and RFC 0013 add may read it too: a Step's and a loop's *enableIf*, a loop's other
+expressions, and a job output's *value*.
 
 A `<StepLoop>` (RFC 0013) has no Sessions, so it has no Environment selection, and its `dependencies` may not have an
 `environment:` entry. The body Steps of a loop may have them.
@@ -1505,10 +1509,10 @@ the *enableIf* expression field of one of its Step Environments, if and only if 
 1. `S` lists `<StepName>` in its own `dependencies` as a whole-Step dependency. A transitive dependency is not
    enough, and with `TASK_DEPENDENCIES` a dependency that selects a subspace of the producer's Tasks is not enough.
 2. `<StepName>` is not `S` itself.
-3. The format string is in one of `S`'s *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter `range`s
-   and the other format strings of *parameterSpace*, *stepEnvironments* (any format string, and with `ENV_PARAMS` their
-   *enableIf*), *script*, or, with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies* (see [Composition with
-   `TASK_DEPENDENCIES`](#composition-with-task_dependencies)).
+3. The format string or expression field is in one of `S`'s *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task
+   parameter `range`s and the other format strings of *parameterSpace*, *stepEnvironments* (any format string, and with
+   `ENV_PARAMS` their *enableIf*), *script*, or, with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies*
+   (see [Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies)).
 
 For a Step in a loop's body, for a loop's own expressions, and for the Steps and job outputs that read a loop, these
 rules, including the job output rule below, are modified by
@@ -1523,10 +1527,10 @@ Step of the Job except a loop's body Step, with no dependency required (see [Job
 A `PATH` or `LIST[PATH]` value of `Steps.<StepName>.Output.<VarName>` or `Steps.<StepName>.TaskParam.<ParamName>` is
 available only in format strings resolved on the worker host (`@fmtstring[host]`), as `PATH` `Param.*` values are,
 because path mapping depends on the consuming Session. Format strings resolved earlier, including the materialization
-expressions and job output *value*s, use `RawOutput` and `TaskRawParam` instead, as they use `RawParam.*` for a job
-parameter. A consumer's `PATH` Task parameter whose `range` comes from `RawOutput` or `TaskRawParam` holds
-submission-context values, and its `Task.Param.*` is mapped forward on the worker host, as a range from `RawParam.*`
-is.
+expressions and job output *value*s, and with `ENV_PARAMS` a Step Environment's *enableIf*, use `RawOutput` and
+`TaskRawParam` instead, as they use `RawParam.*` for a job parameter. A consumer's `PATH` Task parameter whose `range`
+comes from `RawOutput` or `TaskRawParam` holds submission-context values, and its `Task.Param.*` is mapped forward on
+the worker host, as a range from `RawParam.*` is.
 
 `<StepName>` must be an `<Identifier>`: a Step whose name is not of that form cannot be referenced through `Steps.`
 (the Step itself is still valid). `<VarName>` must name an output declared by the Step, and `<ParamName>` a Task
@@ -1549,7 +1553,7 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
 | Stage | When | Known Values | Unknown Values | What Happens |
 |---|---|---|---|---|
 | **Template validation** | as today | as today | as today, and `Steps.*` | With `CONTROL_FLOW`: `Steps.*` symbols are `unresolved` with the types of [The `Steps.*` scope](#the-steps-scope), and every template-validation rule of [Validation](#validation) and of [RFC 0012 §Validation](0012-step-output-variables.md#validation) and [RFC 0013 §Validation](0013-step-loops.md#validation) is checked. |
-| **Job creation** | as today | as today; with `ENV_PARAMS`, each Step's Environment parameter values, Environment set, and Environments' host requirements only once its Environment selection is made | as today, and `Steps.*` symbols that are not yet concrete; with `ENV_PARAMS`, those values for a Step whose Environment selection is not made at Job creation | With `CONTROL_FLOW`, in Step dependency order: every Step's *enableIf* whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, its Environment selection (with `ENV_PARAMS`, see [`<Environment>`](#environment)) and every materialization group whose inputs are concrete; a failure fails Job creation. Nothing of a loop's body Steps is evaluated: they are bound per iteration (see [RFC 0013 §Template processing stages](0013-step-loops.md#template-processing-stages)). A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
+| **Job creation** | as today | as today; with `ENV_PARAMS`, each Step's Environment parameter values, set of Job and attached Environments, and their host requirements only once its Environment selection is made | as today, and `Steps.*` symbols that are not yet concrete; with `ENV_PARAMS`, those values for a Step whose Environment selection is not made at Job creation | With `CONTROL_FLOW`, in Step dependency order: every Step's *enableIf* whose inputs are concrete is evaluated, and for each Step whose *enableIf* is then `true` or absent, its Environment selection (with `ENV_PARAMS`, see [`<Environment>`](#environment)) and every materialization group whose inputs are concrete; a failure fails Job creation. Nothing of a loop's body Steps is evaluated: they are bound per iteration (see [RFC 0013 §Template processing stages](0013-step-loops.md#template-processing-stages)). A Step all of whose groups evaluate is bound now; every other Step that is not `SKIPPED` enters `PENDING_INPUTS`, possibly with its Tasks or host requirements already known. A job output that reads no unresolved `Steps.*` is evaluated. |
 | **Step input binding** (new, `CONTROL_FLOW` only) | Per materialization group of a Step, once its inputs are concrete (with `TASK_DEPENDENCIES`, the Task graph group also once the Tasks of every Step its subspace dependencies name are known), with *enableIf* first | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name`, the referenced `Steps.*`; with `ENV_PARAMS`, `Job.EnvNames` and the values RFC 0010 lets its fields read | `Task.*`, `Session.*` | The group's expressions are evaluated and checked. *enableIf* `false` makes the Step `SKIPPED`, and `true` is followed at once by the Step's Environment selection (with `ENV_PARAMS`); Task enumeration makes its Tasks known; host selection makes its host requirements known; a failure makes it `FAILED` at once; when every group has evaluated, it is bound and `READY`. See [Step input binding](#step-input-binding). |
 | **Job output evaluation** (new, `CONTROL_FLOW` only) | Per job output, once every `Steps.*` symbol its *value* references is concrete | `Param.*`, `RawParam.*`, `Job.Name`, the referenced `Steps.*`; with `ENV_PARAMS`, `Job.EnvNames` | `Step.Name`, `Task.*`, `Session.*` | The output's *value* is evaluated, converted, and checked; a failure fails the Job. See [Job outputs](#job-outputs). |
 | **Task execution** | as today | as today, and the `Steps.*` symbols of the Step's direct dependencies | *(none)* | As today. With `CONTROL_FLOW`, the runtime processes `onRun`'s output directives as they are printed, reverse-maps `PATH` values, and commits the values when the Task succeeds. |
@@ -2063,12 +2067,13 @@ other than the current one without overloading `Step`.
   may be empty, and the 1024-element cap that `crates/openjd-model/src/job/create_job/ranges.rs` applies to computed list ranges
   (`max_task_param_range_len`) applies only to YAML list literals, with scheduler-supplied per-Step and per-Job Task
   limits taking its place.
-- **CLI (`openjd run`)**: Runs Steps in dependency order already. After each Step finishes, and after a pending
-  Step's Tasks become known, it advances the binding of every pending Step that reads it, so a Step whose evaluation
-  fails, fails then. It prints each job output as soon as it is evaluated. When it runs only
-  some Steps (`--step`), a job output that reads a Step it doesn't run is reported as not evaluated. `openjd summary`
-  reports, for a Step that would need binding, whether its Tasks and its host requirements are known at Job creation,
-  with the Task count when they are, and the outputs each waits for when they are not.
+- **CLI (`openjd run`)**: Runs Steps in dependency order already. After each Step finishes, and after a pending Step's
+  Tasks become known, it advances the binding of every pending Step that reads it, so a Step whose evaluation fails,
+  fails then. It prints each job output as soon as it is evaluated. When it runs only some Steps (`--step`), a job
+  output that reads a Step it doesn't run is reported as not evaluated. `openjd summary` reports, for a Step that would
+  need binding, whether its Tasks and its host requirements are known at Job creation, with the Task count when they
+  are, and the outputs each waits for when they are not. With `ENV_PARAMS`, `openjd run` makes each Step's Environment
+  selection when the Step is enabled, and for each instance of a loop's body Step.
 - **Schedulers**: The largest work: evaluating job outputs as their inputs complete and returning them to callers,
   the `PENDING_INPUTS` and `SKIPPED` states, advancing binding group by group as `Steps.*` symbols become concrete,
   and displaying pending Steps with what is known of them. RFC 0012 adds storing and displaying output values and the
@@ -2201,11 +2206,11 @@ are in [RFC 0012 §Open Questions](0012-step-output-variables.md#open-questions)
 14. **When a Step's Environment selection is made.** It is made once the Step's *enableIf* is `true`, so for a Step
     decided after Job creation, and for every body Step of a loop, RFC 0010's errors are reported then rather than at
     Job creation (see [Design Choice 11](#11-an-environments-enableif-extends-rfc-0010s)). Should a scheduler instead
-    make it at Job creation for every Step, including once for each body Step of a loop on behalf of all its
-    instances, as RFC 0010 alone does, and report its errors even for a Step that may never run?
+    make it at Job creation for every Step, as RFC 0010 alone does, including once for each body Step of a loop on
+    behalf of all its instances, and report its errors even for a Step that may never run?
 15. **A disabled Environment's fields.** With `CONTROL_FLOW`, a Step Environment whose *enableIf* is `false` has its
-    TEMPLATE-scope format strings left unevaluated (see [`<Environment>`](#environment) item 4). RFC 0010 does not say
-    whether a disabled Environment's format strings are resolved. Should RFC 0010 state the same rule for every
+    TEMPLATE-scope format strings left unevaluated (see [`<Environment>`](#environment) item 4). RFC 0010 makes no
+    exception for a disabled Environment's TEMPLATE-scope format strings. Should RFC 0010 state the same rule for every
     disabled Environment, so that the rule has one home and listing `CONTROL_FLOW` does not change it?
 
 ## Future Work
