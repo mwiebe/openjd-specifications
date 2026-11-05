@@ -817,6 +817,9 @@ Changed semantics of *steps*: with `CONTROL_FLOW`, an element that has a `loop` 
    This replaces the rule of §3, item 1, that each Step's name differs from those of the other Steps.
 2. A top-level Step's `dependencies` name only top-level Steps.
 
+In these constraints and the others of this RFC on `dependencies`, an entry is one that names a Step. With RFC 0010's
+`ENV_PARAMS`, an `environment:` entry names an Environment instead, and these constraints don't apply to it.
+
 #### `<StepLoop>`
 
 A `<StepLoop>` is the object:
@@ -851,7 +854,9 @@ Where:
     3. No two elements in this list may have the same value for the `name` property.
 
 A `<StepLoop>` has no other properties: in particular no `script`, `parameterSpace`, `hostRequirements`,
-`stepEnvironments`, or `let`.
+`stepEnvironments`, or `let`. With RFC 0010's `ENV_PARAMS`, its `dependencies` may not have an `environment:` entry: a
+loop has no Sessions, so it requests no Environment, and it has no Environment selection (see
+[RFC 0011 §`<Environment>`](0011-control-flow.md#environment)). Its body Steps may have them.
 
 Where the base specification and RFC 0011 speak of a Step as a node of the step graph, by its name, its
 `dependencies`, its *enableIf*, its state, or the `dependsOn` of another Step, a loop is a Step. It has no Tasks,
@@ -1289,7 +1294,8 @@ Every rule this RFC adds, and when it is checked, in the form of
 2. A body is a non-empty list of `<StepTemplate>`s, none a `<StepLoop>`.
 3. The names of all Steps of the template, top-level, loops, and body Steps, are distinct.
 4. A top-level Step's `dependencies` name only top-level Steps; a body Step's name only Steps of the same body; each
-   body's dependency graph is acyclic, as is the top-level graph.
+   body's dependency graph is acyclic, as is the top-level graph. With `ENV_PARAMS`, a loop's `dependencies` have no
+   `environment:` entry.
 5. *variables*: 1 to 32 elements with unique `<Identifier>` names other than `Iteration`; types are
    `<OutputVariableType>`s; constraint properties are valid for the type.
 6. *outputVariables* of a loop: 1 to 32 elements with unique `<Identifier>` names; *collect* is present and is `LAST`
