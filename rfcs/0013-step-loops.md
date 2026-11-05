@@ -12,6 +12,8 @@
   * RFC 0011, Control Flow, for the `Steps.*` scope, step input binding, `enableIf`, and the Step states
   * RFC 0012, Step Output Variables, for the output variable types, collect modes, and the re-run rule
 * Related:
+  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), whose Environment rules apply to body Step instances as
+    [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends them
   * Use case U17 of [RFC 0011 §Use cases](0011-control-flow.md#use-cases), which this RFC covers
   * Discussion #22, immutability vs. dynamic adjustments
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/22)
@@ -992,7 +994,8 @@ CONTROL_FLOW adds three value references for loops:
 1. In a body Step of `L`, in the fields where
    [RFC 0011 §The `Steps.*` scope](0011-control-flow.md#the-steps-scope) *Where available* rule 3 allows `Steps.*`:
    its *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter `range`s and the other format strings of
-   *parameterSpace* (not *combination*), *stepEnvironments* (any format string, including their *enableIf*), *script*,
+   *parameterSpace* (not *combination*), *stepEnvironments* (any format string, and with `ENV_PARAMS` their
+   *enableIf*), *script*,
    and, with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies*. There, the values are those of the
    iteration that the body Step instance belongs to.
 2. In `L`'s *while*, where the values are those of the iteration about to start; and in `L`'s *until*, *next*, and
