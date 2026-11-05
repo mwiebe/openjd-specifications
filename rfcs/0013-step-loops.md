@@ -11,9 +11,9 @@
 * Depends On:
   * RFC 0011, Control Flow, for the `Steps.*` scope, step input binding, `enableIf`, and the Step states
   * RFC 0012, Step Output Variables, for the output variable types, collect modes, and the re-run rule
+  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), only for the parts that apply its Environment rules to
+    body Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends them
 * Related:
-  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), whose Environment rules apply to body Step instances as
-    [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends them
   * Use case U17 of [RFC 0011 §Use cases](0011-control-flow.md#use-cases), which this RFC covers
   * Discussion #22, immutability vs. dynamic adjustments
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/22)
@@ -991,13 +991,11 @@ CONTROL_FLOW adds three value references for loops:
 
 **Where available.** For loop `L`:
 
-1. In a body Step of `L`, in the fields where
-   [RFC 0011 §The `Steps.*` scope](0011-control-flow.md#the-steps-scope) *Where available* rule 3 allows `Steps.*`:
-   its *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter `range`s and the other format strings of
-   *parameterSpace* (not *combination*), *stepEnvironments* (any format string, and with `ENV_PARAMS` their
-   *enableIf*), *script*,
-   and, with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies*. There, the values are those of the
-   iteration that the body Step instance belongs to.
+1. In a body Step of `L`, in the fields where [RFC 0011 §The `Steps.*` scope](0011-control-flow.md#the-steps-scope)
+   *Where available* rule 3 allows `Steps.*`: its *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter
+   `range`s and the other format strings of *parameterSpace* (not *combination*), *stepEnvironments* (any format string,
+   and with `ENV_PARAMS` their *enableIf*), *script*, and, with `TASK_DEPENDENCIES`, the subspace ranges of its
+   *dependencies*. There, the values are those of the iteration that the body Step instance belongs to.
 2. In `L`'s *while*, where the values are those of the iteration about to start; and in `L`'s *until*, *next*, and
    loop output *value*s, where the values are those of the iteration that just finished. See
    [The iteration boundary](#the-iteration-boundary).
@@ -1063,7 +1061,7 @@ says for any Step, within its iteration.
 | **Template validation** | as today | as today | as today, and `Loop.*`, `RawLoop.*` | Every rule of [Validation](#validation) is checked, with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. |
 | **Job creation** | as today | as today; for the loop's first *while*, `Loop.*` and `RawLoop.*` for iteration 0 | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated, and the `minLength` check of the loop's `APPEND` outputs is never part of Job creation. |
 | **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011; for a body Step instance, `Loop.*` and `RawLoop.*`; for the loop's first *while*, `Loop.*` and `RawLoop.*` for iteration 0 | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
-| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each body Step, `Loop.*` and `RawLoop.*` for `N`, the `Steps.*` of the loop's dependencies | the body Step instances' `Steps.*` values that are not yet concrete, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
+| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each body Step, `Loop.*` and `RawLoop.*` for `N`, the `Steps.*` of the loop's dependencies; with `ENV_PARAMS`, `Job.EnvNames` and the values RFC 0010 lets its fields read | the body Step instances' `Steps.*` values that are not yet concrete, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
 | **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Loop.*` and `RawLoop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Step.Name`, `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
 | **Job output evaluation** | as RFC 0011 | as RFC 0011 | as RFC 0011 | A job output may read a loop's `Steps.*` symbols, and not a body Step's. |
 | **Task execution** | as today | as RFC 0011, and for a body Step instance, `Loop.*`, `RawLoop.*`, and the `Steps.*` of the loop's dependencies | *(none)* | As RFC 0011. |
