@@ -109,14 +109,14 @@ The scheduler performs **step input binding** progressively. The Step's fields t
 are divided into groups, and each group can be evaluated as soon as the values it reads are available. A scheduler
 should evaluate it then, and must have evaluated every group before it schedules any of the Step's Tasks:
 
-1. `enableIf` is always decided first. Nothing else of the Step is evaluated until it is. If it is `false`, the Step
-   is **skipped**: it has zero Tasks, and none of its other fields is evaluated. A Step without `enableIf` is enabled
-   at once. With the `ENV_PARAMS` extension, once the Step is enabled the scheduler decides at once which of the Job's
+1. `enableIf` is always decided first. Nothing else of the Step is evaluated until it is. If it is `false`, the Step is
+   **skipped**: it has zero Tasks, and none of its other fields is evaluated. A Step without `enableIf` is enabled at
+   once. With the `ENV_PARAMS` extension, once the Step is enabled the scheduler decides at once which of the Job's
    Environments and attached Environments its Sessions enter, with which parameter values. They depend only on values
    known when the Job is created, but are decided only once the Step is enabled: when the Job is created for a Step
-   enabled then, and otherwise when it is enabled. Whether each of its Step Environments is entered is decided later,
-   with its other fields. An error in them that would reject the Job when the Job is created fails only that Step
-   when it is found later. A skipped Step enters none.
+   enabled then, otherwise when it is enabled, and for a Step in a loop's body, in each iteration. Whether each of its
+   Step Environments is entered is decided later, with its other fields. An error in them that would reject the Job when
+   the Job is created fails only that Step when it is found later. A skipped Step enters none.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
