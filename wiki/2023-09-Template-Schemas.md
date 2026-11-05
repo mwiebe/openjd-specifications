@@ -2312,10 +2312,10 @@ lists `CONTROL_FLOW`:
    *enableIf*, and comes before any Step's Environment selection: attaching the Environment Templates and making
    `Job.EnvNames` concrete, before any Step's *enableIf* is evaluated, resolving every *environment* entry that names no
    Job Environment against them and rejecting a name that matches two of them, checking that a PATH or LIST[PATH]
-   literal `default` is absolute or a URI, and rejecting an attached `ALWAYS` Environment with the name of a Job
-   Environment and a parameter without a `default`. A skipped Step has no Environment selection, so no Environment is
-   entered, no entry or Environment *enableIf* is evaluated, and none of the checks of Environment selection or of
-   `CONTROL_FLOW` rule 5 is made for it.
+   literal `default` is absolute or a URI and meets its constraints against the unmapped value, and rejecting an
+   attached `ALWAYS` Environment with the name of a Job Environment and a parameter without a `default`. A skipped Step
+   has no Environment selection, so no Environment is entered, no entry or Environment *enableIf* is evaluated, and none
+   of the checks of Environment selection or of `CONTROL_FLOW` rule 5 is made for it.
 
    Every check that `ENV_PARAMS` makes before the Job is created is made whatever any Step's *enableIf*, including the
    checks of an entry's form ([&lt;StepDependency&gt;](#32-stepdependency) constraints 1 to 4, 8, and 9, and that each
@@ -2337,8 +2337,8 @@ lists `CONTROL_FLOW`:
    such as the `WRAP_ACTIONS` single-layer rule ([&lt;EnvironmentActions&gt;](#43-environmentactions)), is made, from
    Job creation on, as soon as its outcome no longer depends on an *enableIf* whose value is not yet known, the Step's
    own included: at the latest when the Step's group of *stepEnvironments* and *script* fields (group 5) is evaluated. A
-   literal `true` or `false` is known. For a Step of a loop's body, it is made for each instance, at the earliest when
-   the instance's Environment selection is made.
+   literal `true` or `false` is known. For a Step of a loop's body, it is made for each instance as soon as its outcome
+   is determined, at the earliest when the instance's Environment selection is made.
 
 An error in the Step's Environment selection, its combined host requirements, or a check of `CONTROL_FLOW` rule 5
 fails the Step at once, or fails Job creation if it is found then.
