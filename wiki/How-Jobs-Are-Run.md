@@ -217,7 +217,9 @@ whose inputs are known have been evaluated, and a Job output that fails to evalu
 With the CONTROL_FLOW extension (introduced for loops in [RFC 0013](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0013-step-loops.md), draft), an element of a
 Job Template's `steps` may be a **loop**: a group of Steps, its **body**, that runs again and again until a condition
 says to stop. A loop is a Step of the Job for scheduling: it has dependencies, may have an `enableIf`, and has the
-states of a Step, and the Steps that depend on it wait for the whole loop. It has no Tasks of its own.
+states of a Step, and the Steps that depend on it wait for the whole loop. It has no Tasks of its own. The loop's
+condition is either `while`, checked before each iteration, or `until`, checked after each one, and like `enableIf`
+it is written as an expression without `{{ }}`, such as `until: "Steps.Check.Output.Score >= Param.Target"`.
 
 Once a loop's `enableIf` is decided `true`, the scheduler evaluates its `maxIterations`, then each loop variable's
 `initial` value, and, for a loop with `while`, the first `while`, as soon as the values they read are available. An

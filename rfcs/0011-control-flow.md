@@ -106,7 +106,8 @@ The `CONTROL_FLOW` extension adds the following, each specified in the section l
   the separate `TASK_DEPENDENCIES` extension: [Composition with `TASK_DEPENDENCIES`](#composition-with-task_dependencies).
 * **Loops.** A `<StepLoop>` entry in `steps` whose body, a group of ordinary Steps, runs once per iteration until a
   `while` or `until` condition says to stop, within a required `maxIterations`, with typed loop variables carried
-  from one iteration to the next: [RFC 0013](0013-step-loops.md).
+  from one iteration to the next. Like `enableIf`, `while` and `until` are expressions of type `bool` written without
+  `{{ }}`: [RFC 0013](0013-step-loops.md).
 * **Validation.** An index of every rule this RFC adds, static and runtime: [Validation](#validation). RFCs 0012 and
   0013 have indexes of their own.
 
@@ -1130,9 +1131,12 @@ together with RFC 0010's Open Question 1 (see Open Question 13).
 * **Not the Step's own `let`.** A Step's *enableIf* still cannot read the Step's *let* bindings, because nothing of a
   Step is evaluated before its *enableIf* is decided (Design Choice 10). The *enableIf* of its Step Environments and of
   its `environment:` entries can read them, as RFC 0010 allows, because they are evaluated after the Step is enabled.
-* **A loop's other conditions.** A loop's *while* and *until* are also single `bool` expressions, but they are not
-  *enableIf*, and this draft leaves them as format strings ([RFC 0013 Open Question
-  9](0013-step-loops.md#open-questions)).
+* **A loop's other conditions.** A loop's *while* and *until* are not *enableIf*, but each also holds one condition,
+  so they are expression fields of type `bool` too, for the same reasons, and every condition in a template has one
+  form. Mark Wiebe decided this on 2026-11-12 ([RFC 0013 Design Choice
+  4](0013-step-loops.md#4-exactly-one-of-while-and-until) and Open Question 9). A loop's *maxIterations*, its
+  variables' *initial* and *next*, and its outputs' *value* compute values rather than conditions, and stay format
+  strings, as a job output's *value* does.
 
 ### 13. Design tenets
 
@@ -1174,8 +1178,8 @@ Template whose `extensions` list includes `CONTROL_FLOW`.
 * `CONTROL_FLOW` adds no field to `<Environment>`. An Environment's *enableIf* is defined by RFC 0010 and needs
   `ENV_PARAMS`; in a Job Template that lists both extensions, [`<Environment>`](#environment) says what
   `CONTROL_FLOW` adds to it.
-* The *enableIf* of a Step and of a loop is an expression field, which RFC 0010 defines for any document that lists
-  `EXPR` (its Template Schemas §7.6). It does not need `ENV_PARAMS`.
+* The *enableIf* of a Step and of a loop, and a loop's *while* and *until* (RFC 0013), are expression fields, which
+  RFC 0010 defines for any document that lists `EXPR` (its Template Schemas §7.6). They do not need `ENV_PARAMS`.
 
 ### Terminology
 
@@ -1618,7 +1622,7 @@ expression that uses one is type-checked by EXPR's existing progressive evaluato
 ### Modifications to the Expression Language
 
 CONTROL_FLOW adds no types, functions, or operators to EXPR, and no new kind of field: a Step's and a loop's
-*enableIf* are expression fields as RFC 0010 defines them. It adds:
+*enableIf*, and a loop's *while* and *until* (RFC 0013), are expression fields as RFC 0010 defines them. It adds:
 
 * The `Steps` root symbol and its `Output`, `RawOutput`, `TaskParam`, and `TaskRawParam` members, with the types and
   scopes of
@@ -1633,8 +1637,8 @@ CONTROL_FLOW adds no types, functions, or operators to EXPR, and no new kind of 
   (see [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)). The warning names
   the expression and suggests a conditional expression or an `or` default. An expression whose type has no
   `nulltype`, such as `'frames only' if x == null else string(x)`, draws no warning. Nor does an expression field such
-  as *enableIf*: it interpolates nothing, and the target type of *enableIf*, `bool`, does not admit `nulltype`, so a
-  `null` result is an error (RFC 0010's Template Schemas §7.6 rule 2).
+  as *enableIf*, or a loop's *while* or *until*: it interpolates nothing, and its target type, `bool`, does not admit
+  `nulltype`, so a `null` result is an error (RFC 0010's Template Schemas §7.6 rule 2).
 
 Symbol collection (RFC 0005) is how an implementation finds a Step's `Steps.*` references, both to check them and to
 decide whether the Step needs step input binding and what the inputs of each of its materialization groups are.

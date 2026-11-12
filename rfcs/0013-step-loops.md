@@ -12,8 +12,9 @@
   * RFC 0011, Control Flow, for the `Steps.*` scope, step input binding, `enableIf`, and the Step states
   * RFC 0012, Step Output Variables, for the output variable types, collect modes, and the re-run rule
   * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), for expression fields (its Template Schemas §7.6), the
-    form of a loop's *enableIf*, which needs only `EXPR`, and for the parts that apply its Environment rules to body
-    Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends them
+    form of a loop's *enableIf*, *while*, and *until*, which needs only `EXPR`, and for the parts that apply its
+    Environment rules to body Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends
+    them
 * Related:
   * Use case U17 of [RFC 0011 §Use cases](0011-control-flow.md#use-cases), which this RFC covers
   * Discussion #22, immutability vs. dynamic adjustments
@@ -49,8 +50,8 @@ iterations is late-bound, as a Task count is under RFC 0011.
   an optional `enableIf`, a `loop` definition, and `outputVariables`: [`<StepLoop>`](#steploop).
 * **Loop variables.** Typed values that each iteration starts with, set by `initial` before the first iteration and
   by `next` after each one: [`<LoopVariableDefinition>`](#loopvariabledefinition).
-* **Conditions and a bound.** Exactly one of `while` and `until`, and a required `maxIterations`:
-  [`<LoopDefinition>`](#loopdefinition).
+* **Conditions and a bound.** Exactly one of `while` and `until`, each an expression of type `bool` written without
+  `{{ }}`, as `enableIf` is, and a required `maxIterations`: [`<LoopDefinition>`](#loopdefinition).
 * **The `Loop.*` scope.** `Loop.<VarName>`, `RawLoop.<VarName>`, and `Loop.Iteration`, available in the body's
   Steps and in the loop's own expressions: [The `Loop.*` scope](#the-loop-scope).
 * **Loop outputs.** Values that Steps after the loop and job outputs read as `Steps.<LoopName>.Output.<VarName>`:
@@ -83,7 +84,7 @@ steps:
           type: FLOAT
           initial: "{{Steps.Setup.Output.Baseline}}"
           next: "{{Steps.Check.Output.Score}}"
-      until: "{{Steps.Check.Output.Score >= Param.Target}}"   # or `while:`; exactly one
+      until: "Steps.Check.Output.Score >= Param.Target"   # or `while:`; exactly one, no {{ }}
       maxIterations: 10
       steps:
         - name: Render
@@ -253,7 +254,7 @@ steps:
           minLength: 1
           initial: "{{list(Param.Frames)}}"
           next: "{{Steps.CheckPass.Output.NoisyFrames}}"
-      until: "{{len(Steps.CheckPass.Output.NoisyFrames) == 0}}"
+      until: "len(Steps.CheckPass.Output.NoisyFrames) == 0"
       maxIterations: "{{Param.MaxPasses}}"
       steps:
         - name: RenderPass
@@ -316,7 +317,7 @@ steps:
   `minLength: 1` on `Frames` is never violated: `next` runs only when `NoisyFrames` is not empty.
 * If frames are still noisy after `MaxPasses` iterations, `Refine` fails, and `EncodeVideo` never runs. A loop that
   should accept the result instead says so in its condition, for example
-  `until: "{{len(Steps.CheckPass.Output.NoisyFrames) == 0 or Loop.Iteration + 1 >= Param.MaxPasses}}"`.
+  `until: "len(Steps.CheckPass.Output.NoisyFrames) == 0 or Loop.Iteration + 1 >= Param.MaxPasses"`.
 * `EncodeVideo` reads only `Refine`'s declared outputs. `FinalSamples` has type `int`, not `int?`, because an `until`
   loop runs at least once and `Refine` has no `enableIf`.
 * `FinalSamples` is the value of `Loop.Samples` in the last iteration, the samples that iteration rendered with.
@@ -393,7 +394,7 @@ steps:
           minValue: 0.001       # the loop fails if the damping collapses
           initial: "{{Param.StartDamping}}"
           next: "{{Loop.Damping * 0.5 if Steps.RelaxStep.Output.Residual > Loop.Residual else Loop.Damping}}"
-      until: "{{Steps.RelaxStep.Output.Residual < Param.Tolerance}}"
+      until: "Steps.RelaxStep.Output.Residual < Param.Tolerance"
       maxIterations: 200
       steps:
         - name: RelaxStep
@@ -460,7 +461,7 @@ steps:
           initial: "{{''}}"
           next: "{{Steps.ListPage.Output.NextToken}}"
       # The first request has no token, and the last page returns none.
-      while: "{{Loop.Iteration == 0 or Loop.Token != ''}}"
+      while: "Loop.Iteration == 0 or Loop.Token != ''"
       maxIterations: 1000
       steps:
         - name: ListPage
@@ -656,9 +657,20 @@ before any body runs, and its loop may run zero times.
 A loop must have one. A loop with neither would run until `maxIterations`, and because reaching the bound fails the
 loop (see [Design Choice 5](#5-maxiterations-is-required-and-reaching-it-fails-the-loop)), it would always fail; if
 instead reaching the bound succeeded for such a loop, a forgotten condition would silently run every loop to its
-bound. A fixed number of iterations is written with a condition: `while: "{{Loop.Iteration < Param.Passes}}"`. A loop
+bound. A fixed number of iterations is written with a condition: `while: "Loop.Iteration < Param.Passes"`. A loop
 with both would need an order between them and an answer to which one's zero-iteration rule applies, for no case
 that one condition plus `and` can't express.
+
+`while` and `until` are expression fields of type `bool` (RFC 0010's Template Schemas §7.6), written without `{{ }}`, as
+a loop's *enableIf* and every other *enableIf* are ([RFC 0011 Design Choice
+12](0011-control-flow.md#12-enableif-is-rfc-0010s-field-on-more-entities)). Mark Wiebe decided this on 2026-11-12 (Open
+Question 9). Each holds one condition and interpolates nothing, so RFC 0011's reasons for *enableIf* apply to them
+unchanged: the braces admit errors that exist only because of them, and a format string's implicit conversions would
+turn a STRING result such as `'yes'` into `true`. Under an expression field a condition over a string is written as a
+comparison, as in the paginated listing's `Loop.Token != ''`, and every condition in a template has one form. A loop's
+*maxIterations*, its variables' *initial* and *next*, and its outputs' *value* stay format strings: they compute a value
+of a declared type rather than decide a condition, as a job output's *value* does, and are converted to that type as it
+is.
 
 ### 5. `maxIterations` is required, and reaching it fails the loop
 
@@ -872,8 +884,8 @@ A `<LoopDefinition>` is the object:
 
 ```yaml
 variables: [ <LoopVariableDefinition>, ... ] # @optional
-while: <bool> | <FormatString> # @optional @fmtstring
-until: <bool> | <FormatString> # @optional @fmtstring
+while: <Expression> # @optional @expr bool
+until: <Expression> # @optional @expr bool
 maxIterations: <int> | <FormatString> # @fmtstring
 steps: [ <StepTemplate>, ... ]
 ```
@@ -884,14 +896,16 @@ Where:
     1. Minimum number of elements: If provided, then this list must contain at least one element.
     2. Maximum number of elements: 32.
     3. No two elements in this list may have the same value for the `name` property.
-2. *while* — Whether to run another iteration, checked before each iteration, including the first. Its target type is
-   `bool`, and a `null` result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters),
-   `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), `Loop.*` and `RawLoop.*` (with values whose type
-   is or contains `path` only through `RawLoop.*`), and the `Steps.*` symbols of the loop's dependencies (see [`Steps.*`
-   in and around a loop](#steps-in-and-around-a-loop)). It may not reference the body's Steps, `Step.Name`, `Task.*`,
-   `Session.*`, or names bound by `let`.
-3. *until* — Whether to stop, checked after each iteration. Its target type is `bool`, and a `null` result is an
-   error. It may reference everything *while* may, and the `Steps.*` symbols of every body Step of the loop.
+2. *while* — Whether to run another iteration, checked before each iteration, including the first. It is an expression
+   field of type `bool` (RFC 0010's Template Schemas §7.6), written without `{{ }}`, as a loop's *enableIf* is: its
+   form, its type rules, and its treatment of `null` are those of §7.6, so a `null` result is an error. It may
+   reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also
+   `Job.EnvNames`), `Loop.*` and `RawLoop.*` (with values whose type is or contains `path` only through `RawLoop.*`),
+   and the `Steps.*` symbols of the loop's dependencies (see [`Steps.*` in and around a
+   loop](#steps-in-and-around-a-loop)). It may not reference the body's Steps, `Step.Name`, `Task.*`, `Session.*`, or
+   names bound by `let`.
+3. *until* — Whether to stop, checked after each iteration. An expression field of type `bool`, as *while* is. It may
+   reference everything *while* may, and the `Steps.*` symbols of every body Step of the loop.
 4. *maxIterations* — The most iterations the loop may run. Its target type is `int`. It may reference only `Param.*`
    (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, and `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`),
    so it is known at Job creation. Its value must be from 1 to 1,000.
@@ -1312,16 +1326,17 @@ Every rule this RFC adds, and when it is checked, in the form of
 9. `Steps.*` symbols in a loop's expressions and in its body Steps name only the Steps that
    [`Steps.*` in and around a loop](#steps-in-and-around-a-loop) allows; no top-level Step or job output names a body
    Step; `Steps.<L>.*` of a loop `L` names a declared loop output and is not `TaskParam` or `TaskRawParam`.
-10. Every expression type-checks with `Loop.*` and `RawLoop.*` as `unresolved` values of their types; the loop's
-    *enableIf* is an expression field of type `bool`, checked as a Step's is ([RFC 0011
-    §Validation](0011-control-flow.md#validation) item 6); *while* and *until* are format strings whose target type is
-    `bool`, so EXPR's implicit conversions apply (Open Question 9); each *initial* and *next* has its variable's type;
-    each loop output *value* has its output's type, or under `APPEND` its element type.
+10. Every expression type-checks with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. The loop's
+    *enableIf*, *while*, and *until* are expression fields of type `bool`, each checked as a Step's *enableIf* is
+    ([RFC 0011 §Validation](0011-control-flow.md#validation) item 6; RFC 0010's Template Schemas §7.6 rules 1, 2, and
+    4): a value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type
+    that does not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each
+    loop output *value* has its output's type, or under `APPEND` its element type.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
-every *initial*, and the first *while*, evaluate, convert, and satisfy their constraints; and the size limit of
-[Limits](#limits) item 4 holds for the *initial* values. A failure fails the loop at once, finally, or Job creation if
-the group is evaluated then.
+every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`
+or `false`; and the size limit of [Limits](#limits) item 4 holds for the *initial* values. A failure fails the loop at
+once, finally, or Job creation if the group is evaluated then.
 
 **When a zero-iteration loop would succeed** (by the scheduler): when the first *while* is `false`, the `minLength` of
 each `APPEND` loop output holds for `[]`. This check is not a materialization group and is never part of Job
@@ -1332,10 +1347,10 @@ creation; it runs once the loop's dependencies are satisfied, as a Step with zer
 Step instance, and the limits of [Limits](#limits) item 2. A failure fails the loop; only a failure of an
 instance's Tasks is recoverable (see [Failure](#failure)).
 
-**At the iteration boundary** (by the scheduler): each loop output *value*, *until*, *next*, and *while* evaluates
-to a non-`null` value that converts to its type and satisfies its constraints, the size limit of [Limits](#limits)
-item 4 holds, the loop does not reach *maxIterations* while continuing, and, when *until* or *while* ends the loop,
-the `minLength` of each `APPEND` loop output holds. A failure fails the loop, finally.
+**At the iteration boundary** (by the scheduler): each loop output *value* and *next* evaluates to a non-`null` value
+that converts to its type and satisfies its constraints, *until* and *while* evaluate to `true` or `false`, the size
+limit of [Limits](#limits) item 4 holds, the loop does not reach *maxIterations* while continuing, and, when *until* or
+*while* ends the loop, the `minLength` of each `APPEND` loop output holds. A failure fails the loop, finally.
 
 **On re-run** (by the scheduler): the rules of [Retries and re-runs](#retries-and-re-runs).
 
@@ -1494,13 +1509,11 @@ notion of which values an early Step may use, and because parallelism belongs in
    Environments on the loop itself, entered by every Session that runs a body Step instance. Is that needed?
 8. **Reporting.** Should a scheduler report the most Tasks a loop could run, from *maxIterations* and the body's
    static parameter spaces, as an upper bound before the loop starts?
-9. **The form of *while* and *until*.** A loop's *enableIf* is an expression field, as every *enableIf* is (see
-   [RFC 0011 Design Choice 12](0011-control-flow.md#12-enableif-is-rfc-0010s-field-on-more-entities)). *while* and
-   *until* also hold one `bool` expression, and in this draft they are format strings, as in
-   `until: "{{Steps.Check.Output.Score >= Param.Target}}"`, under which a STRING result such as `'yes'` converts to
-   `true`. Should they be expression fields too, `until: "Steps.Check.Output.Score >= Param.Target"`, so that every
-   condition in a template has one form? The same question could be asked of *maxIterations* and of the *initial*,
-   *next*, and output *value* expressions, which hold one expression of a declared type.
+9. **The form of *while* and *until*.** Decided by Mark Wiebe on 2026-11-12: *while* and *until* are expression
+   fields of type `bool`, as every *enableIf* is, so that every condition in a template has one form, as in
+   `until: "Steps.Check.Output.Score >= Param.Target"`. *maxIterations* and the *initial*, *next*, and loop output
+   *value* fields stay format strings, because they compute values rather than conditions. The reasons are in [Design
+   Choice 4](#4-exactly-one-of-while-and-until).
 
 ## Future Work
 

@@ -2045,8 +2045,8 @@ named as a dependency, has a state, or is skipped, a loop is a Step.
 
 ```yaml
 variables: [ <LoopVariableDefinition>, ... ] # @optional
-while: <bool> | <FormatString> # @optional @fmtstring
-until: <bool> | <FormatString> # @optional @fmtstring
+while: <Expression> # @optional @expr bool
+until: <Expression> # @optional @expr bool
 maxIterations: <int> | <FormatString> # @fmtstring
 steps: [ <StepTemplate>, ... ]
 ```
@@ -2059,14 +2059,15 @@ Where:
     * No two elements in this list may have the same value for the `name` property.
 2. *while* — Checked before each iteration, including the first: the iteration runs only if it is `true`. If it is
    `false` before the first iteration, the loop runs zero iterations and, once its dependencies are satisfied, succeeds
-   if every `APPEND` output's `minLength` holds for `[]`. Its target type is `bool`, and a `null` result is an error. It
-   may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with `ENV_PARAMS`,
+   if every `APPEND` output's `minLength` holds for `[]`. An [expression field](#76-expression-fields) of type `bool`,
+   written without `{{ }}`, as in `while: "Loop.Iteration < Param.Passes"`; a `null` result is an error. It may
+   reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with `ENV_PARAMS`,
    also `Job.EnvNames`), `Loop.*` and `RawLoop.*`, and the `Steps.*` values of the loop's *dependencies*, but not the
    Steps of the loop's body.
 3. *until* — Checked after each iteration: if it is `true`, it ends the loop, which succeeds if every `APPEND`
-   output's `minLength` holds. A loop with *until* runs at
-   least once. Its target type is `bool`, and a `null` result is an error. It may reference everything *while* may,
-   and the `Steps.*` values of every Step of the loop's body, for the iteration that just finished.
+   output's `minLength` holds. A loop with *until* runs at least once. An [expression field](#76-expression-fields) of
+   type `bool`, as *while* is. It may reference everything *while* may, and the `Steps.*` values of every Step of the
+   loop's body, for the iteration that just finished.
 4. *maxIterations* — The most iterations the loop may run, an integer from 1 to 1,000. A format string here may
    reference only `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, and `Job.Name` (with
    `ENV_PARAMS`, also `Job.EnvNames`). A loop that would start another iteration after running *maxIterations*
@@ -2180,15 +2181,15 @@ pass secrets.
 
 The loop's *enableIf* is decided first, as a Step's is. Then, in this order, its *maxIterations*, each variable's
 *initial* in declaration order, and, with *while*, the first *while* are evaluated, as materialization expressions of
-the loop, each value converted and checked against its variable's type and constraints. When the loop's dependencies are
-satisfied it runs its iterations in order, starting with iteration 0. Each iteration creates a new instance of every
-Step of the body, with its own Tasks, states, and output values, and the body's Steps run as the Steps of a Job do, in
-the order of their *dependencies*. `Loop.*` values are fixed for the whole iteration. The next iteration starts only
-when every Step of the current one has completed successfully or been skipped. After each iteration, in this order:
-every loop output's *value* is evaluated; *until*, if present, is checked, and if it is `true` the loop ends; every
-variable's *next* is evaluated; *while*, if present, is checked with the new values, and if it is `false` the loop ends;
-and if the loop has run *maxIterations* iterations, it fails, with a message that names *maxIterations* and its value.
-An error in any of these steps fails the loop at once, with a message that names the field, the expression, the
+the loop, each *initial* value converted and checked against its variable's type and constraints. When the loop's
+dependencies are satisfied it runs its iterations in order, starting with iteration 0. Each iteration creates a new
+instance of every Step of the body, with its own Tasks, states, and output values, and the body's Steps run as the Steps
+of a Job do, in the order of their *dependencies*. `Loop.*` values are fixed for the whole iteration. The next iteration
+starts only when every Step of the current one has completed successfully or been skipped. After each iteration, in this
+order: every loop output's *value* is evaluated; *until*, if present, is checked, and if it is `true` the loop ends;
+every variable's *next* is evaluated; *while*, if present, is checked with the new values, and if it is `false` the loop
+ends; and if the loop has run *maxIterations* iterations, it fails, with a message that names *maxIterations* and its
+value. An error in any of these steps fails the loop at once, with a message that names the field, the expression, the
 iteration, and the problem, and no later step is evaluated. A loop whose first *while* is `false` ends with zero
 iterations once its dependencies are satisfied. When a loop ends, each `APPEND` output's `minLength` is checked, and
 then the loop succeeds; this check is not a materialization expression and is never part of Job creation.
@@ -2914,8 +2915,8 @@ whose static type includes `nulltype` and that references, directly or through a
 a Step that has an *enableIf*, or a `collect: LAST` output of a loop with *while*. It names the expression and suggests
 a conditional expression or an `or` default. An expression whose type has no `nulltype`, such as
 `'frames only' if x == null else string(x)`, draws no warning, and neither does an expression field such as
-*enableIf*, which interpolates nothing and whose target type, `bool`, makes a `null` result an error (see
-[7.6](#76-expression-fields)).
+*enableIf* or a loop's *while* or *until*, which interpolates nothing and whose target type, `bool`, makes a `null`
+result an error (see [7.6](#76-expression-fields)).
 
 The `@fmtstring` and `@fmtstring[host]` annotations in this specification indicate which stage
 a format string is resolved in. A format string annotated `@fmtstring` (without `[host]`) is
