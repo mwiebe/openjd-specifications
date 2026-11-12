@@ -24,7 +24,7 @@ template:
     dependencies:
     - dependsOn: P
     loop:
-      while: '{{null if Steps.P.Output.V == 1 else Loop.Iteration < 2}}'
+      while: 'null if Steps.P.Output.V == 1 else Loop.Iteration < 2'
       maxIterations: 10
       steps:
       - name: W

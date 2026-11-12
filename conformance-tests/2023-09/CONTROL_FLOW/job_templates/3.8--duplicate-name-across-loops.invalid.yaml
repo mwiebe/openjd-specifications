@@ -7,7 +7,7 @@ name: TestJob
 steps:
 - name: A
   loop:
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: Work
@@ -21,7 +21,7 @@ steps:
               print('IT' + '_' + str({{Loop.Iteration}}))
 - name: B
   loop:
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: Work

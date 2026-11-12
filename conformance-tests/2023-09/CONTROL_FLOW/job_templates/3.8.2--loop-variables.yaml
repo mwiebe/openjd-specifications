@@ -33,7 +33,7 @@ steps:
       type: LIST[LIST[INT]]
       initial: '{{[[1]]}}'
       next: '{{Loop.G}}'
-    until: '{{Loop.Iteration >= 2}}'
+    until: 'Loop.Iteration >= 2'
     maxIterations: 5
     steps:
     - name: W

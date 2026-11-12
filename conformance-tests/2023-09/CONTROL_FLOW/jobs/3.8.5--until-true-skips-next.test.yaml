@@ -14,7 +14,7 @@ template:
         type: INT
         initial: '{{0}}'
         next: '{{fail(''next evaluated'') if Steps.W.Output.Done else Loop.N + 1}}'
-      until: '{{Steps.W.Output.Done}}'
+      until: 'Steps.W.Output.Done'
       maxIterations: 5
       steps:
       - name: W

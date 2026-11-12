@@ -22,7 +22,7 @@ steps:
   dependencies:
   - dependsOn: Setup
   loop:
-    until: '{{true}}'
+    until: 'true'
     maxIterations: '{{Steps.Setup.Output.Start}}'
     steps:
     - name: W

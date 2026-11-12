@@ -11,7 +11,7 @@ template:
   steps:
   - name: L
     loop:
-      while: '{{Loop.Iteration < 2}}'
+      while: 'Loop.Iteration < 2'
       maxIterations: 10
       steps:
       - name: W

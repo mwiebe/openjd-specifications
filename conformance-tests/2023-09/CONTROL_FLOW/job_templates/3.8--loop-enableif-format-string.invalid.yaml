@@ -1,0 +1,33 @@
+# RFC 0013 §Validation item 10: a loop's enableIf is an expression field of type bool,
+# checked as a Step's (RFC 0010's Template Schemas §7.6 rule 1). A value written as a
+# format string is a parse error. 3.8--loop-enableif is the valid form.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Run
+  type: BOOL
+  default: true
+steps:
+- name: L
+  enableIf: '{{Param.Run}}'
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+    until: 'Loop.N >= 1'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

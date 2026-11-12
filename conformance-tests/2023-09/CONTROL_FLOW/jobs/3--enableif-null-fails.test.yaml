@@ -1,7 +1,8 @@
-# RFC 0011 §<StepTemplate> enableIf: the target type is bool, not bool?; a null result
-# (a skipped producer's output) fails instead of enabling the Step. Q is skipped at Job
-# creation, so P's enableIf is decided then (§When groups are evaluated) and Job creation
-# fails.
+# RFC 0011 §<StepTemplate> enableIf: an expression field of type bool. An expression of
+# type bool? is accepted, but a null result (a skipped producer's output) is an error
+# (RFC 0010's Template Schemas §7.6 rule 2) and fails instead of enabling the Step. Q is
+# skipped at Job creation, so P's enableIf is decided then (§When groups are evaluated)
+# and Job creation fails.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -23,7 +24,7 @@ template:
           - |-
             print('openjd_output_var: Go=true')
   - name: P
-    enableIf: '{{Steps.Q.Output.Go}}'
+    enableIf: 'Steps.Q.Output.Go'
     dependencies:
     - dependsOn: Q
     script:

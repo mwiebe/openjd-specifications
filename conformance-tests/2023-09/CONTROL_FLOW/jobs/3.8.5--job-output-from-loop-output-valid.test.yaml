@@ -15,7 +15,7 @@ template:
   steps:
   - name: L
     loop:
-      until: '{{Loop.Iteration >= 2}}'
+      until: 'Loop.Iteration >= 2'
       maxIterations: 5
       steps:
       - name: W

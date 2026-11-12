@@ -19,7 +19,7 @@ steps:
         - |-
           print('openjd_output_var: Go=true')
 - name: C
-  enableIf: '{{Steps.P.Output.Go}}'
+  enableIf: 'Steps.P.Output.Go'
   dependencies:
   - dependsOn: P
   script:

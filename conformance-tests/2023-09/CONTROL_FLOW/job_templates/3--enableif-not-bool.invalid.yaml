@@ -1,5 +1,6 @@
-# RFC 0011 §Validation item 6: enableIf has type bool. An int has no implicit conversion
-# to bool.
+# RFC 0011 §Validation item 6: enableIf is an expression field of type bool. An int
+# expression does not fit bool, and has no implicit conversion to it (RFC 0010's Template
+# Schemas §7.6 rule 2).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
@@ -11,7 +12,7 @@ parameterDefinitions:
   default: 1
 steps:
 - name: A
-  enableIf: '{{Param.N}}'
+  enableIf: 'Param.N'
   script:
     actions:
       onRun:

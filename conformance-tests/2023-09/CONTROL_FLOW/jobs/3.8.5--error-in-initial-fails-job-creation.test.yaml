@@ -29,7 +29,7 @@ template:
         type: INT
         initial: '{{Param.N if Param.N > 0 else fail(''N must be positive'')}}'
         next: '{{Loop.N + 1}}'
-      until: '{{Loop.Iteration >= 4}}'
+      until: 'Loop.Iteration >= 4'
       maxIterations: 10
       steps:
       - name: W

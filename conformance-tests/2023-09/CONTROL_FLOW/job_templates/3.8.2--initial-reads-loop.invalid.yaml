@@ -13,7 +13,7 @@ steps:
       type: INT
       initial: '{{Loop.Iteration}}'
       next: '{{1}}'
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: W

@@ -10,7 +10,7 @@ template:
   steps:
   - name: L
     loop:
-      until: '{{Steps.Count.Output.V >= 20}}'
+      until: 'Steps.Count.Output.V >= 20'
       maxIterations: 10
       steps:
       - name: Count

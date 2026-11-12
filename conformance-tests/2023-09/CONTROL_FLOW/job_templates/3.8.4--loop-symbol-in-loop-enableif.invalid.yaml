@@ -7,14 +7,14 @@ extensions:
 name: TestJob
 steps:
 - name: L
-  enableIf: '{{Loop.N == 0}}'
+  enableIf: 'Loop.N == 0'
   loop:
     variables:
     - name: N
       type: INT
       initial: '{{0}}'
       next: '{{Loop.N + 1}}'
-    until: '{{Loop.Iteration >= 1}}'
+    until: 'Loop.Iteration >= 1'
     maxIterations: 5
     steps:
     - name: W

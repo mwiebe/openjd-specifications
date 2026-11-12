@@ -15,7 +15,7 @@ template:
         initial: '{{0}}'
         next: '{{Loop.N + 1}}'
         maxValue: 2
-      until: '{{Loop.Iteration >= 4}}'
+      until: 'Loop.Iteration >= 4'
       maxIterations: 10
       steps:
       - name: W

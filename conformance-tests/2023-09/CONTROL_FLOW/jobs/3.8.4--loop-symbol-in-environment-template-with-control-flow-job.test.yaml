@@ -30,7 +30,7 @@ template:
     dependencies:
     - dependsOn: P
     loop:
-      until: '{{Loop.Iteration >= 0}}'
+      until: 'Loop.Iteration >= 0'
       maxIterations: 1
       steps:
       - name: C

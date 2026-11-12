@@ -137,7 +137,7 @@ steps:
       type: INT
       initial: '{{0}}'
       next: '{{Loop.V32}}'
-    until: '{{Loop.Iteration >= 0}}'
+    until: 'Loop.Iteration >= 0'
     maxIterations: 1
     steps:
     - name: W

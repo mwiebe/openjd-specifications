@@ -13,7 +13,7 @@ parameterDefinitions:
   default: 3
 steps:
 - name: A
-  enableIf: '{{Param.Run}}'
+  enableIf: 'Param.Run'
   script:
     actions:
       onRun:
@@ -23,7 +23,7 @@ steps:
         - |-
           print('ok')
 - name: B
-  enableIf: '{{Param.N > 2}}'
+  enableIf: 'Param.N > 2'
   script:
     actions:
       onRun:

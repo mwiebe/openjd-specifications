@@ -11,7 +11,7 @@ jobOutputDefinitions:
 steps:
 - name: L
   loop:
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: W

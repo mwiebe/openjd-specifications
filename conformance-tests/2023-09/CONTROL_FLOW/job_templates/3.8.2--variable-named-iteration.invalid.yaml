@@ -13,7 +13,7 @@ steps:
       type: INT
       initial: '{{0}}'
       next: '{{1}}'
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: W

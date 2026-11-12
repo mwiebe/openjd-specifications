@@ -15,7 +15,7 @@ template:
         type: INT
         initial: '{{1}}'
         next: '{{Steps.Check.Output.Score}}'
-      until: '{{Steps.Check.Output.Score > 10}}'
+      until: 'Steps.Check.Output.Score > 10'
       maxIterations: 10
       steps:
       - name: Render
