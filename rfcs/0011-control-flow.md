@@ -966,9 +966,9 @@ reads it is evaluated (at Job creation, for a producer skipped then, which fails
 starts, not at validation. Both are loud failures that name the expression.
 The silent cases are the places where EXPR discards a `null` by design: text interpolation, where it becomes `""`
 (`"--size {{Steps.P.Output.X}}"` becomes `--size `); a list item such as an `args` entry, which is dropped; and an
-optional field, which is omitted. This RFC requires a validation warning for each. *enableIf* is not one of them: like
-every expression field, it treats a `null` result as an error rather than as an omitted field (RFC 0010's Template
-Schemas §7.6 rule 2), so that a skipped producer can never silently enable a Step.
+optional field, which is omitted. This RFC requires a validation warning for each. *enableIf* is not one of them: it
+is an expression field whose target type, `bool`, does not admit `nulltype`, so a `null` result is an error, never an
+omitted field (RFC 0010's Template Schemas §7.6 rule 2), and a skipped producer can never silently enable a Step.
 
 ### 6. An empty computed parameter space is a zero-Task success
 
@@ -1094,16 +1094,18 @@ Templates, and is decided per Step with the Step's Environment parameter values.
 
 ### 12. `enableIf` is RFC 0010's field on more entities
 
-A Step, a loop, an Environment, and an `environment:` entry each have an *enableIf*, and it is one field: the one RFC
-0010 defines, which this RFC adds to Steps and loops. It has the same name and the same form everywhere, an expression
-field of type `bool` (RFC 0010's Template Schemas §7.6, Expression Fields; see [RFC 0010 §Processing stages and
-expression fields](0010-environment-parameters.md#processing-stages-and-expression-fields)). `false` means the same
-everywhere: the entity is not in effect. A Step or a loop is `SKIPPED`, an Environment is not entered, and an entry
-requests nothing. A `null` result is an error everywhere. Only two things differ from one entity to another: when the
-field is evaluated, which for a Step or a loop may be at step input binding or within a loop's iteration (see [Step
-input binding](#step-input-binding)), and what it may reference, which for a Step or a loop includes `Steps.*` (see
-[`<StepTemplate>`](#steptemplate)). Mark Wiebe decided the name and the form on 2026-11-12, together with RFC 0010's
-Open Question 1 (see Open Question 13).
+A Step, a loop, an Environment, and an `environment:` entry each have an *enableIf*, and it is one kind of field: the
+one RFC 0010 defines for Environments and entries, which this RFC adds to Steps and loops. It has the same name and the
+same form everywhere, an expression field of type `bool` (RFC 0010's Template Schemas §7.6, Expression Fields; see [RFC
+0010 §Processing stages and expression fields](0010-environment-parameters.md#processing-stages-and-expression-fields)).
+`false` means the same everywhere: the entity is not in effect for what it would apply to. A Step or a loop is
+`SKIPPED`, an Environment is not entered by the Step's Sessions, and an entry requests nothing. What follows from that
+for an Environment is RFC 0010's: a disabled entry declines a `BY_DEFAULT` Environment, and a disabled entry for, or a
+`false` *enableIf* of, an `ALWAYS` Environment is an error. A `null` result is an error everywhere. Only two things
+differ from one entity to another: when the field is evaluated, which for a Step or a loop may be at step input binding
+or within a loop's iteration (see [Step input binding](#step-input-binding)), and what it may reference, which for a
+Step or a loop includes `Steps.*` (see [`<StepTemplate>`](#steptemplate)). Mark Wiebe decided the name and the form on
+2026-11-12, together with RFC 0010's Open Question 1 (see Open Question 13).
 
 * **The form.** Earlier drafts wrote a Step's *enableIf* as a format string, `"{{Param.X}}"`. An expression field holds
   the expression alone, `"Param.X"`. RFC 0010 gives the reasons ([RFC 0010 §Expression fields rather than format
@@ -1117,11 +1119,11 @@ Open Question 1 (see Open Question 13).
   this is true", and OpenJD Steps do wait, for their dependencies and, with this RFC, for their inputs. `enableIf` is
   also the name discussion #81 proposed.
 * **What changes for authors.** A value written with `{{ }}` is rejected at template validation (Template Schemas §7.6
-  rule 1). An expression whose type is not `bool`, or `bool?` (whose `null` is an error when it is evaluated), is a type
-  error, whatever its value would convert to, so a STRING parameter is compared, as in `"Param.Mode == 'on'"`. A
-  literal `true` or `false` is known before Job creation. Any other value, even the expression `"true"`, is known only
-  once it is evaluated (§7.6 rule 5), and [`<Environment>`](#environment) item 3 uses that rule to decide which Steps
-  are known to be enabled before Job creation.
+  rule 1). An expression whose static type is neither `bool` nor `bool?` is a type error, whatever its value would
+  convert to (with `bool?`, a `null` result is an error when it is evaluated), so a STRING parameter is compared, as in
+  `"Param.Mode == 'on'"`. A literal `true` or `false` is known before Job creation. Any other value, even the expression
+  `"true"`, is known only once it is evaluated (§7.6 rule 5), and [`<Environment>`](#environment) item 3 uses that rule
+  to decide which Steps are known to be enabled before Job creation.
 * **Not the Step's own `let`.** A Step's *enableIf* still cannot read the Step's *let* bindings, because nothing of a
   Step is evaluated before its *enableIf* is decided (Design Choice 10). The *enableIf* of its Step Environments and of
   its `environment:` entries can read them, as RFC 0010 allows, because they are evaluated after the Step is enabled.
@@ -1272,12 +1274,12 @@ Changed semantics of existing properties:
   that Step's own dependencies are satisfied (see [`<StepDependency>`](#stepdependency)). Listing a producer here
   is also what makes its `Steps.*` symbols visible to this Step.
 * *let*, *hostRequirements*, *parameterSpace*, *stepEnvironments*, *script* — These fields may reference the `Steps.*`
-  symbols of the Step's direct dependencies. A format string among them that is resolved at Job creation (not
-  annotated `@fmtstring[host]`) and references `Steps.*` is evaluated at step input binding instead, when the
-  inputs of its materialization group are concrete. See [Step input binding](#step-input-binding). In a body Step
-  of a loop, they may also read `Loop.*`, `RawLoop.*`, and the `Steps.*` symbols that RFC 0013 allows (see
-  [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope) and
-  [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
+  symbols of the Step's direct dependencies. A format string among them that is resolved at Job creation (not annotated
+  `@fmtstring[host]`), or with `ENV_PARAMS` a Step Environment's *enableIf*, that references `Steps.*` is evaluated at
+  step input binding instead, when the inputs of its materialization group are concrete. See [Step input
+  binding](#step-input-binding). In a body Step of a loop, they may also read `Loop.*`, `RawLoop.*`, and the `Steps.*`
+  symbols that RFC 0013 allows (see [RFC 0013 §The `Loop.*` scope](0013-step-loops.md#the-loop-scope) and [RFC 0013
+  §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)).
 
 ##### `<JobOutputDefinition>`
 
@@ -1380,7 +1382,7 @@ and [§Requesting an Environment from a Step](0010-environment-parameters.md#req
 that an Environment's is decided once per Step that would enter it, with that Step's Environment parameter values, and
 an entry's once for its Step, before those values are resolved; what `false` and `null` mean; and how they interact with
 `activation`, `exclusiveGroup`, constraint 7, and combined host requirements. A template can use them only if it lists
-`ENV_PARAMS`. They are the same field as a Step's and a loop's *enableIf*, with the same form and the same meaning of
+`ENV_PARAMS`. A Step's and a loop's *enableIf* are the same kind of field, with the same form and the same meaning of
 `false` (see [Design Choice 12](#12-enableif-is-rfc-0010s-field-on-more-entities)). In a Job Template that also lists
 `CONTROL_FLOW`, these rules extend RFC 0010's, and RFC 0010's rules hold except where they say otherwise:
 
@@ -1668,24 +1670,24 @@ When more than one group can be evaluated at the same moment, they are evaluated
    of its *script*, such as an action's `timeout` and `cancelation` fields; and a format string that a future extension
    adds to a Step and that is resolved at Job creation, unless that extension places it in another group.
 
-*let* is not a group of its own. A group **uses** the *let* bindings that its format strings reference, and the
-bindings that those reference, transitively. The remaining group uses every *let* binding of the Step, so that a
-binding read only by host-scope fields is still evaluated before any of the Step's Tasks is dispatched, as every
-*let* binding is today. Each binding is evaluated once, when the first group that uses it is evaluated, and later
-groups reuse its value. A group evaluates the bindings it uses in declaration order, so a binding is never evaluated
-before one it reads, but a later binding may be evaluated before an earlier one that it doesn't read. A Step's
+*let* is not a group of its own. A group **uses** the *let* bindings that its format strings and expression fields
+reference, and the bindings that those reference, transitively. The remaining group uses every *let* binding of the
+Step, so that a binding read only by host-scope fields is still evaluated before any of the Step's Tasks is dispatched,
+as every *let* binding is today. Each binding is evaluated once, when the first group that uses it is evaluated, and
+later groups reuse its value. A group evaluates the bindings it uses in declaration order, so a binding is never
+evaluated before one it reads, but a later binding may be evaluated before an earlier one that it doesn't read. A Step's
 *enableIf* may not reference *let* (see [`<StepTemplate>`](#steptemplate)). With `ENV_PARAMS`, the enablement group's
-Environment selection uses the bindings that the Step's `environment:` entries reference, which read no `Steps.*`
-symbol (see [`<Environment>`](#environment) item 2), so the group's inputs are those of the Step's *enableIf*.
+Environment selection uses the bindings that the Step's `environment:` entries reference, which read no `Steps.*` symbol
+(see [`<Environment>`](#environment) item 2), so the group's inputs are those of the Step's *enableIf*.
 
-A group's **inputs** are the `Steps.*` symbols that its format strings reference, directly or through the *let*
-bindings it uses. The inputs of the Task graph group also include those of the Task enumeration group, because its
-subspace ranges are evaluated once per Task of the materialized parameter space, and the group also waits until the
-Tasks of every Step that one of its subspace dependencies names are known, because its out-of-range check needs
-them. Because nothing else of a Step is evaluated before its *enableIf* is decided, the inputs of every group other
-than enablement also include those of the enablement group, and such a group is evaluated only once *enableIf* is
-`true`. A group that has no format strings and uses no *let* binding, such as the host selection group of a Step
-without *hostRequirements*, has no inputs of its own and evaluates trivially once *enableIf* is `true`.
+A group's **inputs** are the `Steps.*` symbols that its format strings and expression fields reference, directly or
+through the *let* bindings it uses. The inputs of the Task graph group also include those of the Task enumeration group,
+because its subspace ranges are evaluated once per Task of the materialized parameter space, and the group also waits
+until the Tasks of every Step that one of its subspace dependencies names are known, because its out-of-range check
+needs them. Because nothing else of a Step is evaluated before its *enableIf* is decided, the inputs of every group
+other than enablement also include those of the enablement group, and such a group is evaluated only once *enableIf* is
+`true`. A group that has no format strings or expression fields and uses no *let* binding, such as the host selection
+group of a Step without *hostRequirements*, has no inputs of its own and evaluates trivially once *enableIf* is `true`.
 
 #### How a Step is bound
 
@@ -1790,7 +1792,8 @@ run.
   12](#12-enableif-is-rfc-0010s-field-on-more-entities)), written without `{{ }}`: `true`, `false`, or an expression
   such as `"Param.EncodeVideo"` or `"Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold"`. Its static type
   must fit `bool` with no conversion; `bool?` is accepted, as for the output of a conditional producer, and a `null`
-  result is an error, which fails the Step, or fails Job creation if it is evaluated then.
+  result is an error (RFC 0010's Template Schemas §7.6 rule 2), which fails the Step, or fails Job creation if it is
+  evaluated then.
 * **Static or dynamic.** An *enableIf* whose inputs are concrete at Job creation (it references no `Steps.*` symbol,
   or only symbols that are concrete then, such as a statically skipped producer's) is decided at Job creation.
   Otherwise it is decided at step input binding, once its inputs are concrete and before any other group of the Step
