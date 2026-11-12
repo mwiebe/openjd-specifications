@@ -103,10 +103,10 @@ With CONTROL_FLOW, a Step may compute its parameter space, its host requirements
 Environments, or whether it runs at all from the output variables of the Steps it depends on. Whether it runs is its
 `enableIf`, a condition written as an expression without `{{ }}`, such as
 `enableIf: "Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold"`, the same field that the `ENV_PARAMS` extension
-gives Environments. The values a Step reads from other Steps don't exist until the producing Steps have run, or (for
-`TaskParam`) their Tasks are known, so such a Step is **pending inputs** (`PENDING_INPUTS`) from Job creation until it
-is bound (every group of its fields described below has been evaluated), skipped, or failed. None of its Tasks can be
-scheduled while it is pending inputs.
+gives Environments and their dependency entries. The values a Step reads from other Steps don't exist until the
+producing Steps have run, or (for `TaskParam`) their Tasks are known, so such a Step is **pending inputs**
+(`PENDING_INPUTS`) from Job creation until it is bound (every group of its fields described below has been evaluated),
+skipped, or failed. None of its Tasks can be scheduled while it is pending inputs.
 
 The scheduler performs **step input binding** progressively. The Step's fields that are resolved before its Tasks run
 are divided into groups, and each group can be evaluated as soon as the values it reads are available. A scheduler
@@ -151,8 +151,8 @@ The Step then becomes one of:
   its dependencies are satisfied. A Step whose computed parameter space is empty has zero Tasks and completes
   successfully once its dependencies are satisfied.
 * **Skipped** — Its `enableIf` was `false`. It runs nothing, and its output variables are `null` to the Steps that
-  read them. A Step whose `enableIf` reads only values available at Job creation, such as Job Parameters, is
-  decided at Job creation instead.
+  read them. A Step outside a loop's body whose `enableIf` reads only values available at Job creation, such as Job
+  Parameters, is decided at Job creation instead.
 * **Failed** — An expression in any group failed, its Task count exceeded the scheduler's per-Step limit or would take
   the Job over its per-Job limit, (with the `ENV_PARAMS` extension) a check of the Environments it enters or of its
   combined host requirements failed, or (with a future `TASK_DEPENDENCIES` extension) the dependencies between its Tasks
