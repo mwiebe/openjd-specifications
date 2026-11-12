@@ -1003,8 +1003,9 @@ Where:
 3. *enableIf* — `@extension CONTROL_FLOW`. Whether the Step runs. An [expression field](#76-expression-fields) of type
    `bool`, written without `{{ }}`, as in `enableIf: "Param.Run"`. It is the same kind of field as the *enableIf* of an
    Environment and of an *environment* dependency entry (`ENV_PARAMS`), with the same form, and `false` means in each
-   case that the entity is not in effect. A `null` result is an error rather than an omitted field. If it evaluates to
-   `false`, the Step is *skipped*: none of its Tasks runs, its Step Environments are not entered, and every
+   case that the entity is not in effect, with the consequences that [4](#4-environment) *activation* gives for an
+   Environment, including the error for an `ALWAYS` one. A `null` result is an error rather than an omitted field. If it
+   evaluates to `false`, the Step is *skipped*: none of its Tasks runs, its Step Environments are not entered, and every
    `Steps.<name>.*` value of the Step (see [Value References](#731-value-references)) is `null`. A skipped Step
    satisfies the dependencies of the Steps that depend on it once its own dependencies are satisfied. If omitted, the
    Step is always enabled. It is evaluated in template scope, without a host, so `path` values have POSIX semantics and
@@ -1014,14 +1015,15 @@ Where:
        Step of a loop's body, it may also reference `Loop.*`, `RawLoop.*`, and the `Steps.*` values that
        [3.8.4](#384-scopes-in-and-around-a-loop) allows. It may not reference names bound by the Step's own *let*,
        `Task.*`, or `Session.*`.
-    2. If every value it references is concrete at Job creation (it references no `Steps.*` value, or only values
-       concrete then, such as those of a Step skipped at Job creation), it is evaluated at Job creation. A Step
-       disabled at Job creation is still part of the Job and is shown as skipped, so every Job created from a template
-       has the same Steps, whatever its parameter values. Otherwise it
-       is evaluated at step input binding (see [Template Processing Stages](#74-template-processing-stages)) once
-       those values are concrete. Either way it is decided before the Step's *let* and every other materialization expression of the
-       Step is evaluated, and if it is `false` none of them is: the Step's parameter space is the empty set (its `Steps.*` values are
-       `null`, not `[]`).
+    2. For a Step outside a loop's body, if every value it references is concrete at Job creation (it references no
+       `Steps.*` value, or only values concrete then, such as those of a Step skipped at Job creation), it is evaluated
+       at Job creation. A Step disabled at Job creation is still part of the Job and is shown as skipped, so every Job
+       created from a template has the same Steps, whatever its parameter values. Otherwise it is evaluated at step
+       input binding (see [Template Processing Stages](#74-template-processing-stages)) once those values are concrete.
+       In a Step of a loop's body it is evaluated for each instance, within the instance's iteration (see
+       [3.8.5](#385-running-a-loop)). Either way it is decided before the Step's *let* and every other materialization
+       expression of the Step is evaluated, and if it is `false` none of them is: the Step's parameter space is the
+       empty set (its `Steps.*` values are `null`, not `[]`).
 4. *let* — An ordered list of expression bindings evaluated once per step. Bound names are available in
    *stepEnvironments*, *hostRequirements*, *parameterSpace*, and *script* fields. See: [&lt;LetBindings&gt;](#36-letbindings).
 5. *dependencies* — A list of the dependencies of this Step. These dependencies must be resolved before the Tasks of the
@@ -2912,7 +2914,8 @@ whose static type includes `nulltype` and that references, directly or through a
 a Step that has an *enableIf*, or a `collect: LAST` output of a loop with *while*. It names the expression and suggests
 a conditional expression or an `or` default. An expression whose type has no `nulltype`, such as
 `'frames only' if x == null else string(x)`, draws no warning, and neither does an expression field such as
-*enableIf*, which interpolates nothing and where a `null` result is an error (see [7.6](#76-expression-fields)).
+*enableIf*, which interpolates nothing and whose target type, `bool`, makes a `null` result an error (see
+[7.6](#76-expression-fields)).
 
 The `@fmtstring` and `@fmtstring[host]` annotations in this specification indicate which stage
 a format string is resolved in. A format string annotated `@fmtstring` (without `[host]`) is
