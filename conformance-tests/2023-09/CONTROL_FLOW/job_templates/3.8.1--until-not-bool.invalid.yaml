@@ -1,5 +1,6 @@
-# RFC 0013 §<LoopDefinition> item 3 / §Validation item 10: until has type bool, and an int
-# does not coerce to bool.
+# RFC 0013 §<LoopDefinition> item 3 / §Validation item 10: until is an expression field of
+# type bool. An int expression does not fit bool, and has no implicit conversion to it
+# (RFC 0010's Template Schemas §7.6 rule 2).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
@@ -13,7 +14,7 @@ steps:
       type: INT
       initial: '{{0}}'
       next: '{{Loop.N + 1}}'
-    until: '{{Loop.N}}'
+    until: 'Loop.N'
     maxIterations: 5
     steps:
     - name: W

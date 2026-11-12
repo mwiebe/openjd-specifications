@@ -25,7 +25,7 @@ steps:
       type: INT
       initial: '{{Steps.Setup.Output.Start}}'
       next: '{{1}}'
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: W

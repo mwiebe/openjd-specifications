@@ -27,7 +27,7 @@ steps:
       type: INT
       initial: '{{0}}'
       next: '{{Loop.N + 1}}'
-    while: '{{Loop.Iteration < Steps.Setup.Output.Start + Loop.N}}'
+    while: 'Loop.Iteration < Steps.Setup.Output.Start + Loop.N'
     maxIterations: 5
     steps:
     - name: W

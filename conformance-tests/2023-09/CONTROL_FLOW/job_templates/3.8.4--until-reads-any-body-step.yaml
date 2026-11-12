@@ -13,7 +13,7 @@ steps:
       type: INT
       initial: '{{0}}'
       next: '{{Steps.A.Output.X}}'
-    until: '{{Steps.A.Output.X > 0}}'
+    until: 'Steps.A.Output.X > 0'
     maxIterations: 5
     steps:
     - name: A

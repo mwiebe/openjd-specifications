@@ -12,7 +12,7 @@ template:
     default: true
   steps:
   - name: S
-    enableIf: '{{Param.Run}}'
+    enableIf: 'Param.Run'
     script:
       actions:
         onRun:

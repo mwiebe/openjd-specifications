@@ -15,7 +15,7 @@ template:
         type: INT
         initial: '{{0}}'
         next: '{{null if Loop.Iteration == 1 else Loop.N + 1}}'
-      until: '{{Loop.Iteration >= 4}}'
+      until: 'Loop.Iteration >= 4'
       maxIterations: 10
       steps:
       - name: W

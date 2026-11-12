@@ -16,7 +16,7 @@ template:
         initial: '{{[1, 2, 3]}}'
         next: '{{Steps.K.Output.Rest}}'
         minLength: 1
-      until: '{{len(Steps.K.Output.Rest) == 0}}'
+      until: 'len(Steps.K.Output.Rest) == 0'
       maxIterations: 10
       steps:
       - name: R

@@ -12,7 +12,7 @@ steps:
       type: INT
       initial: '{{0}}'
       next: '{{1}}'
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: WA
@@ -26,7 +26,7 @@ steps:
               print('IT' + '_' + str({{Loop.Iteration}}))
 - name: B
   loop:
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps:
     - name: WB

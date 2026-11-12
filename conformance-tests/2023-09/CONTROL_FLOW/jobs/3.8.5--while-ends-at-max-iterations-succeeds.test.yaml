@@ -9,7 +9,7 @@ template:
   steps:
   - name: L
     loop:
-      while: '{{Loop.Iteration < 3}}'
+      while: 'Loop.Iteration < 3'
       maxIterations: 3
       steps:
       - name: W

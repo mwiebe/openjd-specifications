@@ -11,7 +11,7 @@ parameterDefinitions:
   default: scene.ma
 steps:
 - name: A
-  enableIf: '{{len(RawParam.Scene) > 0}}'
+  enableIf: 'len(RawParam.Scene) > 0'
   script:
     actions:
       onRun:

@@ -24,7 +24,7 @@ template:
           - |-
             print('openjd_output_var: Go=false'); print('openjd_output_var: N=0')
   - name: C
-    enableIf: '{{Steps.Q.Output.Go}}'
+    enableIf: 'Steps.Q.Output.Go'
     dependencies:
     - dependsOn: Q
     parameterSpace:

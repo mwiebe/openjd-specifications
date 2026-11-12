@@ -1,0 +1,47 @@
+# RFC 0013 §<LoopDefinition> items 2 and 3: while and until are expression fields of type
+# bool, and a YAML bool literal is used as written (RFC 0010's Template Schemas §7.6
+# item 1).
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L1
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+    until: true
+    maxIterations: 5
+    steps:
+    - name: W1
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+- name: L2
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+    while: false
+    maxIterations: 5
+    steps:
+    - name: W2
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

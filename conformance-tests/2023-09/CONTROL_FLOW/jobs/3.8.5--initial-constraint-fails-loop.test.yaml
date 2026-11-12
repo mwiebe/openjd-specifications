@@ -30,7 +30,7 @@ template:
         initial: '{{Steps.P.Output.V}}'
         next: '{{Loop.N + 1}}'
         maxValue: 0
-      until: '{{Loop.Iteration >= 4}}'
+      until: 'Loop.Iteration >= 4'
       maxIterations: 10
       steps:
       - name: W

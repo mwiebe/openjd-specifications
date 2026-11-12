@@ -10,7 +10,7 @@ template:
   - name: L
     enableIf: false
     loop:
-      until: '{{true}}'
+      until: 'true'
       maxIterations: 5
       steps:
       - name: B

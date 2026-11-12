@@ -18,7 +18,7 @@ template:
         type: INT
         initial: '{{2}}'
         next: '{{Loop.A}}'
-      until: '{{Loop.Iteration >= 2}}'
+      until: 'Loop.Iteration >= 2'
       maxIterations: 5
       steps:
       - name: W

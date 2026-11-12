@@ -18,7 +18,7 @@ template:
         type: STRING
         initial: '{{''a'' * 1048574}}'
         next: '{{(''b'' if Loop.Iteration % 2 == 0 else ''a'') * 1048574}}'
-      until: '{{Loop.Iteration >= 2}}'
+      until: 'Loop.Iteration >= 2'
       maxIterations: 5
       steps:
       - name: W

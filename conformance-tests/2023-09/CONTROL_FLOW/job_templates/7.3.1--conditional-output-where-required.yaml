@@ -11,7 +11,7 @@ parameterDefinitions:
   default: true
 steps:
 - name: P
-  enableIf: '{{Param.Run}}'
+  enableIf: 'Param.Run'
   outputVariables:
   - name: N
     type: INT

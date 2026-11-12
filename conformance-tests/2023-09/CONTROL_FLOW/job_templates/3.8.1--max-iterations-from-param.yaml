@@ -11,7 +11,7 @@ parameterDefinitions:
 steps:
 - name: L
   loop:
-    until: '{{true}}'
+    until: 'true'
     maxIterations: '{{Param.Max}}'
     steps:
     - name: W

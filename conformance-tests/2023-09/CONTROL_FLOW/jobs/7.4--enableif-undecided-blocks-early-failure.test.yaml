@@ -38,7 +38,7 @@ template:
           - |-
             print('openjd_output_var: Go=false')
   - name: C
-    enableIf: '{{Steps.Q.Output.Go}}'
+    enableIf: 'Steps.Q.Output.Go'
     dependencies:
     - dependsOn: P
     - dependsOn: Q

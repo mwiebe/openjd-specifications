@@ -22,7 +22,7 @@ template:
           - |-
             print('openjd_output_var: Go=false'); print('openjd_output_var: L=[]')
   - name: P
-    enableIf: '{{Steps.Q.Output.Go}}'
+    enableIf: 'Steps.Q.Output.Go'
     let:
     - m = min(Steps.Q.Output.L)
     dependencies:

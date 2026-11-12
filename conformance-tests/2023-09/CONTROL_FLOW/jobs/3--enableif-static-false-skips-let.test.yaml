@@ -12,7 +12,7 @@ template:
     default: 1
   steps:
   - name: S
-    enableIf: '{{Param.N > 5}}'
+    enableIf: 'Param.N > 5'
     let:
     - x = fail('let evaluated') if Param.N < 5 else 0
     script:

@@ -28,7 +28,7 @@ template:
         type: INT
         initial: '{{fail(''bad start'') if Steps.P.Output.V == 1 else 0}}'
         next: '{{Loop.N + 1}}'
-      until: '{{Loop.Iteration >= 4}}'
+      until: 'Loop.Iteration >= 4'
       maxIterations: 10
       steps:
       - name: W

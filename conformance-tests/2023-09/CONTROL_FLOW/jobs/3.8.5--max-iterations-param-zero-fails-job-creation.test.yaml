@@ -26,7 +26,7 @@ template:
             print('X_' + 'RAN')
   - name: L
     loop:
-      until: '{{Loop.Iteration >= 4}}'
+      until: 'Loop.Iteration >= 4'
       maxIterations: '{{Param.Max}}'
       steps:
       - name: W

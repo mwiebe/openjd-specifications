@@ -7,6 +7,6 @@ name: TestJob
 steps:
 - name: L
   loop:
-    until: '{{true}}'
+    until: 'true'
     maxIterations: 5
     steps: []

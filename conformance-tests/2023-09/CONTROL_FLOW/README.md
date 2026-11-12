@@ -5,12 +5,15 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 418 tests: 4 in `env_templates`, 199 in `job_templates`, and 215 in
-> `jobs`. All 418 pass on Linux against the openjd-rs prototype (branch
-> `control-flow-prototype`, commit `6553952`), the only implementation that has run them.
-> The tests were written from the RFC text, and the prototype was developed against them.
-> If a test and the RFC disagree, the RFC wins: fix the test, or raise the question on the
-> RFC.
+> **Status.** There are 428 tests: 4 in `env_templates`, 209 in `job_templates`, and 215 in
+> `jobs`. A Step's and a loop's `enableIf`, and a loop's `while` and `until`, are written
+> as expression fields (RFC 0010's Template Schemas §7.6), without `{{ }}`. The openjd-rs
+> prototype (branch `control-flow-prototype`), the only implementation that has run these
+> tests, still reads those fields as format strings: at commit `116bb23` it passes 354 of
+> the 428 on Linux, and every test it fails uses the expression-field form. Before that
+> change, all 418 tests then present passed at the same commit. The tests were written
+> from the RFC text. If a test and the RFC disagree, the RFC wins: fix the test, or raise
+> the question on the RFC.
 
 ## What this extension does
 
@@ -104,32 +107,38 @@ and its section.
   then, even though `P` is pending because its `hostRequirements` read another Step's output
   (`7.4--taskparam-concrete-before-bound-*`), and so is a job output that reads it
   (`2.17--job-output-taskparam-before-bound-*`).
-- **`enableIf`** (`job_templates/3--*`, `job_templates/4--*`, `jobs/3--*`, `jobs/4--*`):
-  allowed and forbidden symbols per location, `bool` type, static and dynamic decisions,
-  `null` outputs of a skipped Step (`== null`, `or`), skipped Steps don't evaluate their
-  `let`, a `null` `enableIf` fails (on a Step or a Step Environment), disabled Job and
-  Step Environments aren't entered, and a skipped Step whose own dependency failed never
-  satisfies `dependsOn` (failure is not skipping).
+- **`enableIf`** (`job_templates/3--*`, `job_templates/4--*`, `jobs/3--*`, `jobs/4--*`): a
+  Step's `enableIf` is an expression field of type `bool` (RFC 0010's Template Schemas
+  §7.6): a YAML bool literal is used as written, a value written with `{{ }}` is rejected,
+  and so is an expression whose type is not `bool` or `bool?` (an `int` or a `STRING`, with
+  a valid companion that compares the `STRING`); allowed and forbidden symbols per location,
+  static and dynamic decisions, `null` outputs of a skipped Step (`== null`, `or`), skipped
+  Steps don't evaluate their `let`, a `null` `enableIf` fails (on a Step or a Step
+  Environment), disabled Job and Step Environments aren't entered, and a skipped Step whose
+  own dependency failed never satisfies `dependsOn` (failure is not skipping).
 - **Job outputs** (`*2.17--*`): count and name rules, separate namespace from parameters,
   `LIST[LIST[INT]]`, any Step readable without a dependency, path rules (`RawParam`,
   `RawOutput`, and `TaskRawParam` allowed; `Param` of `PATH` and `LIST[PATH]` parameters
   and `TaskParam` of a `PATH` Task parameter forbidden), other forbidden symbols, type and `collect`; at run time, failures at Job
   creation and after a Step fail the run, valid or `null` job outputs don't, and job
   outputs totaling exactly 1 MiB are accepted.
-- **Loop schema** (`1.1--loop-*`, `job_templates/3.8--*`, `3.8.1--*`, `3.8.2--*`, `3.8.3--*`):
-  gating; no `script` or `parameterSpace` on a loop; names unique across top-level Steps,
-  loops, and body Steps (also across two loops, and a loop and its own body Step); top-level
-  Steps depend only on top-level Steps; exactly one of `while` and `until`; `maxIterations`
-  required, 1 to 1,000, from `Param.*` but not from `Steps.*` or `Loop.*`; no nested loops;
-  a non-empty, acyclic body whose dependencies stay inside it; `while` can't read body Steps;
-  `until` is `bool`; 1 to 32 variables, unique, not named `Iteration`, with no `unit`,
-  `initial` without `Loop.*` and only from the loop's dependencies, `next` with the
+- **Loop schema** (`1.1--loop-*`, `job_templates/3.8--*`, `3.8.1--*`, `3.8.2--*`,
+  `3.8.3--*`): gating; no `script` or `parameterSpace` on a loop; names unique across
+  top-level Steps, loops, and body Steps (also across two loops, and a loop and its own body
+  Step); top-level Steps depend only on top-level Steps; a loop's `enableIf`, `while`, and
+  `until` are expression fields of type `bool`, so a value written with `{{ }}` is rejected,
+  as is a `while` or `until` of type `int` or `STRING` (with a valid companion that compares
+  the `STRING`), and a YAML bool literal is used as written; exactly one of `while` and
+  `until`; `maxIterations` required, 1 to 1,000, from `Param.*` but not from `Steps.*` or
+  `Loop.*`; no nested loops; a non-empty, acyclic body whose dependencies stay inside it;
+  `while` can't read body Steps; 1 to 32 variables, unique, not named `Iteration`, with no
+  `unit`, `initial` without `Loop.*` and only from the loop's dependencies, `next` with the
   variable's type; constraint properties valid for the type (all 12 types; none on `BOOL`,
   none from another type, `minValue` not above `maxValue`); `PATH` variables through
   `RawLoop.*` in TEMPLATE scope; 1 to 32 loop outputs, which need `value` and `collect`
-  (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a list, its value of the element
-  type), with unique names, `LAST` scalar and `APPEND` list types, the `unit` rules, and
-  constraint properties valid for the type.
+  (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a list, its value of the element type),
+  with unique names, `LAST` scalar and `APPEND` list types, the `unit` rules, and constraint
+  properties valid for the type.
 - **Loop scopes** (`job_templates/3.8.4--*`): a body Step reads the loop's dependencies, but
   not other outside Steps nor body Steps it doesn't depend on; `until`/`next`/`value` read
   any body Step; outside Steps and job outputs read loop outputs, never body Steps, and
@@ -220,6 +229,17 @@ and its section.
 
 ## Not covered
 
+- The `enableIf` of an Environment and of an `environment:` entry, which RFC 0010
+  (`ENV_PARAMS`) defines and RFC 0011 extends. These tests don't use `ENV_PARAMS` yet. The
+  Environment `enableIf` tests (`job_templates/4--enableif-*`, `jobs/4--enableif-*`) and
+  `CEnv` in `job_templates/7.3.1--output-in-every-allowed-field` still give an Environment
+  an `enableIf` without `ENV_PARAMS`, most of them in the format-string form, which the RFCs
+  no longer allow. They are to be rewritten with `ENV_PARAMS`.
+- Which Steps are *known to be enabled* before Job creation (RFC 0011 §`<Environment>`
+  item 3): a Step whose `enableIf` is absent or the literal `true`, and not one whose
+  `enableIf` is an expression such as `"true"`. The rule decides only when `ENV_PARAMS`'s
+  checks that depend on whether a Step runs are made, so no template without `ENV_PARAMS`
+  can show it.
 - Re-runs and retries, including the recovery of a loop, which is `FAILED` until every
   failed body Step instance of the iteration in progress has succeeded after a retry or
   requeue of its Tasks and then returns to `RUNNING`, and the rule that no recovery

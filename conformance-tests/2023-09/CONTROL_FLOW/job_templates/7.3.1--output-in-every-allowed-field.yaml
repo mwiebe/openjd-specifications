@@ -1,5 +1,7 @@
 # RFC 0011 §The Steps.* scope, Where available item 3: a direct dependent may read
 # Steps.P.* in its enableIf, let, parameterSpace range, stepEnvironments, and script.
+# CEnv's enableIf is still written as a format string: an Environment's enableIf comes
+# from RFC 0010 and needs ENV_PARAMS, which these tests don't use yet.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
@@ -19,7 +21,7 @@ steps:
         - |-
           print('openjd_output_var: N=1')
 - name: C
-  enableIf: '{{Steps.P.Output.N > 0}}'
+  enableIf: 'Steps.P.Output.N > 0'
   let:
   - n2 = Steps.P.Output.N * 2
   dependencies:

@@ -11,14 +11,14 @@ parameterDefinitions:
   default: true
 steps:
 - name: L
-  enableIf: '{{Param.Run}}'
+  enableIf: 'Param.Run'
   loop:
     variables:
     - name: N
       type: INT
       initial: '{{1}}'
       next: '{{Loop.N + 1}}'
-    until: '{{Steps.Check.Output.Score >= 3}}'
+    until: 'Steps.Check.Output.Score >= 3'
     maxIterations: 10
     steps:
     - name: Work
