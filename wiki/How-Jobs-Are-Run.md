@@ -100,10 +100,13 @@ Without the CONTROL_FLOW extension (introduced in [RFC 0011](https://github.com/
 created, and a Step's Tasks are scheduled once the Steps it depends on have completed successfully.
 
 With CONTROL_FLOW, a Step may compute its parameter space, its host requirements, its `let` bindings, its Step
-Environments, or whether it runs at all (`enableIf`) from the output variables of the Steps it depends on. Those
-values don't exist until the producing Steps have run, or (for `TaskParam`) their Tasks are known, so such a Step is
-**pending inputs** (`PENDING_INPUTS`) from Job creation until it is bound (every group of its fields described below
-has been evaluated), skipped, or failed. None of its Tasks can be scheduled while it is pending inputs.
+Environments, or whether it runs at all from the output variables of the Steps it depends on. Whether it runs is its
+`enableIf`, a condition written as an expression without `{{ }}`, such as
+`enableIf: "Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold"`, the same field that the `ENV_PARAMS` extension
+gives Environments. The values a Step reads from other Steps don't exist until the producing Steps have run, or (for
+`TaskParam`) their Tasks are known, so such a Step is **pending inputs** (`PENDING_INPUTS`) from Job creation until it
+is bound (every group of its fields described below has been evaluated), skipped, or failed. None of its Tasks can be
+scheduled while it is pending inputs.
 
 The scheduler performs **step input binding** progressively. The Step's fields that are resolved before its Tasks run
 are divided into groups, and each group can be evaluated as soon as the values it reads are available. A scheduler
