@@ -1001,14 +1001,14 @@ Where:
 2. *description* — A description to apply to the step. It has no functional purpose, but may appear in UI elements.
    See: [&lt;Description&gt;](#72-description).
 3. *enableIf* — `@extension CONTROL_FLOW`. Whether the Step runs. An [expression field](#76-expression-fields) of type
-   `bool`, written without `{{ }}`, as in `enableIf: "Param.Run"`. It is the same field as the *enableIf* of an
-   Environment and of an *environment* dependency entry (`ENV_PARAMS`), with the same form and the same meaning of
-   `false`. A `null` result is an error rather than an omitted field. If it evaluates to `false`, the Step is
-   *skipped*: none of its Tasks runs, its Step Environments are not entered, and every `Steps.<name>.*` value of the
-   Step (see [Value References](#731-value-references)) is `null`. A skipped Step satisfies the dependencies of the
-   Steps that depend on it once its own dependencies are satisfied. If omitted, the Step is always enabled. It is
-   evaluated in template scope, without a host, so `path` values have POSIX semantics and no path mapping applies.
-   Constraints:
+   `bool`, written without `{{ }}`, as in `enableIf: "Param.Run"`. It is the same kind of field as the *enableIf* of an
+   Environment and of an *environment* dependency entry (`ENV_PARAMS`), with the same form, and `false` means in each
+   case that the entity is not in effect. A `null` result is an error rather than an omitted field. If it evaluates to
+   `false`, the Step is *skipped*: none of its Tasks runs, its Step Environments are not entered, and every
+   `Steps.<name>.*` value of the Step (see [Value References](#731-value-references)) is `null`. A skipped Step
+   satisfies the dependencies of the Steps that depend on it once its own dependencies are satisfied. If omitted, the
+   Step is always enabled. It is evaluated in template scope, without a host, so `path` values have POSIX semantics and
+   no path mapping applies. Constraints:
     1. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with
        `ENV_PARAMS`, also `Job.EnvNames`), `Step.Name`, and the `Steps.*` values of the Step's direct dependencies. In a
        Step of a loop's body, it may also reference `Loop.*`, `RawLoop.*`, and the `Steps.*` values that
