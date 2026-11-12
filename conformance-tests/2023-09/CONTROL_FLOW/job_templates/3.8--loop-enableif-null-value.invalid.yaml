@@ -1,0 +1,29 @@
+# RFC 0013 §Validation item 10 and RFC 0010's Template Schemas §7.6: a loop's enableIf is
+# an expression field, and a null value is an error, not an omitted field. The same loop
+# without enableIf is valid.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  enableIf: null
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+    until: 'Loop.N >= 1'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

@@ -1,6 +1,7 @@
 # RFC 0013 §<LoopDefinition> item 3 / §Validation item 10: until has static type bool or
 # bool?, with no implicit conversion (RFC 0010's Template Schemas §7.6 rule 2), so a STRING
-# loop variable is an error whatever its value.
+# loop variable is an error whatever its value. 3.8.1--while-string-compared shows the
+# comparison form.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
