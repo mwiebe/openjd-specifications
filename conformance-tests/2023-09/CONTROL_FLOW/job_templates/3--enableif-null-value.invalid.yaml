@@ -1,0 +1,19 @@
+# RFC 0011 §<StepTemplate> enableIf and RFC 0010's Template Schemas §7.6: enableIf is an
+# expression field, and a null value is an error, not an omitted field. The same Step
+# without enableIf is valid.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: A
+  enableIf: null
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

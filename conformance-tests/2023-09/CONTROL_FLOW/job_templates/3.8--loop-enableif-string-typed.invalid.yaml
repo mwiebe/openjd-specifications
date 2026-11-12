@@ -1,0 +1,33 @@
+# RFC 0013 §Validation item 10: a loop's enableIf is checked as a Step's, so its static
+# type is bool or bool?, with no implicit conversion (RFC 0010's Template Schemas §7.6
+# rule 2). A STRING parameter is an error whatever its value, here the text 'true'.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Mode
+  type: STRING
+  default: 'true'
+steps:
+- name: L
+  enableIf: 'Param.Mode'
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+    until: 'Loop.N >= 1'
+    maxIterations: 5
+    steps:
+    - name: W
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

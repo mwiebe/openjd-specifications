@@ -1,0 +1,48 @@
+# RFC 0013 §<StepLoop> item 3: a loop's enableIf is the same expression field as a Step's,
+# so a YAML bool literal is used as written (RFC 0010's Template Schemas §7.6 item 1).
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L1
+  enableIf: true
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+    until: 'Loop.N >= 1'
+    maxIterations: 5
+    steps:
+    - name: W1
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))
+- name: L2
+  enableIf: false
+  loop:
+    variables:
+    - name: N
+      type: INT
+      initial: '{{0}}'
+      next: '{{Loop.N + 1}}'
+    until: 'Loop.N >= 1'
+    maxIterations: 5
+    steps:
+    - name: W2
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('IT' + '_' + str({{Loop.Iteration}}))

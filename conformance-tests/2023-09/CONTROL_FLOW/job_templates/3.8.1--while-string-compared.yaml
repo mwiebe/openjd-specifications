@@ -1,4 +1,5 @@
-# RFC 0013 §<LoopDefinition> item 2: a STRING loop variable is compared in while, as in
+# RFC 0013 §<LoopDefinition> item 2 and Design Choice 4: a condition over a STRING loop
+# variable is written as a comparison (RFC 0010's Template Schemas §7.6 rule 2), here
 # Loop.Token != 'b'. The valid companion of 3.8.1--while-string-typed.invalid.
 specificationVersion: jobtemplate-2023-09
 extensions:
