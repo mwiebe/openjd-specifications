@@ -12,7 +12,7 @@
   * RFC 0011, Control Flow, for the `Steps.*` scope, step input binding, `enableIf`, and the Step states
   * RFC 0012, Step Output Variables, for the output variable types, collect modes, and the re-run rule
   * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), for expression fields (its Template Schemas §7.6), the
-    form of a loop's *enableIf*, *while*, and *until*, which needs only `EXPR`, and for the parts that apply its
+    form of a loop's *enableIf*, *while*, and *until*, which need only `EXPR`, and for the parts that apply its
     Environment rules to body Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends
     them
 * Related:
@@ -661,16 +661,16 @@ bound. A fixed number of iterations is written with a condition: `while: "Loop.I
 with both would need an order between them and an answer to which one's zero-iteration rule applies, for no case
 that one condition plus `and` can't express.
 
-`while` and `until` are expression fields of type `bool` (RFC 0010's Template Schemas §7.6), written without `{{ }}`, as
-a loop's *enableIf* and every other *enableIf* are ([RFC 0011 Design Choice
+**The form.** `while` and `until` are expression fields of type `bool` (RFC 0010's Template Schemas §7.6), written
+without `{{ }}`, as a loop's *enableIf* and every other *enableIf* are ([RFC 0011 Design Choice
 12](0011-control-flow.md#12-enableif-is-rfc-0010s-field-on-more-entities)). Mark Wiebe decided this on 2026-11-12 (Open
 Question 9). Each holds one condition and interpolates nothing, so RFC 0011's reasons for *enableIf* apply to them
 unchanged: the braces admit errors that exist only because of them, and a format string's implicit conversions would
 turn a STRING result such as `'yes'` into `true`. Under an expression field a condition over a string is written as a
 comparison, as in the paginated listing's `Loop.Token != ''`, and every condition in a template has one form. A loop's
 *maxIterations*, its variables' *initial* and *next*, and its outputs' *value* stay format strings: they compute a value
-of a declared type rather than decide a condition, as a job output's *value* does, and are converted to that type as it
-is.
+of a declared type rather than decide a condition, as a job output's *value* does, and like it they are converted to
+that type.
 
 ### 5. `maxIterations` is required, and reaching it fails the loop
 
@@ -897,13 +897,12 @@ Where:
     2. Maximum number of elements: 32.
     3. No two elements in this list may have the same value for the `name` property.
 2. *while* — Whether to run another iteration, checked before each iteration, including the first. It is an expression
-   field of type `bool` (RFC 0010's Template Schemas §7.6), written without `{{ }}`, as a loop's *enableIf* is: its
-   form, its type rules, and its treatment of `null` are those of §7.6, so a `null` result is an error. It may
-   reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also
-   `Job.EnvNames`), `Loop.*` and `RawLoop.*` (with values whose type is or contains `path` only through `RawLoop.*`),
-   and the `Steps.*` symbols of the loop's dependencies (see [`Steps.*` in and around a
-   loop](#steps-in-and-around-a-loop)). It may not reference the body's Steps, `Step.Name`, `Task.*`, `Session.*`, or
-   names bound by `let`.
+   field of type `bool` (RFC 0010's Template Schemas §7.6), as a loop's *enableIf* is, so it is written without `{{ }}`
+   and a `null` result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters),
+   `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), `Loop.*` and `RawLoop.*` (with values whose type
+   is or contains `path` only through `RawLoop.*`), and the `Steps.*` symbols of the loop's dependencies (see [`Steps.*`
+   in and around a loop](#steps-in-and-around-a-loop)). It may not reference the body's Steps, `Step.Name`, `Task.*`,
+   `Session.*`, or names bound by `let`.
 3. *until* — Whether to stop, checked after each iteration. An expression field of type `bool`, as *while* is. It may
    reference everything *while* may, and the `Steps.*` symbols of every body Step of the loop.
 4. *maxIterations* — The most iterations the loop may run. Its target type is `int`. It may reference only `Param.*`
@@ -1101,8 +1100,8 @@ order:
 2. **Bound:** *maxIterations*. Its inputs are concrete at Job creation, so it is evaluated as soon as *enableIf* is
    decided `true`. A value outside 1 to 1,000 is an error.
 3. **Start:** each variable's *initial*, in declaration order, then, if the loop has *while*, *while* for iteration 0
-   with `Loop.Iteration` 0 and the initial values. Each value is converted and checked against its variable's type and
-   constraints.
+   with `Loop.Iteration` 0 and the initial values. Each *initial* value is converted and checked against its
+   variable's type and constraints, and *while* evaluates to `true` or `false`.
 
 An error in any group fails the loop at once, or fails Job creation if the group is evaluated then, as for a Step. A
 loop is bound when *enableIf* is `true` and every group has evaluated, and then is `READY`. A bound loop whose first
