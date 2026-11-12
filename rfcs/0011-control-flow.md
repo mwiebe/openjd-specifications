@@ -1430,7 +1430,7 @@ except where they say otherwise:
    the earliest when its Environment selection is made. Its outcome is determined when it holds, or fails, whatever
    every *enableIf* whose value is not yet known resolves to, the Step's own included, so a violation is never
    determined before the Step's own *enableIf* is `true`. A literal `true` or `false` is known (RFC 0010's Template
-   Schemas §7.5 rule 5). Before Job creation, item 3 applies. A violation fails the Step at once, or fails Job creation
+   Schemas §7.6 rule 5). Before Job creation, item 3 applies. A violation fails the Step at once, or fails Job creation
    if it is found then.
 7. **Sessions.** RFC 0010's rule that a Session runs a Step's Tasks only if it entered exactly that Step's Environments,
    with that Step's values, is unchanged. Which Step Environments a Step enters is part of its set of Environments, so a
