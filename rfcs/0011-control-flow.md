@@ -1102,12 +1102,13 @@ same form everywhere, an expression field of type `bool` (RFC 0010's Template Sc
 `SKIPPED`, an Environment is not entered by the Step's Sessions, and an entry requests nothing and supplies no values.
 RFC 0010 adds the consequences that depend on an Environment's `activation`: a disabled entry declines a `BY_DEFAULT`
 Environment, and a disabled entry for, or a `false` *enableIf* of, an `ALWAYS` Environment is an error. A `null` result
-is an error everywhere. Otherwise only two things differ from one entity to another: when the field is evaluated, which
-for a Step or a loop may be at step input binding, and for a body Step of a loop is within each iteration (see [Step
-input binding](#step-input-binding)), and what it may reference, which for a Step or a loop includes `Steps.*` (see
-[`<StepTemplate>`](#steptemplate)). This RFC also leaves a disabled Step Environment's TEMPLATE-scope format strings
-unevaluated, a rule RFC 0010 does not have (see [`<Environment>`](#environment) item 4 and Open Question 15). Mark
-Wiebe decided the name and the form on 2026-11-12, together with RFC 0010's Open Question 1 (see Open Question 13).
+is an error everywhere. Otherwise what differs from one entity to another is when the field is evaluated, which for a
+Step or a loop may be at step input binding, and for a body Step of a loop is within each iteration (see [Step input
+binding](#step-input-binding) and [RFC 0013 §Iterations](0013-step-loops.md#iterations)), and what it may reference,
+which for a Step or a loop includes `Steps.*` (see [`<StepTemplate>`](#steptemplate)). This RFC also leaves a disabled
+Step Environment's TEMPLATE-scope format strings unevaluated, a rule RFC 0010 does not have (see
+[`<Environment>`](#environment) item 4 and Open Question 15). Mark Wiebe decided the name and the form on 2026-11-12,
+together with RFC 0010's Open Question 1 (see Open Question 13).
 
 * **The form.** Earlier drafts wrote a Step's *enableIf* as a format string, `"{{Param.X}}"`. An expression field holds
   the expression alone, `"Param.X"`. RFC 0010 gives the reasons ([RFC 0010 §Expression fields rather than format
@@ -1121,11 +1122,11 @@ Wiebe decided the name and the form on 2026-11-12, together with RFC 0010's Open
   this is true", and OpenJD Steps do wait, for their dependencies and, with this RFC, for their inputs. `enableIf` is
   also the name discussion #81 proposed.
 * **What changes for authors.** A value written with `{{ }}` is rejected at template validation (Template Schemas §7.6
-  rule 1). An expression whose static type is neither `bool` nor `bool?` is a type error, whatever its value would
-  convert to (with `bool?`, a `null` result is an error when it is evaluated), so a STRING parameter is compared, as in
-  `"Param.Mode == 'on'"`. A literal `true` or `false` is known before Job creation. Any other value, even the expression
-  `"true"`, is known only once it is evaluated (§7.6 rule 5), and [`<Environment>`](#environment) item 3 uses that rule
-  to decide which Steps are known to be enabled before Job creation.
+  rules 1 and 4). An expression whose static type is neither `bool` nor `bool?` is a type error, whatever its value
+  would convert to (with `bool?`, a `null` result is an error when it is evaluated), so a STRING parameter is compared,
+  as in `"Param.Mode == 'on'"`. A literal `true` or `false` is known before Job creation. Any other value, even the
+  expression `"true"`, is known only once it is evaluated (§7.6 rule 5), and [`<Environment>`](#environment) item 3 uses
+  that rule to decide which Steps are known to be enabled before Job creation.
 * **Not the Step's own `let`.** A Step's *enableIf* still cannot read the Step's *let* bindings, because nothing of a
   Step is evaluated before its *enableIf* is decided (Design Choice 10). The *enableIf* of its Step Environments and of
   its `environment:` entries can read them, as RFC 0010 allows, because they are evaluated after the Step is enabled.
