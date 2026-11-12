@@ -1314,8 +1314,9 @@ Every rule this RFC adds, and when it is checked, in the form of
    Step; `Steps.<L>.*` of a loop `L` names a declared loop output and is not `TaskParam` or `TaskRawParam`.
 10. Every expression type-checks with `Loop.*` and `RawLoop.*` as `unresolved` values of their types; the loop's
     *enableIf* is an expression field of type `bool`, checked as a Step's is ([RFC 0011
-    §Validation](0011-control-flow.md#validation) item 6); *while* and *until* have type `bool`; each *initial* and
-    *next* has its variable's type; each loop output *value* has its output's type, or under `APPEND` its element type.
+    §Validation](0011-control-flow.md#validation) item 6); *while* and *until* are format strings whose target type is
+    `bool`, so EXPR's implicit conversions apply (Open Question 9); each *initial* and *next* has its variable's type;
+    each loop output *value* has its output's type, or under `APPEND` its element type.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial*, and the first *while*, evaluate, convert, and satisfy their constraints; and the size limit of

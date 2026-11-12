@@ -1099,13 +1099,15 @@ one RFC 0010 defines for Environments and entries, which this RFC adds to Steps 
 same form everywhere, an expression field of type `bool` (RFC 0010's Template Schemas §7.6, Expression Fields; see [RFC
 0010 §Processing stages and expression fields](0010-environment-parameters.md#processing-stages-and-expression-fields)).
 `false` means the same everywhere: the entity is not in effect for what it would apply to. A Step or a loop is
-`SKIPPED`, an Environment is not entered by the Step's Sessions, and an entry requests nothing. What follows from that
-for an Environment is RFC 0010's: a disabled entry declines a `BY_DEFAULT` Environment, and a disabled entry for, or a
-`false` *enableIf* of, an `ALWAYS` Environment is an error. A `null` result is an error everywhere. Only two things
-differ from one entity to another: when the field is evaluated, which for a Step or a loop may be at step input binding
-or within a loop's iteration (see [Step input binding](#step-input-binding)), and what it may reference, which for a
-Step or a loop includes `Steps.*` (see [`<StepTemplate>`](#steptemplate)). Mark Wiebe decided the name and the form on
-2026-11-12, together with RFC 0010's Open Question 1 (see Open Question 13).
+`SKIPPED`, an Environment is not entered by the Step's Sessions, and an entry requests nothing and supplies no values.
+RFC 0010 adds the consequences that depend on an Environment's `activation`: a disabled entry declines a `BY_DEFAULT`
+Environment, and a disabled entry for, or a `false` *enableIf* of, an `ALWAYS` Environment is an error. A `null` result
+is an error everywhere. Otherwise only two things differ from one entity to another: when the field is evaluated, which
+for a Step or a loop may be at step input binding, and for a body Step of a loop is within each iteration (see [Step
+input binding](#step-input-binding)), and what it may reference, which for a Step or a loop includes `Steps.*` (see
+[`<StepTemplate>`](#steptemplate)). This RFC also leaves a disabled Step Environment's TEMPLATE-scope format strings
+unevaluated, a rule RFC 0010 does not have (see [`<Environment>`](#environment) item 4 and Open Question 15). Mark
+Wiebe decided the name and the form on 2026-11-12, together with RFC 0010's Open Question 1 (see Open Question 13).
 
 * **The form.** Earlier drafts wrote a Step's *enableIf* as a format string, `"{{Param.X}}"`. An expression field holds
   the expression alone, `"Param.X"`. RFC 0010 gives the reasons ([RFC 0010 §Expression fields rather than format
@@ -1255,12 +1257,12 @@ New property:
   and treatment of `null` are those of RFC 0010's Template Schemas §7.6. A `null` result is an error, not an omitted
   field, so a skipped producer's `null` can never silently enable a Step. If it evaluates to `false`, the Step is
   `SKIPPED`: none of its Tasks runs, its Step Environments are not entered, its `Steps.*` symbols are `null`, and it
-  satisfies the `dependsOn` of the Steps that depend on it once its own dependencies are satisfied. If omitted, the
-  Step is always enabled. It is evaluated at Job creation if its inputs are concrete then, and otherwise at step input
-  binding, before anything else of the Step (see [Conditional execution](#conditional-execution-enableif)); a body
-  Step of a loop evaluates it for each instance, within the instance's iteration. Like every field resolved before a
-  Task runs, it is evaluated in template scope, not in a host context: `path` values have POSIX semantics and no path
-  mapping applies (Expression Language §1.2.1). Constraints:
+  satisfies the `dependsOn` of the Steps that depend on it once its own dependencies are satisfied. If omitted, the Step
+  is always enabled. It is evaluated at Job creation if its inputs are concrete then, and otherwise at step input
+  binding, before anything else of the Step (see [Conditional execution](#conditional-execution-enableif)); a body Step
+  of a loop evaluates it for each instance, within the instance's iteration. Like every field resolved at Job creation
+  or step input binding, it is evaluated in template scope, not in a host context: `path` values have POSIX semantics
+  and no path mapping applies (Expression Language §1.2.1). Constraints:
     1. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters, which are available only on the worker
        host), `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), `Step.Name`, and the `Steps.*` symbols
        of the Step's direct dependencies (see [The `Steps.*` scope](#the-steps-scope)). A body Step of a loop may also
@@ -1630,7 +1632,8 @@ CONTROL_FLOW adds no types, functions, or operators to EXPR, and no new kind of 
   (see [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)). The warning names
   the expression and suggests a conditional expression or an `or` default. An expression whose type has no
   `nulltype`, such as `'frames only' if x == null else string(x)`, draws no warning. Nor does an expression field such
-  as *enableIf*: it interpolates nothing, and a `null` result is an error (RFC 0010's Template Schemas §7.6 rule 2).
+  as *enableIf*: it interpolates nothing, and the target type of *enableIf*, `bool`, does not admit `nulltype`, so a
+  `null` result is an error (RFC 0010's Template Schemas §7.6 rule 2).
 
 Symbol collection (RFC 0005) is how an implementation finds a Step's `Steps.*` references, both to check them and to
 decide whether the Step needs step input binding and what the inputs of each of its materialization groups are.
@@ -1790,17 +1793,18 @@ run.
 
 * **The field.** A Step's *enableIf* is RFC 0010's expression field of type `bool` (see [Design Choice
   12](#12-enableif-is-rfc-0010s-field-on-more-entities)), written without `{{ }}`: `true`, `false`, or an expression
-  such as `"Param.EncodeVideo"` or `"Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold"`. Its static type
-  must fit `bool` with no conversion; `bool?` is accepted, as for the output of a conditional producer, and a `null`
-  result is an error (RFC 0010's Template Schemas §7.6 rule 2), which fails the Step, or fails Job creation if it is
+  such as `"Param.EncodeVideo"` or `"Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold"`. Its type follows RFC
+  0010's Template Schemas §7.6 rule 2, as [`<StepTemplate>`](#steptemplate) says: a `bool?` expression, such as one that
+  reads a conditional producer's output, is accepted, and a `null` result fails the Step, or fails Job creation if it is
   evaluated then.
 * **Static or dynamic.** An *enableIf* whose inputs are concrete at Job creation (it references no `Steps.*` symbol,
   or only symbols that are concrete then, such as a statically skipped producer's) is decided at Job creation.
   Otherwise it is decided at step input binding, once its inputs are concrete and before any other group of the Step
   is evaluated (see [How a Step is bound](#how-a-step-is-bound) and
-  [When groups are evaluated](#when-groups-are-evaluated)). A statically disabled Step is still part of the Job
-  and is shown as `SKIPPED`, so every Job created from a template has the same Steps, whatever its parameter
-  values.
+  [When groups are evaluated](#when-groups-are-evaluated)). A body Step of a loop is the exception: nothing of it is
+  evaluated at Job creation, so its *enableIf* is decided for each instance, within the instance's iteration (see
+  [RFC 0013 §Iterations](0013-step-loops.md#iterations)). A statically disabled Step is still part of the Job and is
+  shown as `SKIPPED`, so every Job created from a template has the same Steps, whatever its parameter values.
 * **A skipped Step** runs no Tasks and enters no Environments. It satisfies the `dependsOn` of the Steps that depend
   on it once its own dependencies are satisfied, and its `Steps.*.Output` and `Steps.*.TaskParam` symbols are
   `null`. Its dependents run, and those that read its outputs must handle `null`, which the `T?` type of the symbols
