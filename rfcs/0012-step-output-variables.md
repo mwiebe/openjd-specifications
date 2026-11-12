@@ -310,7 +310,7 @@ The terms of [RFC 0011 §Terminology](0011-control-flow.md#terminology) apply. T
 ```diff
   name: <StepName>
   description: <Description> # @optional
-  enableIf: <bool> | <FormatString> # @optional @fmtstring @extension CONTROL_FLOW
+  enableIf: <Expression> # @optional @expr bool @extension CONTROL_FLOW
   let: <LetBindings> # @optional @extension EXPR
   dependencies: [ <StepDependency>, ... ] # @optional
   stepEnvironments: [ <Environment>, ... ] # @optional

@@ -827,7 +827,7 @@ A `<StepLoop>` is the object:
 ```yaml
 name: <StepName>
 description: <Description> # @optional
-enableIf: <bool> | <FormatString> # @optional @fmtstring
+enableIf: <Expression> # @optional @expr bool
 dependencies: [ <StepDependency>, ... ] # @optional
 loop: <LoopDefinition>
 outputVariables: [ <LoopOutputVariableDefinition>, ... ] # @optional
@@ -838,10 +838,13 @@ Where:
 1. *name* — The loop's name, by which other Steps depend on it and read its outputs as `Steps.<name>.*`. A
    `<StepName>`, unique among all Steps of the template.
 2. *description* — As on `<StepTemplate>`.
-3. *enableIf* — Whether the loop runs, with the meaning, scope, and constraints of a `<StepTemplate>`'s *enableIf*
-   (see [RFC 0011 §`<StepTemplate>`](0011-control-flow.md#steptemplate)), where `Step.Name` is the loop's name. If it
-   is `false`, the loop is `SKIPPED`: no iteration runs, none of its other fields is evaluated, and its
-   `Steps.<name>.*` symbols are `null`.
+3. *enableIf* — Whether the loop runs. It is the same field as a `<StepTemplate>`'s *enableIf*, RFC 0010's expression
+   field of type `bool`, with the same form, meaning, scope, and constraints (see [RFC 0011
+   §`<StepTemplate>`](0011-control-flow.md#steptemplate) and [RFC 0011 Design Choice
+   12](0011-control-flow.md#12-enableif-is-rfc-0010s-field-on-more-entities)), where `Step.Name` is the loop's name. It
+   is evaluated as a Step's is, at Job creation if its inputs are concrete then and otherwise at step input binding
+   (see [Loop binding](#loop-binding)). If it is `false`, the loop is `SKIPPED`: no iteration runs, none of its other
+   fields is evaluated, and its `Steps.<name>.*` symbols are `null`.
 4. *dependencies* — The top-level Steps the loop depends on. The loop's first iteration starts only when every one is
    satisfied, and the Steps listed here are those whose `Steps.*` symbols the loop's expressions and its body Steps
    may read (see [`Steps.*` in and around a loop](#steps-in-and-around-a-loop)). Constraints and satisfaction as for a
@@ -1308,9 +1311,10 @@ Every rule this RFC adds, and when it is checked, in the form of
 9. `Steps.*` symbols in a loop's expressions and in its body Steps name only the Steps that
    [`Steps.*` in and around a loop](#steps-in-and-around-a-loop) allows; no top-level Step or job output names a body
    Step; `Steps.<L>.*` of a loop `L` names a declared loop output and is not `TaskParam` or `TaskRawParam`.
-10. Every expression type-checks with `Loop.*` and `RawLoop.*` as `unresolved` values of their types; *while* and
-    *until* have type `bool`; each *initial* and *next* has its variable's type; each loop output *value* has its
-    output's type, or under `APPEND` its element type.
+10. Every expression type-checks with `Loop.*` and `RawLoop.*` as `unresolved` values of their types; the loop's
+    *enableIf* is an expression field of type `bool`, checked as a Step's is ([RFC 0011
+    §Validation](0011-control-flow.md#validation) item 6); *while* and *until* have type `bool`; each *initial* and
+    *next* has its variable's type; each loop output *value* has its output's type, or under `APPEND` its element type.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial*, and the first *while*, evaluate, convert, and satisfy their constraints; and the size limit of
@@ -1488,6 +1492,13 @@ notion of which values an early Step may use, and because parallelism belongs in
    Environments on the loop itself, entered by every Session that runs a body Step instance. Is that needed?
 8. **Reporting.** Should a scheduler report the most Tasks a loop could run, from *maxIterations* and the body's
    static parameter spaces, as an upper bound before the loop starts?
+9. **The form of *while* and *until*.** A loop's *enableIf* is an expression field, as every *enableIf* is (see
+   [RFC 0011 Design Choice 12](0011-control-flow.md#12-enableif-is-rfc-0010s-field-on-more-entities)). *while* and
+   *until* also hold one `bool` expression, and in this draft they are format strings, as in
+   `until: "{{Steps.Check.Output.Score >= Param.Target}}"`, under which a STRING result such as `'yes'` converts to
+   `true`. Should they be expression fields too, `until: "Steps.Check.Output.Score >= Param.Target"`, so that every
+   condition in a template has one form? The same question could be asked of *maxIterations* and of the *initial*,
+   *next*, and output *value* expressions, which hold one expression of a declared type.
 
 ## Future Work
 
