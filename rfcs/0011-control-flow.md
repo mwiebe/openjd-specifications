@@ -967,9 +967,10 @@ reads it is evaluated (at Job creation, for a producer skipped then, which fails
 starts, not at validation. Both are loud failures that name the expression.
 The silent cases are the places where EXPR discards a `null` by design: text interpolation, where it becomes `""`
 (`"--size {{Steps.P.Output.X}}"` becomes `--size `); a list item such as an `args` entry, which is dropped; and an
-optional field, which is omitted. This RFC requires a validation warning for each. *enableIf* is not one of them: it
-is an expression field whose target type, `bool`, does not admit `nulltype`, so a `null` result is an error, never an
-omitted field (RFC 0010's Template Schemas §7.6 rule 2), and a skipped producer can never silently enable a Step.
+optional field, which is omitted. This RFC requires a validation warning for each. *enableIf*, and a loop's *while*
+and *until* (RFC 0013), are not among them: each is an expression field whose target type, `bool`, does not admit
+`nulltype`, so a `null` result is an error, never an omitted field (RFC 0010's Template Schemas §7.6 rule 2), and a
+skipped producer can never silently enable a Step or decide a loop's condition.
 
 ### 6. An empty computed parameter space is a zero-Task success
 
@@ -1131,10 +1132,10 @@ together with RFC 0010's Open Question 1 (see Open Question 13).
 * **Not the Step's own `let`.** A Step's *enableIf* still cannot read the Step's *let* bindings, because nothing of a
   Step is evaluated before its *enableIf* is decided (Design Choice 10). The *enableIf* of its Step Environments and of
   its `environment:` entries can read them, as RFC 0010 allows, because they are evaluated after the Step is enabled.
-* **A loop's other conditions.** A loop's *while* and *until* are not *enableIf*, but each also holds one condition,
-  so they are expression fields of type `bool` too, for the same reasons, and every condition in a template has one
-  form. Mark Wiebe decided this on 2026-11-12 ([RFC 0013 Design Choice
-  4](0013-step-loops.md#4-exactly-one-of-while-and-until) and Open Question 9). A loop's *maxIterations*, its
+* **A loop's other conditions.** A loop's *while* and *until* are not *enableIf*, but each also holds one condition.
+  They are expression fields of type `bool` too, for the same reasons, so every condition in a template has one form.
+  Mark Wiebe decided this on 2026-11-12 ([RFC 0013 Design Choice 4](0013-step-loops.md#4-exactly-one-of-while-and-until)
+  and [RFC 0013 Open Question 9](0013-step-loops.md#open-questions)). A loop's *maxIterations*, its
   variables' *initial* and *next*, and its outputs' *value* compute values rather than conditions, and stay format
   strings, as a job output's *value* does.
 
