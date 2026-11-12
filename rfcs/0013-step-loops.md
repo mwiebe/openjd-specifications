@@ -666,11 +666,11 @@ without `{{ }}`, as a loop's *enableIf* and every other *enableIf* are ([RFC 001
 12](0011-control-flow.md#12-enableif-is-rfc-0010s-field-on-more-entities)). Mark Wiebe decided this on 2026-11-12 (Open
 Question 9). Each holds one condition and interpolates nothing, so RFC 0011's reasons for *enableIf* apply to them
 unchanged: the braces admit errors that exist only because of them, and a format string's implicit conversions would
-turn a STRING result such as `'yes'` into `true`. Under an expression field a condition over a string is written as a
+turn a `string` result such as `'yes'` into `true`. Under an expression field a condition over a string is written as a
 comparison, as in the paginated listing's `Loop.Token != ''`, and every condition in a template has one form. A loop's
-*maxIterations*, its variables' *initial* and *next*, and its outputs' *value* stay format strings: they compute a value
-of a declared type rather than decide a condition, as a job output's *value* does, and like it they are converted to
-that type.
+*maxIterations*, its variables' *initial* and *next*, and its outputs' *value* stay format strings: each computes a
+value of a given type, `int` for *maxIterations* and the declared type for the others, rather than deciding a condition,
+and is converted to that type, as a job output's *value* is.
 
 ### 5. `maxIterations` is required, and reaching it fails the loop
 
@@ -1286,18 +1286,19 @@ does not wait for it (see [Failure](#failure)).
 
 Add a section, *Step Loops*: a loop runs its body Steps once per iteration, one iteration after another; each iteration
 has its own instance of every body Step, with its own Tasks; at the end of each iteration the scheduler evaluates the
-loop's outputs and decides, from `until` or `while`, whether another iteration runs; a loop that would exceed
-`maxIterations` fails; and a failure of a body Step instance of the iteration in progress fails the loop. Only a failure
-of the Tasks of a body Step instance of the iteration in progress is recoverable: a loop whose failure is recoverable is
-`FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry or requeue of
-its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. A re-run of a body Task that has
-already succeeded leaves the Task `SUCCEEDED`, under
-[RFC 0012 §Retries and re-runs](0012-step-output-variables.md#retries-and-re-runs), so it never fails the loop or
-changes its state, variables, or outputs, and the iteration boundary does not wait for it. Only a failed attempt of a
-Task that has not yet succeeded counts as a body Step instance failure. Every other loop failure, including an
-expression or constraint error in the loop or at an iteration boundary, a binding error of a body Step instance,
-exceeding a limit, a violated `minLength` when the loop ends, and reaching `maxIterations`, is
-final, and once one occurs the loop cannot return to `RUNNING`. See [Running a loop](#running-a-loop).
+loop's outputs and decides, from `until` or `while`, whether another iteration runs, where `while` is checked before
+each iteration and `until` after it, each written as an expression without `{{ }}`, as `enableIf` is; a loop that would
+exceed `maxIterations` fails; and a failure of a body Step instance of the iteration in progress fails the loop. Only a
+failure of the Tasks of a body Step instance of the iteration in progress is recoverable: a loop whose failure is
+recoverable is `FAILED` until every failed body Step instance of the iteration in progress has succeeded after a retry
+or requeue of its Tasks; it then returns to `RUNNING`, and the iteration continues to its boundary. A re-run of a body
+Task that has already succeeded leaves the Task `SUCCEEDED`, under [RFC 0012 §Retries and
+re-runs](0012-step-output-variables.md#retries-and-re-runs), so it never fails the loop or changes its state, variables,
+or outputs, and the iteration boundary does not wait for it. Only a failed attempt of a Task that has not yet succeeded
+counts as a body Step instance failure. Every other loop failure, including an expression or constraint error in the
+loop or at an iteration boundary, a binding error of a body Step instance, exceeding a limit, a violated `minLength`
+when the loop ends, and reaching `maxIterations`, is final, and once one occurs the loop cannot return to `RUNNING`. See
+[Running a loop](#running-a-loop).
 
 ### Validation
 
