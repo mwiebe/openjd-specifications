@@ -23,9 +23,10 @@
     be qualified for `CONTROL_FLOW` as `<Environment>` items 3, 4, and 7 say. That includes its statements that checking
     the Job Template and creating the Job report a parameter that a Step does not supply, and that a Job in which a Step
     declines an `ALWAYS` Environment, or in which an `ALWAYS` Environment's `enableIf` is `false` for some Step, is
-    rejected: with `CONTROL_FLOW` they hold for a Step that is enabled, and checking the Job Template reports them only
-    for a Step known to be enabled, except the errors that `<Environment>` item 3 reports whatever any Step's
-    *enableIf*.
+    rejected: with `CONTROL_FLOW` they hold for a Step that is enabled, and are reported when its Environment selection
+    is made (at Job creation only for a Step outside a loop's body whose *enableIf* is absent or decided `true` then),
+    and checking the Job Template reports them only for a Step known to be enabled, except the errors that
+    `<Environment>` item 3 reports whatever any Step's *enableIf*.
 * Related:
   * Discussion #111, variable data flow along step dependencies, the seed idea for this RFC
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/111)
@@ -1134,13 +1135,13 @@ together with RFC 0010's question of the name, which RFC 0010 lists as decided (
   `enableIf` says what `false` does, which is to skip the Step, not to hold it back. `when` can read as "wait until
   this is true", and OpenJD Steps do wait, for their dependencies and, with this RFC, for their inputs. `enableIf` is
   also the name discussion #81 proposed.
-* **What changes for authors.** A value written with `{{ }}` is rejected at template validation (Template Schemas §7.6
-  rules 1 and 4). An expression whose static type is neither `bool` nor `bool?` is a type error, whatever its value
-  would convert to (with `bool?`, a `null` result is an error when it is evaluated), so a STRING parameter is compared,
-  as in `"Param.Mode == 'on'"`. Before it is evaluated, its value is known as RFC 0010's Template Schemas §7.6 rule 5
-  says: a literal `true` or `false` is known, and so is an expression that gives a value that is not unresolved when
-  every value not yet known is `unresolved`, by the Expression Language's rules for unknown operands. With a BOOL Job
-  Parameter `F`, `"true"` and `"Param.F or true"` are known to be `true`, and `"Param.F"` is not.
+* **What changes for authors.** A value written with `{{ }}` is rejected at template validation (RFC 0010's Template
+  Schemas §7.6 rules 1 and 4). An expression whose static type is neither `bool` nor `bool?` is a type error, whatever
+  its value would convert to (with `bool?`, a `null` result is an error when it is evaluated), so a STRING parameter is
+  compared, as in `"Param.Mode == 'on'"`. Before it is evaluated, its value is known as RFC 0010's Template Schemas §7.6
+  rule 5 says: a literal `true` or `false` is known, and so is an expression that gives a value that is not unresolved
+  when every value not yet known is `unresolved`, by the Expression Language's rules for unknown operands. With a BOOL
+  Job Parameter `F`, `"true"` and `"Param.F or true"` are known to be `true`, and `"Param.F"` is not.
   [`<Environment>`](#environment) item 3 uses that rule to decide which Steps are known to be enabled before Job
   creation.
 * **Not the Step's own `let`.** A Step's *enableIf* still cannot read the Step's *let* bindings, because nothing of a
@@ -2107,7 +2108,8 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
    `environment:` entry's *parameters* and *enableIf* reference no `Steps.*`, `Loop.*`, or `RawLoop.*` symbol, directly
    or through a *let* binding ([`<Environment>`](#environment) item 2). A check that RFC 0010 makes at template
    validation, or before Job creation, and whose outcome depends on whether a Step runs or on which Environments its
-   Sessions enter is made then only for a Step known to be enabled ([`<Environment>`](#environment) item 3).
+   Sessions enter is made then only for a Step known to be enabled, except the errors in an Environment's definition
+   that item 3 reports whatever any Step's *enableIf* ([`<Environment>`](#environment) item 3).
 6. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types. A Step's *enableIf* is an
    expression field of type `bool` (RFC 0010's Template Schemas §7.6 rules 1, 2, and 4): it parses as one expression,
    so a value written as a format string, such as `"{{Param.Run}}"`, is an error, and its static type fits `bool` or

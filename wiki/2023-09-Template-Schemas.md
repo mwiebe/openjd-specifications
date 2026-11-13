@@ -2871,7 +2871,9 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    evaluated: when the Job is created for a Step outside a loop's body whose *enableIf* is absent or decided `true`
    then, when its *enableIf* is decided `true` for any other such Step, and within its iteration for each instance of a
    Step of a loop's body, once the instance's *enableIf* is `true` or at once if it has none (see
-   [3.8.5](#385-running-a-loop)).
+   [3.8.5](#385-running-a-loop)). When a Step's Environment selection has several errors, which of them an
+   implementation reports, and in what order, is not specified, as for a submission (see
+   [7.4.1](#741-job-creation-with-env_params)).
 
    The work that does not depend on which Steps enter an Environment stays at Job creation, whatever any Step's
    *enableIf*, and comes before any Step's Environment selection: attaching the Environment Templates and making

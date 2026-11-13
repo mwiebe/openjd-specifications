@@ -223,9 +223,10 @@ should evaluate it then, and must have evaluated every group before it schedules
    Job if found when the Job is created, fails only that Step when found later (and for a Step in a loop's body, so the
    loop). A skipped Step enters none, and is held to none of those checks except an error in an Environment's own
    definition, such as an `ALWAYS` Environment whose `enableIf` is known to be `false` from the template alone, which is
-   reported whatever any Step's `enableIf`. So checking the Job Template reports them only for a Step known to be
-   enabled: one whose `enableIf` is absent or known to be `true` from the template alone, and, in a loop's body, whose
-   loop's `enableIf` is too and whose loop has no `while` or one known to be `true`.
+   reported whatever any Step's `enableIf`. Since any Step may be skipped, checking the Job Template reports the other
+   errors of that choice only for a Step known to be enabled: one whose `enableIf` is absent or known to be `true` from
+   the template alone, and, in a loop's body, whose loop's `enableIf` is too and whose loop has no `while` or one known
+   to be `true`.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
