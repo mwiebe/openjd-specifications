@@ -1,6 +1,7 @@
 # RFC 0013 §<LoopDefinition> item 3 / §Validation item 10: until is an expression field of
 # type bool. An int expression does not fit bool, and has no implicit conversion to it
 # (RFC 0010's Template Schemas §7.6 rule 2).
+# 3.8.4--until-reads-any-body-step is the valid form.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
