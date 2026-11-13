@@ -241,15 +241,15 @@ should evaluate it then, and must have evaluated every group before it schedules
    A `let` binding of the Step is evaluated with the first group that uses it, and every one is evaluated before
    the Step is bound.
 
-A Step whose Tasks are known is still pending inputs until every group has been evaluated, but a scheduler or tool
-can already show its Tasks to the people monitoring the Job and plan capacity for them, and a Step whose host
-requirements are known tells the scheduler which Worker Hosts it may need. A scheduler or tool that shows a pending
-Step should report, for whether it runs, its Tasks, and its host requirements, whether each is known, and for each
-that is not, what it is waiting for: the values of other Steps that are not available yet, or the Step's undecided
-`enableIf`. At Job creation the scheduler works through the Steps in dependency order, so a Step skipped there, or
-whose Tasks become known there, supplies its values to the Steps after it in the same pass. In a Step whose `enableIf`
-is decided `true` (or absent) at Job creation, the groups whose values are available then are evaluated then, and an
-error in one makes Job creation fail.
+A Step whose Tasks are known is still pending inputs until every group has been evaluated, but a scheduler or tool can
+already show its Tasks to the people monitoring the Job and plan capacity for them, and a Step whose host requirements
+are known tells the scheduler which Worker Hosts it may need. A scheduler or tool that shows a pending Step should
+report, for whether it runs, its Tasks, and its host requirements, whether each is known, and for each that is not, what
+it is waiting for: the values of other Steps that are not available yet, or the Step's undecided `enableIf`. At Job
+creation the scheduler works through the Steps in dependency order, so a Step skipped there, or whose Tasks become known
+there, supplies its values to the Steps after it in the same pass. In a Step outside a loop's body whose `enableIf` is
+decided `true` (or absent) at Job creation, the groups whose values are available then are evaluated then, and an error
+in one makes Job creation fail.
 
 The Step then becomes one of:
 

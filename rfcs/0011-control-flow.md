@@ -20,13 +20,13 @@
     RFC 0010 is to be accepted first. Only the Environment part needs a template to list `ENV_PARAMS`: expression fields
     need only `EXPR`. The wiki text of this RFC refers to RFC 0010's wiki edits, so it is to be merged after them, and
     RFC 0010's How Jobs Are Run text, which says every Environment decision is made when the Job is created, is then to
-    be qualified for `CONTROL_FLOW` as `<Environment>` items 3, 4, and 7 say. That includes its statements that checking
-    the Job Template and creating the Job report a parameter that a Step does not supply, and that a Job in which a Step
-    declines an `ALWAYS` Environment, or in which an `ALWAYS` Environment's `enableIf` is `false` for some Step, is
-    rejected: with `CONTROL_FLOW` they hold for a Step that is enabled, and are reported when its Environment selection
-    is made (at Job creation only for a Step outside a loop's body whose *enableIf* is absent or decided `true` then),
-    and checking the Job Template reports them only for a Step known to be enabled, except the errors that
-    `<Environment>` item 3 reports whatever any Step's *enableIf*.
+    be qualified for `CONTROL_FLOW` as `<Environment>` items 3 to 5 and 7 say. That covers its statements that a
+    parameter a Step does not supply, a Step declining an `ALWAYS` Environment, an `ALWAYS` Environment's `enableIf`
+    being `false` for some Step, and contradictory combined host requirements reject the Job when it is created. With
+    `CONTROL_FLOW`, except the errors in an Environment's definition that `<Environment>` item 3 reports whatever any
+    Step's *enableIf*, they hold only for a Step that is enabled, are reported when its Environment selection is made
+    or, for its combined host requirements, when its host selection group is evaluated, and fail only that Step if that
+    is after Job creation. Checking the Job Template reports them only for a Step known to be enabled.
 * Related:
   * Discussion #111, variable data flow along step dependencies, the seed idea for this RFC
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/111)
@@ -2109,7 +2109,7 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
    or through a *let* binding ([`<Environment>`](#environment) item 2). A check that RFC 0010 makes at template
    validation, or before Job creation, and whose outcome depends on whether a Step runs or on which Environments its
    Sessions enter is made then only for a Step known to be enabled, except the errors in an Environment's definition
-   that item 3 reports whatever any Step's *enableIf* ([`<Environment>`](#environment) item 3).
+   that [`<Environment>`](#environment) item 3 reports whatever any Step's *enableIf*.
 6. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types. A Step's *enableIf* is an
    expression field of type `bool` (RFC 0010's Template Schemas §7.6 rules 1, 2, and 4): it parses as one expression,
    so a value written as a format string, such as `"{{Param.Run}}"`, is an error, and its static type fits `bool` or

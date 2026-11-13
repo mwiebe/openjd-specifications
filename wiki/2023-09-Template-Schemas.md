@@ -1101,13 +1101,13 @@ with the `ENV_PARAMS` extension the *enableIf* of its *stepEnvironments* and the
 `CONTROL_FLOW` rules 1 and 2 of [4](#4-environment)). They are divided into *materialization groups*. *enableIf* is
 decided first; after it is `true` (or if it is absent), each other group can be evaluated as soon as the `Steps.*`
 values it reads (directly or through the *let* bindings it uses) are concrete, and should be evaluated then. Every group
-whose values are concrete at Job creation is evaluated then, only in a Step whose *enableIf* is `true` or absent at Job
-creation. Before the Job is created, [7.6](#76-expression-fields) rule 5 decides which errors in them, other than the
-fields of its Environment selection (see `CONTROL_FLOW` rule 3 of [4](#4-environment)), template validation reports,
-with the Step's *enableIf*, and for a Step of a loop's body the loop's *enableIf* and *while*, among the fields such a
-check depends on, and for a Step Environment's format strings also that Environment's *enableIf* (`CONTROL_FLOW` rule 1
-of [4](#4-environment)). The groups are listed below. When more than one group can be evaluated at the same moment, they
-are evaluated in this order:
+whose values are concrete at Job creation is evaluated then, only in a Step outside a loop's body whose *enableIf* is
+`true` or absent at Job creation. Before the Job is created, [7.6](#76-expression-fields) rule 5 decides which errors in
+them, other than the fields of its Environment selection (see `CONTROL_FLOW` rule 3 of [4](#4-environment)), template
+validation reports, with the Step's *enableIf*, and for a Step of a loop's body the loop's *enableIf* and *while*, among
+the fields such a check depends on, and for a Step Environment's format strings also that Environment's *enableIf*
+(`CONTROL_FLOW` rule 1 of [4](#4-environment)). The groups are listed below. When more than one group can be evaluated
+at the same moment, they are evaluated in this order:
 
 1. *enableIf*, which is decided before any other group is evaluated, followed, once it is `true` and with the
    `ENV_PARAMS` extension, by the Step's Environment selection (see [&lt;Environment&gt;](#4-environment));
