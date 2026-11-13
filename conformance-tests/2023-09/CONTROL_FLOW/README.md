@@ -132,17 +132,17 @@ and its section.
   `until` are expression fields of type `bool`, so a value written with `{{ }}` is rejected,
   as are a `while` or `until` of type `int` or `STRING` (with a valid companion that
   compares a `STRING` in `while`), a loop `enableIf` of type `STRING`, and a `null` loop
-  `enableIf`, and a YAML bool literal in any of them is used as written; exactly one of
-  `while` and `until`; `maxIterations` required, 1 to 1,000, from `Param.*` but not from
-  `Steps.*` or `Loop.*`; no nested loops; a non-empty, acyclic body whose dependencies stay
-  inside it; `while` can't read body Steps; 1 to 32 variables, unique, not named
-  `Iteration`, with no `unit`, `initial` without `Loop.*` and only from the loop's
-  dependencies, `next` with the variable's type; constraint properties valid for the type
-  (all 12 types; none on `BOOL`, none from another type, `minValue` not above `maxValue`);
-  `PATH` variables through `RawLoop.*` in TEMPLATE scope; 1 to 32 loop outputs, which need
-  `value` and `collect` (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a list, its value
-  of the element type), with unique names, `LAST` scalar and `APPEND` list types, the `unit`
-  rules, and constraint properties valid for the type.
+  `enableIf`, and a YAML bool literal is accepted in each of them; exactly one of `while`
+  and `until`; `maxIterations` required, 1 to 1,000, from `Param.*` but not from `Steps.*`
+  or `Loop.*`; no nested loops; a non-empty, acyclic body whose dependencies stay inside it;
+  `while` can't read body Steps; 1 to 32 variables, unique, not named `Iteration`, with no
+  `unit`, `initial` without `Loop.*` and only from the loop's dependencies, `next` with the
+  variable's type; constraint properties valid for the type (all 12 types; none on `BOOL`,
+  none from another type, `minValue` not above `maxValue`); `PATH` variables through
+  `RawLoop.*` in TEMPLATE scope; 1 to 32 loop outputs, which need `value` and `collect`
+  (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a list, its value of the element type),
+  with unique names, `LAST` scalar and `APPEND` list types, the `unit` rules, and constraint
+  properties valid for the type.
 - **Loop scopes** (`job_templates/3.8.4--*`): a body Step reads the loop's dependencies, but
   not other outside Steps nor body Steps it doesn't depend on; `until`/`next`/`value` read
   any body Step; outside Steps and job outputs read loop outputs, never body Steps, and
@@ -238,13 +238,14 @@ and its section.
   Environment `enableIf` tests (`job_templates/4--enableif-*`, `jobs/4--enableif-*`) still
   give an Environment an `enableIf` without `ENV_PARAMS`, most of them in the format-string
   form, which the RFCs no longer allow, and
+  `job_templates/1.1--environment-enableif-without-extension`,
   `env_templates/4--enableif-in-environment-template` and
   `jobs/4--enableif-in-environment-template-with-control-flow-job` cite an RFC 0011 rule
   that RFC 0010 has replaced. They are to be rewritten with `ENV_PARAMS`.
-- A `null` value for `while` or `until`. It is an error, but an implementation that read it
-  as an omitted field would reject the template too, for having neither `while` nor `until`,
-  so a test could not tell the two apart; the `null` value tests are for `enableIf`, which
-  may be omitted.
+- A `null` value for `while` or `until`. It is an error, but alone it gives the same result
+  as an implementation that read it as an omitted field, which rejects a loop with neither
+  `while` nor `until`, and beside the other of the two it also breaks the rule that a loop
+  has exactly one of them. The `null` value tests are for `enableIf`, which may be omitted.
 - Which Steps are *known to be enabled* before Job creation (RFC 0011 §`<Environment>` item
   3): a Step whose `enableIf` is absent or the literal `true`, and for a body Step also a
   loop whose `enableIf` is absent or the literal `true` and that has no `while`, but not a

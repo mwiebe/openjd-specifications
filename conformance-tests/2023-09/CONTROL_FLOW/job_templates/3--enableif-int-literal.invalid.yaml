@@ -1,6 +1,6 @@
 # RFC 0011 §<StepTemplate> enableIf and RFC 0010's Template Schemas §7.6 item 1: a YAML
 # scalar is used as written only when its type fits the target type. An integer does not
-# fit bool.
+# fit bool. 3--enableif-bool-literal is the valid form.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
