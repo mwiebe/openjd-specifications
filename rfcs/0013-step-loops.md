@@ -1226,8 +1226,9 @@ A body Step instance is a Step for the rules of Sessions: a Session holds the St
 Session that runs Tasks of two instances, of the same body Step in two iterations or of two body Steps, exits the
 first instance's Step Environments and enters the second's. A scheduler MAY run instances of different iterations in
 one Session under those rules, keeping its Job Environments entered, but need not. With RFC 0010's `ENV_PARAMS`, a
-Session runs a Step's Tasks only if it entered that Step's Environments with that Step's parameter values, and the
-instances of one body Step always have the same Job Environments, attached Environments, and values (see
+Session runs a Step's Tasks only if it entered that Step's Environments with values equal to that Step's effective
+values (RFC 0010's Template Schemas §3.2.2), and the instances of one body Step always have the same Job Environments,
+attached Environments, and values (see
 [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) item 7).
 
 #### Retries and re-runs

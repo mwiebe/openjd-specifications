@@ -247,11 +247,11 @@ and its section.
   `while` nor `until`, and beside the other of the two it also breaks the rule that a loop
   has exactly one of them. The `null` value tests are for `enableIf`, which may be omitted.
 - Which Steps are *known to be enabled* before Job creation (RFC 0011 §`<Environment>` item
-  3): a Step whose `enableIf` is absent or the literal `true`, and for a body Step also a
-  loop whose `enableIf` is absent or the literal `true` and that has no `while`, but not a
-  Step whose `enableIf` is an expression such as `"true"`. The rule decides only when
-  `ENV_PARAMS`'s checks that depend on whether a Step runs are made, so no template without
-  `ENV_PARAMS` can show it.
+  3): a Step whose `enableIf` is absent or known to be `true` by RFC 0010's Template Schemas
+  §7.6 rule 5, such as `true`, `"true"` or `"Param.F or true"`, and for a body Step also a
+  loop whose `enableIf` is absent or known to be `true` and that has no `while` or one known
+  to be `true`. The rule decides only when `ENV_PARAMS`'s checks that depend on whether a
+  Step runs are made, so no template without `ENV_PARAMS` can show it.
 - Re-runs and retries, including the recovery of a loop, which is `FAILED` until every
   failed body Step instance of the iteration in progress has succeeded after a retry or
   requeue of its Tasks and then returns to `RUNNING`, and the rule that no recovery
