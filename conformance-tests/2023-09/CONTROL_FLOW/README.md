@@ -253,6 +253,10 @@ and its section.
   absent or known to be `true` and that has no `while` or one known to be `true`. It decides
   when `ENV_PARAMS`'s checks that depend on whether a Step runs are made, so no submission
   in which no document lists `ENV_PARAMS` can show it, and these tests use none.
+- That template validation reports an error in a value it can compute, such as a `timeout`
+  of `"{{1 - 1}}"`, only for a Step known to be enabled (RFC 0011 §Validation item 10, RFC
+  0013 §Validation item 11), while it reports parse, type, scope and schema errors whatever
+  the `enableIf`. No test covers it yet.
 - That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
   (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
   Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph

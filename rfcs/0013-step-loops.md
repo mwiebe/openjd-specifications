@@ -1333,9 +1333,11 @@ Every rule this RFC adds, and when it is checked, in the form of
     value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type that does
     not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each loop output
     *value* has its output's type, or under `APPEND` its element type.
-11. An error in a value that template validation can compute is reported whatever the loop's *enableIf* and *while* and
-    whatever its body Steps' *enableIf*, in the loop's own fields and in its body Steps', as [RFC 0011
-    §Validation](0011-control-flow.md#validation) item 10 says.
+11. An error that template validation can compute in a loop's own fields, or in a body Step's, is reported as [RFC 0011
+    §Validation](0011-control-flow.md#validation) item 10 says: for the loop's fields only if the loop is known to be
+    enabled, and for a body Step's only if the body Step is known to be enabled, which needs the loop's *enableIf* and
+    *while* too (RFC 0011 §`<Environment>` item 3). Parse, type, scope, and schema errors are reported whatever any
+    *enableIf*.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`
