@@ -2894,20 +2894,21 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    Environments its Sessions enter: the keys and values of an entry (constraints 5 and 6, where constraint 6 includes a
    value's type, such as the rule that a value for a list-typed parameter is a list literal or a single `{{ }}`
    expression), constraint 7, a disabled entry that names an Environment whose *activation* is `ALWAYS` as written, an
-   enabled `required: true` entry that resolves to no Environment, the combined host requirements of the Environments
-   the Step's Sessions would enter (see [3.3.3](#333-combined-host-requirements)), and the checks over a Step's whole
-   set of Environments, wherever `ENV_PARAMS` makes them before the Job is created, including for an external entry when
-   a validator is given the Environment Templates. The attached Environment named like a Job Environment of the
-   paragraph before is not excepted: a validator given the Environment Templates rejects it whatever any Step's
-   *enableIf*. Such a check is made then only for a Step known to be enabled: its *enableIf* is absent or known to be
-   `true` as [7.6](#76-expression-fields) rule 5 says, with `Steps.*`, `Loop.*`, and `RawLoop.*` values not yet known,
-   so with a BOOL Job Parameter `F`, `"true"` and `"Param.F or true"` are known to be `true`; and for a Step of a loop's
-   body, the loop's *enableIf* is too, and the loop has no *while* or one known to be `true`. Otherwise it is made in
-   the Step's Environment selection (or, for a check of `CONTROL_FLOW` rule 5, as that rule says), or never if the Step
-   is skipped. Being known to be enabled decides only which checks are made before the Job is created: a Step's
-   *enableIf* is still evaluated only once every value it reads is concrete, so its Environment selection may come
-   later. From the Job's creation on, the checks of Environment selection are made when it is made, even where one would
-   already hold, or all its fields would be known, at an earlier stage, except the work that stays at Job creation.
+   enabled `required: true` entry that resolves to no Environment, a Step's combined host requirements, its own together
+   with those of the Environments its Sessions would enter (see [3.3.3](#333-combined-host-requirements)), and the
+   checks over a Step's whole set of Environments, wherever `ENV_PARAMS` makes them before the Job is created, including
+   for an external entry when a validator is given the Environment Templates. The attached Environment named like a Job
+   Environment of the paragraph before is not excepted: a validator given the Environment Templates rejects it whatever
+   any Step's *enableIf*. Such a check is made then only for a Step known to be enabled: its *enableIf* is absent or
+   known to be `true` as [7.6](#76-expression-fields) rule 5 says, with `Steps.*`, `Loop.*`, and `RawLoop.*` values not
+   yet known, so with a BOOL Job Parameter `F`, `"true"` and `"Param.F or true"` are known to be `true`; and for a Step
+   of a loop's body, the loop's *enableIf* is too, and the loop has no *while* or one known to be `true`. Otherwise it
+   is made in the Step's Environment selection (or, for a check of `CONTROL_FLOW` rule 5, as that rule says), or never
+   if the Step is skipped. Being known to be enabled decides only which checks are made before the Job is created: a
+   Step's *enableIf* is still evaluated only once every value it reads is concrete, so its Environment selection may
+   come later. From the Job's creation on, the checks of Environment selection are made when it is made, even where one
+   would already hold, or all its fields would be known, at an earlier stage, except the work that stays at Job
+   creation.
 4. A Step's combined host requirements are completed when its *hostRequirements* are evaluated: its own requirements
    that resolve to nothing are discarded (when the Job Template lists `ENV_PARAMS`; otherwise each is an error, as
    without it), an *anyOf* or *allOf* of its own that resolves to no values is rejected, the rest are combined with the

@@ -21,12 +21,13 @@
     need only `EXPR`. The wiki text of this RFC refers to RFC 0010's wiki edits, so it is to be merged after them, and
     RFC 0010's How Jobs Are Run text, which says every Environment decision is made when the Job is created, is then to
     be qualified for `CONTROL_FLOW` as `<Environment>` items 3 to 5 and 7 say. That covers its statements that a
-    parameter a Step does not supply, a Step declining an `ALWAYS` Environment, an `ALWAYS` Environment's `enableIf`
-    being `false` for some Step, and contradictory combined host requirements reject the Job when it is created. With
-    `CONTROL_FLOW`, except the errors in an Environment's definition that `<Environment>` item 3 reports whatever any
-    Step's *enableIf*, they hold only for a Step that is enabled, are reported when its Environment selection is made
-    or, for its combined host requirements, when its host selection group is evaluated, and fail only that Step if that
-    is after Job creation. Checking the Job Template reports them only for a Step known to be enabled.
+    parameter a Step does not supply, an Environment `enableIf` that reads a value that cannot be worked out, a Step
+    declining an `ALWAYS` Environment, an `ALWAYS` Environment's `enableIf` being `false` for some Step, and
+    contradictory combined host requirements reject the Job when it is created. With `CONTROL_FLOW`, except the errors
+    in an Environment's definition that `<Environment>` item 3 reports whatever any Step's *enableIf*, they hold only
+    for a Step that is enabled, are reported when its Environment selection is made or, for its combined host
+    requirements, when its host selection group is evaluated, and fail only that Step if that is after Job creation.
+    Checking the Job Template reports them only for a Step known to be enabled.
 * Related:
   * Discussion #111, variable data flow along step dependencies, the seed idea for this RFC
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/111)
