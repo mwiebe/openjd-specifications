@@ -2840,11 +2840,12 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    attached Environment that are resolved when the Job is created are resolved and checked whether or not it is disabled
    for any Step (see [3.2.2](#322-effective-environment-parameter-values)). Before the Job is created,
    [7.6](#76-expression-fields) rule 5 decides which errors in them template validation reports, with the Step
-   Environment's *enableIf* and the Step's among the fields such a check depends on. The Step's *let* bindings are still
-   evaluated, so a binding that only a disabled Step Environment needs must allow for the missing value. A failure,
-   including a `null` result, fails the Step, or Job creation for a group evaluated then. The *enableIf* of a Job
-   Environment or an attached Environment, every Environment's *hostRequirements*, and Environment parameter `default`s
-   may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`.
+   Environment's *enableIf*, the Step's, and for a Step of a loop's body the loop's *enableIf* and *while*, among the
+   fields such a check depends on. The Step's *let* bindings are still evaluated, so a binding that only a disabled Step
+   Environment needs must allow for the missing value. A failure, including a `null` result, fails the Step, or Job
+   creation for a group evaluated then. The *enableIf* of a Job Environment or an attached Environment, every
+   Environment's *hostRequirements*, and Environment parameter `default`s may not reference `Steps.*`, `Loop.*`, or
+   `RawLoop.*`.
 2. An *environment* entry's *parameters* values and *enableIf* may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`,
    directly or through a *let* binding that does.
 3. What `ENV_PARAMS` does for one Step when the Job is created is the Step's *Environment selection*: evaluating its
@@ -2884,9 +2885,10 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    Environments its Sessions enter: the keys and values of an entry (constraints 5 and 6, where constraint 6 includes a
    value's type, such as the rule that a value for a list-typed parameter is a list literal or a single `{{ }}`
    expression), constraint 7, a disabled entry that names an Environment whose *activation* is `ALWAYS` as written, an
-   enabled `required: true` entry that resolves to no Environment, and the checks over a Step's whole set of
-   Environments, wherever `ENV_PARAMS` makes them before the Job is created, including for an external entry when a
-   validator is given the Environment Templates. Such a check is made then only for a Step known to be enabled: its
+   enabled `required: true` entry that resolves to no Environment, the combined host requirements of the Environments
+   the Step's Sessions would enter (see [3.3.3](#333-combined-host-requirements)), and the checks over a Step's whole
+   set of Environments, wherever `ENV_PARAMS` makes them before the Job is created, including for an external entry when
+   a validator is given the Environment Templates. Such a check is made then only for a Step known to be enabled: its
    *enableIf* is absent or known to be `true` as [7.6](#76-expression-fields) rule 5 says, with `Steps.*`, `Loop.*`, and
    `RawLoop.*` values not yet known, so with a BOOL Job Parameter `F`, `"true"` and `"Param.F or true"` are known to be
    `true`; and for a Step of a loop's body, the loop's *enableIf* is too, and the loop has no *while* or one known to be
