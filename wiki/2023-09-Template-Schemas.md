@@ -1102,8 +1102,10 @@ with the `ENV_PARAMS` extension the *enableIf* of its *stepEnvironments* and the
 decided first; after it is `true` (or if it is absent), each other group can be evaluated as soon as the `Steps.*`
 values it reads (directly or through the *let* bindings it uses) are concrete, and should be evaluated then. Every group
 whose values are concrete at Job creation is evaluated then, only in a Step whose *enableIf* is `true` or absent at Job
-creation. The groups are listed below. When more than one group can be evaluated at the same moment, they are evaluated
-in this order:
+creation. Before the Job is created, [7.6](#76-expression-fields) rule 5 decides which errors in them template
+validation reports, with the Step's *enableIf*, and for a Step of a loop's body the loop's *enableIf* and *while*, among
+the fields such a check depends on. The groups are listed below. When more than one group can be evaluated at the same
+moment, they are evaluated in this order:
 
 1. *enableIf*, which is decided before any other group is evaluated, followed, once it is `true` and with the
    `ENV_PARAMS` extension, by the Step's Environment selection (see [&lt;Environment&gt;](#4-environment));
@@ -2855,18 +2857,19 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    Environment whose *activation* is `ALWAYS` as written in its document (a disabled entry has no effect on an
    Environment from a document that does not list `ENV_PARAMS`); resolving the Step's parameter values for them, and
    checking constraint 7 for every one of them before any of their *enableIf* is evaluated; evaluating their *enableIf*
-   and applying `exclusiveGroup`, which decides which of them its Sessions enter; rejecting a `false` *enableIf* of an
-   `ALWAYS` Environment; for the Environments not disabled for the Step, checking the Step's effective values (see
-   [&lt;StepDependency&gt;](#32-stepdependency) constraint 6), including a non-literal `default` that the Step takes;
-   resolving those Environments' *hostRequirements* with the Step's values, discarding requirements that resolve to
-   nothing, rejecting an *anyOf* or *allOf* that resolves to no values, and checking each Environment's requirements as
-   one source; and combining the Environments' requirements with each other and checking the combination. The *enableIf*
-   of its Step Environments (`CONTROL_FLOW` rule 1), the Step's own host requirements (`CONTROL_FLOW` rule 4), and the
-   other checks over its whole set of Environments (`CONTROL_FLOW` rule 5) are not part of it. It is made once the
-   Step's own *enableIf* is `true`, before any other materialization group of the Step is evaluated: when the Job is
-   created for a Step outside a loop's body whose *enableIf* is absent or decided `true` then, when its *enableIf* is
-   decided `true` for any other such Step, and within its iteration for each instance of a Step of a loop's body, once
-   the instance's *enableIf* is `true` or at once if it has none (see [3.8.5](#385-running-a-loop)).
+   in the Job's Environment order and applying `exclusiveGroup`, which decides which of them its Sessions enter;
+   rejecting a `false` *enableIf* of an `ALWAYS` Environment; for the Environments not disabled for the Step, checking
+   the Step's effective values (see [&lt;StepDependency&gt;](#32-stepdependency) constraint 6), including a non-literal
+   `default` that the Step takes; resolving those Environments' *hostRequirements* with the Step's values, discarding
+   requirements that resolve to nothing, rejecting an *anyOf* or *allOf* that resolves to no values, and checking each
+   Environment's requirements as one source; and combining the Environments' requirements with each other and checking
+   the combination. The *enableIf* of its Step Environments (`CONTROL_FLOW` rule 1), the Step's own host requirements
+   (`CONTROL_FLOW` rule 4), and the other checks over its whole set of Environments (`CONTROL_FLOW` rule 5) are not part
+   of it. It is made once the Step's own *enableIf* is `true`, before any other materialization group of the Step is
+   evaluated: when the Job is created for a Step outside a loop's body whose *enableIf* is absent or decided `true`
+   then, when its *enableIf* is decided `true` for any other such Step, and within its iteration for each instance of a
+   Step of a loop's body, once the instance's *enableIf* is `true` or at once if it has none (see
+   [3.8.5](#385-running-a-loop)).
 
    The work that does not depend on which Steps enter an Environment stays at Job creation, whatever any Step's
    *enableIf*, and comes before any Step's Environment selection: attaching the Environment Templates and making
@@ -2912,8 +2915,9 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
 An error in the Step's Environment selection, its combined host requirements, or a check of `CONTROL_FLOW` rule 5
 fails the Step at once, or fails Job creation if it is found then.
 
-With `ENV_PARAMS`, `Job.EnvNames` may also be read by the fields that `CONTROL_FLOW` adds and that are resolved at Job
-creation or later: a Step's and a loop's *enableIf*, a loop's other expressions, and a Job output's *value*.
+When the Job Template lists `ENV_PARAMS`, `Job.EnvNames` may also be read by the fields that `CONTROL_FLOW` adds and
+that are resolved at Job creation or later: a Step's and a loop's *enableIf*, a loop's other expressions, and a Job
+output's *value*.
 
 The format string scopes available to format strings within an Environment are:
 
