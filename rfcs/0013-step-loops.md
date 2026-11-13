@@ -1328,11 +1328,14 @@ Every rule this RFC adds, and when it is checked, in the form of
    [`Steps.*` in and around a loop](#steps-in-and-around-a-loop) allows; no top-level Step or job output names a body
    Step; `Steps.<L>.*` of a loop `L` names a declared loop output and is not `TaskParam` or `TaskRawParam`.
 10. Every expression type-checks with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. The loop's
-    *enableIf*, *while*, and *until* are expression fields of type `bool`, each checked as a Step's *enableIf* is
-    ([RFC 0011 §Validation](0011-control-flow.md#validation) item 6; RFC 0010's Template Schemas §7.6 rules 1, 2, and
-    4): a value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type
-    that does not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each
-    loop output *value* has its output's type, or under `APPEND` its element type.
+    *enableIf*, *while*, and *until* are expression fields of type `bool`, each checked as a Step's *enableIf* is ([RFC
+    0011 §Validation](0011-control-flow.md#validation) item 6; RFC 0010's Template Schemas §7.6 rules 1, 2, and 4): a
+    value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type that does
+    not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each loop output
+    *value* has its output's type, or under `APPEND` its element type.
+11. An error in a value that template validation can compute is reported whatever the loop's *enableIf* and *while* and
+    whatever its body Steps' *enableIf*, in the loop's own fields and in its body Steps', as [RFC 0011
+    §Validation](0011-control-flow.md#validation) item 10 says.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`
