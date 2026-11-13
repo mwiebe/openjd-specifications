@@ -1,0 +1,19 @@
+# RFC 0011 §Validation item 6 and RFC 0010's Template Schemas §7.6 rule 2: an expression
+# whose static type is nulltype is an error unless the target type admits it, and bool
+# does not. 3--enableif-from-param is the valid form.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: A
+  enableIf: 'null'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('ok')

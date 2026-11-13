@@ -1,6 +1,7 @@
 # RFC 0013 §Validation item 10: a loop's enableIf is checked as a Step's, so its static
 # type is bool or bool?, with no implicit conversion (RFC 0010's Template Schemas §7.6
 # rule 2). A STRING parameter is an error whatever its value, here the text 'true'.
+# 3--enableif-string-compared shows the comparison form for a Step.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

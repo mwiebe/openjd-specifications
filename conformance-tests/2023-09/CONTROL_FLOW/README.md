@@ -5,12 +5,12 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 435 tests: 4 in `env_templates`, 215 in `job_templates`, and 216 in
+> **Status.** There are 436 tests: 4 in `env_templates`, 216 in `job_templates`, and 216 in
 > `jobs`. A Step's and a loop's `enableIf`, and a loop's `while` and `until`, are written as
 > expression fields (RFC 0010's Template Schemas §7.6), without `{{ }}`. The openjd-rs
 > prototype (branch `control-flow-prototype`), the only implementation that has run these
-> tests, still reads those fields as format strings. At commit `116bb23` it passes 358 of
-> the 435 on Linux. Every test it fails either writes one of those fields as an expression
+> tests, still reads those fields as format strings. At commit `116bb23` it passes 359 of
+> the 436 on Linux. Every test it fails either writes one of those fields as an expression
 > or checks that a value written with `{{ }}` or a `null` value is rejected. Before this
 > change, all 418 tests then present passed at the same commit. The tests were written from
 > the RFC text. If a test and the RFC disagree, the RFC wins: fix the test, or raise the
@@ -110,15 +110,15 @@ and its section.
   (`2.17--job-output-taskparam-before-bound-*`).
 - **`enableIf`** (`job_templates/3--*`, `jobs/3--*`): a Step's `enableIf` is an expression
   field of type `bool` (RFC 0010's Template Schemas §7.6): a YAML bool literal is used as
-  written, and a value written with `{{ }}`, a `null` value, an integer literal, and an
-  expression whose type is not `bool` or `bool?` (an `int` or a `STRING`, with a valid
-  companion that compares the `STRING`) are rejected; allowed and forbidden symbols, static
-  and dynamic decisions, `null` outputs of a skipped Step (`== null`, `or`), skipped Steps
-  don't evaluate their `let`, a `null` `enableIf` result is an error (here at Job creation),
-  while an `enableIf` of type `bool?` is accepted, and a skipped Step whose own dependency
-  failed never satisfies `dependsOn` (failure is not skipping). The Environment `enableIf`
-  tests (`job_templates/4--*`, `jobs/4--*`) are not yet in the form the RFCs require; see
-  *Not covered*.
+  written, and a value written with `{{ }}`, a `null` value, an integer literal, the
+  expression `null`, and an expression whose type is not `bool` or `bool?` (an `int` or a
+  `STRING`, with a valid companion that compares the `STRING`) are rejected; allowed and
+  forbidden symbols, static and dynamic decisions, `null` outputs of a skipped Step (`==
+  null`, `or`), skipped Steps don't evaluate their `let`, a `null` `enableIf` result is an
+  error (here at Job creation), while an `enableIf` of type `bool?` is accepted, and a
+  skipped Step whose own dependency failed never satisfies `dependsOn` (failure is not
+  skipping). The Environment `enableIf` tests (`job_templates/4--*`, `jobs/4--*`) are not
+  yet in the form the RFCs require; see *Not covered*.
 - **Job outputs** (`*2.17--*`): count and name rules, separate namespace from parameters,
   `LIST[LIST[INT]]`, any Step readable without a dependency, path rules (`RawParam`,
   `RawOutput`, and `TaskRawParam` allowed; `Param` of `PATH` and `LIST[PATH]` parameters

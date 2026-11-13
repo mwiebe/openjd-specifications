@@ -1,7 +1,7 @@
 # RFC 0013 §<LoopDefinition> item 2 / §Validation item 10: while is an expression field
 # of type bool (RFC 0010's Template Schemas §7.6 rule 1), written without {{ }}. A value
 # written as a format string is a parse error, even though the expression inside it is a
-# bool.
+# bool. 3.8.1--while is the valid form.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
