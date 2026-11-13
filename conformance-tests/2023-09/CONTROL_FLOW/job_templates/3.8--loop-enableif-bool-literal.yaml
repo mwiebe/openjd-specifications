@@ -1,5 +1,5 @@
 # RFC 0013 §<StepLoop> item 3: a loop's enableIf is the same expression field as a Step's,
-# so a YAML bool literal is used as written (RFC 0010's Template Schemas §7.6 item 1).
+# so a YAML bool literal is accepted (RFC 0010's Template Schemas §7.6 item 1).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

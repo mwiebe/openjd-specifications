@@ -1,6 +1,7 @@
 # RFC 0011 §Validation item 6: a Step's enableIf is an expression field of type bool
 # (RFC 0010's Template Schemas §7.6 rule 1), written without {{ }}. A value written as a
 # format string is a parse error, even though the expression inside it is a bool.
+# 3--enableif-from-param is the valid form.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
