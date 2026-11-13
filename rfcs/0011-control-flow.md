@@ -1457,8 +1457,8 @@ Template lists `ENV_PARAMS` (its Template Schemas §7.4.1), and RFC 0010's rules
       concrete (step 1); resolving every entry that names no Job Environment against the attached Environments, enabled
       or disabled (step 3), and rejecting a name that matches two of them; rejecting an `ALWAYS` Environment whose
       *enableIf* is known to be `false` by RFC 0010's Template Schemas §7.6 rule 5 with the values of template
-      validation, where template validation did not report it because it was not given that Environment; and rejecting
-      an attached `ALWAYS` or `BY_DEFAULT` Environment that has the name of a Job Environment and a parameter without a
+      validation, which template validation already reports where it is given that Environment; and rejecting an
+      attached `ALWAYS` or `BY_DEFAULT` Environment that has the name of a Job Environment and a parameter without a
       `default`, which RFC 0010 says always rejects the submission (its Template Schemas §3.2.1 item 4). RFC 0010
       evaluates an entry's *enableIf* before resolving its name; resolving every entry first, as here, gives the same
       result, because disabled entries are resolved too and a disabled entry that matches nothing has no effect.
@@ -1508,9 +1508,10 @@ Template lists `ENV_PARAMS` (its Template Schemas §7.4.1), and RFC 0010's rules
       of them would already hold at an earlier stage. Rule 5's statements that a check whose fields are all known at an
       earlier stage is made at that stage, and that an error should be reported at the earliest stage at which it holds,
       apply to them only before Job creation. So does RFC 0010's Template Schemas §4 item 4 for the `ALWAYS` errors:
-      they are reported at template validation where the "Before Job creation" bullet makes them, and otherwise when the
-      Step's Environment selection is made, which is at Job creation only for a Step whose *enableIf* is absent or
-      decided `true` then. The checks of item 6 are made as item 6 says.
+      they are reported at template validation where the "Before Job creation" bullet makes them, at Job creation where
+      the "What stays at Job creation" bullet makes them, and otherwise when the Step's Environment selection is made,
+      which is at Job creation only for a Step outside a loop's body whose *enableIf* is absent or decided `true` then.
+      The checks of item 6 are made as item 6 says.
 4. **Step Environments.** The *enableIf* of a Step Environment is evaluated in the Step's remaining group (see
    [Materialization groups](#materialization-groups)), before that Environment's TEMPLATE-scope format strings, rather
    than in the Step's Environment selection. Those format strings are the fields of its *script* that are resolved
@@ -1552,9 +1553,9 @@ Template lists `ENV_PARAMS` (its Template Schemas §7.4.1), and RFC 0010's rules
    body Step of a loop, nothing beyond item 3's Job-level work is done at Job creation, so the check is made for each
    instance, at the earliest when its Environment selection is made. Its outcome is determined when it holds, or fails,
    whatever every *enableIf* whose value is not yet known resolves to, the Step's own included, so a violation is never
-   determined before the Step's own *enableIf* is known or decided to be `true`. An *enableIf* not yet evaluated is
-   known when RFC 0010's Template Schemas §7.6 rule 5 says, with each value not yet concrete taken as `unresolved`, so a
-   literal `true` or `false` is known, and so is an expression such as `"Steps.A.Output.Ok or true"`. Before Job
+   determined before the Step's own *enableIf* is decided `true`. An *enableIf* not yet evaluated is known when RFC
+   0010's Template Schemas §7.6 rule 5 says, with each value not yet concrete taken as `unresolved`, so a literal `true`
+   or `false` is known, and so is a Step Environment's *enableIf* such as `"Steps.A.Output.Ok or true"`. Before Job
    creation, item 3 applies. A violation fails the Step at once, or fails Job creation if it is found then.
 7. **Sessions.** RFC 0010's rule that a Session runs a Step's Tasks only if it entered exactly that Step's Environments,
    each with values *equal* to that Step's effective values as RFC 0010's Template Schemas §3.2.2 defines equality, is
@@ -2136,8 +2137,9 @@ checks (its Template Schemas §3.3.3) once its host selection group is evaluated
 Environments, such as the `WRAP_ACTIONS` single-layer rule, holds, checked as soon as its outcome is determined
 ([`<Environment>`](#environment) item 6); ranges are valid (a range string may not be empty; a list may be); the Task
 count is within the scheduler's per-Step and per-Job Task limits; and with `TASK_DEPENDENCIES`, the Task graph is
-acyclic and its indices are in range. The first failure fails the Step at once. In a Step whose *enableIf* is `true` or
-absent at Job creation, a group whose inputs are concrete then is checked then, and a failure fails Job creation.
+acyclic and its indices are in range. The first failure fails the Step at once. In a Step outside a loop's body whose
+*enableIf* is `true` or absent at Job creation, a group whose inputs are concrete then is checked then, and a failure
+fails Job creation.
 
 **At job output evaluation** (by the scheduler, as each job output's inputs become concrete): the *value* evaluates,
 converts to the declared type and satisfies its constraint properties, and the total of the Job's output values stays

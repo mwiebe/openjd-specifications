@@ -2877,12 +2877,13 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    *enableIf*, and comes before any Step's Environment selection: attaching the Environment Templates and making
    `Job.EnvNames` concrete, before any Step's *enableIf* is evaluated, resolving every *environment* entry that names no
    Job Environment against them and rejecting a name that matches two of them, rejecting an `ALWAYS` Environment whose
-   *enableIf* is known to be `false` with the values of template validation where template validation was not given it,
-   and rejecting an attached `ALWAYS` or `BY_DEFAULT` Environment with the name of a Job Environment and a parameter
-   without a `default`. A skipped Step has no Environment selection, so no Environment is entered, no entry or
-   Environment *enableIf* is evaluated, and none of the checks of Environment selection or of `CONTROL_FLOW` rule 5 is
-   made for it, except that an `ALWAYS` Environment whose *enableIf* is known to be `false` before the Job is created is
-   an error then, and the attached Environment just described is rejected, whatever any Step's *enableIf*.
+   *enableIf* is known to be `false` with the values of template validation, which template validation already reports
+   where it is given that Environment, and rejecting an attached `ALWAYS` or `BY_DEFAULT` Environment with the name of a
+   Job Environment and a parameter without a `default`. A skipped Step has no Environment selection, so no Environment
+   is entered, no entry or Environment *enableIf* is evaluated, and none of the checks of Environment selection or of
+   `CONTROL_FLOW` rule 5 is made for it, except that an `ALWAYS` Environment whose *enableIf* is known to be `false`
+   before the Job is created is an error then or when the Job is created, as just described, and the attached
+   Environment just described is rejected, whatever any Step's *enableIf*.
 
    Every check that `ENV_PARAMS` makes before the Job is created is made whatever any Step's *enableIf*, including an
    `ALWAYS` Environment whose *enableIf* is known to be `false`, and the checks of an entry's form
@@ -2904,7 +2905,7 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    is skipped. Being known to be enabled decides only which checks are made before the Job is created: a Step's
    *enableIf* is still evaluated only once every value it reads is concrete, so its Environment selection may come
    later. From the Job's creation on, the checks of Environment selection are made when it is made, even where one would
-   already hold, or all its fields would be known, at an earlier stage.
+   already hold, or all its fields would be known, at an earlier stage, except the work that stays at Job creation.
 4. A Step's combined host requirements are completed when its *hostRequirements* are evaluated: its own requirements
    that resolve to nothing are discarded (when the Job Template lists `ENV_PARAMS`; otherwise each is an error, as
    without it), an *anyOf* or *allOf* of its own that resolves to no values is rejected, the rest are combined with the
