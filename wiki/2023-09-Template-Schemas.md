@@ -1102,10 +1102,12 @@ with the `ENV_PARAMS` extension the *enableIf* of its *stepEnvironments* and the
 decided first; after it is `true` (or if it is absent), each other group can be evaluated as soon as the `Steps.*`
 values it reads (directly or through the *let* bindings it uses) are concrete, and should be evaluated then. Every group
 whose values are concrete at Job creation is evaluated then, only in a Step whose *enableIf* is `true` or absent at Job
-creation. Before the Job is created, [7.6](#76-expression-fields) rule 5 decides which errors in them template
-validation reports, with the Step's *enableIf*, and for a Step of a loop's body the loop's *enableIf* and *while*, among
-the fields such a check depends on. The groups are listed below. When more than one group can be evaluated at the same
-moment, they are evaluated in this order:
+creation. Before the Job is created, [7.6](#76-expression-fields) rule 5 decides which errors in them, other than the
+fields of its Environment selection (see `CONTROL_FLOW` rule 3 of [4](#4-environment)), template validation reports,
+with the Step's *enableIf*, and for a Step of a loop's body the loop's *enableIf* and *while*, among the fields such a
+check depends on, and for a Step Environment's format strings also that Environment's *enableIf* (`CONTROL_FLOW` rule 1
+of [4](#4-environment)). The groups are listed below. When more than one group can be evaluated at the same moment, they
+are evaluated in this order:
 
 1. *enableIf*, which is decided before any other group is evaluated, followed, once it is `true` and with the
    `ENV_PARAMS` extension, by the Step's Environment selection (see [&lt;Environment&gt;](#4-environment));
@@ -2891,15 +2893,17 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    enabled `required: true` entry that resolves to no Environment, the combined host requirements of the Environments
    the Step's Sessions would enter (see [3.3.3](#333-combined-host-requirements)), and the checks over a Step's whole
    set of Environments, wherever `ENV_PARAMS` makes them before the Job is created, including for an external entry when
-   a validator is given the Environment Templates. Such a check is made then only for a Step known to be enabled: its
-   *enableIf* is absent or known to be `true` as [7.6](#76-expression-fields) rule 5 says, with `Steps.*`, `Loop.*`, and
-   `RawLoop.*` values not yet known, so with a BOOL Job Parameter `F`, `"true"` and `"Param.F or true"` are known to be
-   `true`; and for a Step of a loop's body, the loop's *enableIf* is too, and the loop has no *while* or one known to be
-   `true`. Otherwise it is made in the Step's Environment selection (or, for a check of `CONTROL_FLOW` rule 5, as that
-   rule says), or never if the Step is skipped. Being known to be enabled decides only which checks are made before the
-   Job is created: a Step's *enableIf* is still evaluated only once every value it reads is concrete, so its Environment
-   selection may come later. From the Job's creation on, the checks of Environment selection are made when it is made,
-   even where one would already hold, or all its fields would be known, at an earlier stage.
+   a validator is given the Environment Templates. The attached Environment named like a Job Environment of the
+   paragraph before is not excepted: a validator given the Environment Templates rejects it whatever any Step's
+   *enableIf*. Such a check is made then only for a Step known to be enabled: its *enableIf* is absent or known to be
+   `true` as [7.6](#76-expression-fields) rule 5 says, with `Steps.*`, `Loop.*`, and `RawLoop.*` values not yet known,
+   so with a BOOL Job Parameter `F`, `"true"` and `"Param.F or true"` are known to be `true`; and for a Step of a loop's
+   body, the loop's *enableIf* is too, and the loop has no *while* or one known to be `true`. Otherwise it is made in
+   the Step's Environment selection (or, for a check of `CONTROL_FLOW` rule 5, as that rule says), or never if the Step
+   is skipped. Being known to be enabled decides only which checks are made before the Job is created: a Step's
+   *enableIf* is still evaluated only once every value it reads is concrete, so its Environment selection may come
+   later. From the Job's creation on, the checks of Environment selection are made when it is made, even where one would
+   already hold, or all its fields would be known, at an earlier stage.
 4. A Step's combined host requirements are completed when its *hostRequirements* are evaluated: its own requirements
    that resolve to nothing are discarded (when the Job Template lists `ENV_PARAMS`; otherwise each is an error, as
    without it), an *anyOf* or *allOf* of its own that resolves to no values is rejected, the rest are combined with the

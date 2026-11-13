@@ -1333,6 +1333,10 @@ Every rule this RFC adds, and when it is checked, in the form of
     4): a value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type
     that does not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each
     loop output *value* has its output's type, or under `APPEND` its element type.
+11. Which errors in a body Step's materialization expressions template validation reports is decided as [RFC 0011
+    §Validation](0011-control-flow.md#validation) item 10 says, with the loop's *enableIf* and *while* among the
+    fields the check depends on. Which of the loop's own fields each condition guards is [RFC 0011 Open Question
+    16](0011-control-flow.md#open-questions).
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`

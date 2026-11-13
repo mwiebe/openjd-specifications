@@ -251,8 +251,9 @@ and its section.
   0010's Template Schemas §7.6 rule 5, such as `true`, `"true"` or, with a BOOL Job
   Parameter `F`, `"Param.F or true"`, and for a body Step also a loop whose `enableIf` is
   absent or known to be `true` and that has no `while` or one known to be `true`. It decides
-  when `ENV_PARAMS`'s checks that depend on whether a Step runs are made, so no submission
-  in which no document lists `ENV_PARAMS` can show it, and these tests use none.
+  when `ENV_PARAMS`'s checks that depend on whether a Step runs are made, which no
+  submission without `ENV_PARAMS` can show, and, by RFC 0011 §Validation item 10, which
+  errors in values template validation reports (the next item).
 - Whether template validation reports an error in a value it can compute, such as, with
   `FEATURE_BUNDLE_1`, a `timeout` of `"{{1 - 1}}"`, in a Step that is not known to be
   enabled. RFC 0011 Open Question 16 asks; no test depends on the answer yet.

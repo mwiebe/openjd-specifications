@@ -1209,7 +1209,7 @@ Template whose `extensions` list includes `CONTROL_FLOW`.
 | **Host requirements known** | A fact about a Step that is not `SKIPPED`: its *enableIf* is `true` and its host selection group has evaluated (with `ENV_PARAMS`, its combined host requirements are then known). It does not apply to a `SKIPPED` Step, which runs nothing. |
 | **Bound** | A Step is bound when its *enableIf* is `true` and every one of its materialization groups has evaluated successfully. Only a bound Step's Tasks may be dispatched. |
 | **Conditional Step** | A Step that has an `enableIf`, even the literal `true`. |
-| **Known to be enabled** | Before Job creation, a Step whose *enableIf* is absent or known to be `true` by RFC 0010's Template Schemas §7.6 rule 5, and for a body Step of a loop, one whose loop's *enableIf* is also absent or known to be `true` and that has no *while* or one known to be `true`. See [`<Environment>`](#environment) item 3. |
+| **Known to be enabled** | Before Job creation, a Step whose *enableIf* is absent or known to be `true` by RFC 0010's Template Schemas §7.6 rule 5, and for a body Step of a loop, one whose loop's *enableIf* is also absent or known to be `true`, and whose loop has no *while* or one known to be `true`. See [`<Environment>`](#environment) item 3. |
 | **Environment selection** | With `ENV_PARAMS`, the work that RFC 0010 does for one Step at Job creation, less the parts [`<Environment>`](#environment) item 3 places elsewhere: deciding which of the Job's Environments and attached Environments its Sessions enter, with which Environment parameter values, and checking them. Part of the Step's enablement group. See [`<Environment>`](#environment) item 3. |
 | **Job output** | A typed value declared in the Job Template's `jobOutputDefinitions`, computed from job parameters and `Steps.*`, and reported to the Job's callers. |
 | **`PENDING_INPUTS`** | The state of a Step that is not yet bound and is neither `SKIPPED` nor `FAILED`: its *enableIf* is undecided, or at least one of its materialization groups has not been evaluated yet, usually because an input is not concrete. Its Tasks, and separately its host requirements, may already be known. |
@@ -2117,11 +2117,12 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
     [`<JobOutputDefinition>`](#joboutputdefinition) allows; in particular, it may read the `Steps.*` symbols of any Step
     except a loop's body Step (see
     [RFC 0013 §`Steps.*` in and around a loop](0013-step-loops.md#steps-in-and-around-a-loop)), and reads values whose
-        type is or contains `path` only through `RawOutput` and `TaskRawParam`.
-10. RFC 0010's Template Schemas §7.6 rule 5 decides which errors in a Step's materialization expressions template
-    validation reports, with the Step's *enableIf*, and for a body Step the loop's *enableIf* and *while*, among the
-    fields that such a check depends on, and for a Step Environment's fields also as [`<Environment>`](#environment)
-    item 4 says (see Open Question 16).
+    type is or contains `path` only through `RawOutput` and `TaskRawParam`.
+10. Which errors in a Step's materialization expressions template validation reports is decided by RFC 0010's
+    Template Schemas §7.6 rule 5, with the Step's *enableIf*, and for a body Step the loop's *enableIf* and *while*,
+    among the fields such a check depends on (see Open Question 16). For a Step Environment's fields, that
+    Environment's *enableIf* is one too ([`<Environment>`](#environment) item 4). The fields of the Step's Environment
+    selection are checked before Job creation as [`<Environment>`](#environment) item 3 says.
 
 **At step input binding** (by the scheduler, group by group as each group's inputs become concrete, and before any Task
 of the Step runs): *enableIf* evaluates to `true` or `false`, not `null`; then, once it is `true`, the Step's

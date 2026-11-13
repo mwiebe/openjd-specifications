@@ -225,7 +225,7 @@ should evaluate it then, and must have evaluated every group before it schedules
    definition, such as an `ALWAYS` Environment whose `enableIf` is known to be `false`, which is reported whatever any
    Step's `enableIf`. So checking the Job Template reports them only for a Step known to be enabled: one whose
    `enableIf` is absent or known to be `true` from the template alone, and, in a loop's body, whose loop's `enableIf` is
-   too and that has no `while` or one known to be `true`.
+   too and whose loop has no `while` or one known to be `true`.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
