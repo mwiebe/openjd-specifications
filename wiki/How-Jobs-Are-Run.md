@@ -221,7 +221,9 @@ should evaluate it then, and must have evaluated every group before it schedules
    enabled then, otherwise when it is enabled, and for a Step in a loop's body, in each iteration. Whether each of its
    Step Environments is entered is decided later, with its other fields. An error in that choice, which would reject the
    Job if found when the Job is created, fails only that Step when found later (and for a Step in a loop's body, so the
-   loop). A skipped Step enters none.
+   loop). A skipped Step enters none, and is held to none of those checks, so checking the Job Template reports them
+   only for a Step known to be enabled: one whose `enableIf` is absent or known to be `true` from the template alone,
+   and, in a loop's body, whose loop is known to run at least once.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
@@ -230,8 +232,8 @@ should evaluate it then, and must have evaluated every group before it schedules
    * with a future task-task dependencies extension (`TASK_DEPENDENCIES`), the dependencies between its Tasks are
      evaluated and checked, once its Tasks, and the Tasks of the Steps those dependencies name, are known and the
      values they read are available;
-   * the rest of its fields, such as its Step Environments (with `ENV_PARAMS`, including whether each is entered)
-     and action timeouts, are evaluated.
+   * the rest of its fields, such as its Step Environments (with `ENV_PARAMS`, including whether each is entered, and
+     the action timeouts of each one that is) and its own action timeouts, are evaluated.
 
    A `let` binding of the Step is evaluated with the first group that uses it, and every one is evaluated before
    the Step is bound.

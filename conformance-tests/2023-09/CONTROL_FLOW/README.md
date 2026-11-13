@@ -246,16 +246,17 @@ and its section.
   as an implementation that read it as an omitted field, which rejects a loop with neither
   `while` nor `until`, and beside the other of the two it also breaks the rule that a loop
   has exactly one of them. The `null` value tests are for `enableIf`, which may be omitted.
-- Which Steps are *known to be enabled* before Job creation (RFC 0011 §`<Environment>` item
-  3): a Step whose `enableIf` is absent or known to be `true` by RFC 0010's Template Schemas
-  §7.6 rule 5, such as `true`, `"true"` or `"Param.F or true"`, and for a body Step also a
-  loop whose `enableIf` is absent or known to be `true` and that has no `while` or one known
-  to be `true`. The rule decides only when `ENV_PARAMS`'s checks that depend on whether a
-  Step runs are made, so no submission in which no document lists `ENV_PARAMS` can show it,
-  and these tests use none.
+- Which Steps are *known to be enabled* before Job creation (RFC 0011 §Terminology and
+  §`<Environment>` item 3): a Step whose `enableIf` is absent or known to be `true` by RFC
+  0010's Template Schemas §7.6 rule 5, such as `true`, `"true"` or, with a BOOL Job
+  Parameter `F`, `"Param.F or true"`, and for a body Step also a loop whose `enableIf` is
+  absent or known to be `true` and that has no `while` or one known to be `true`. It decides
+  when `ENV_PARAMS`'s checks that depend on whether a Step runs are made, so no submission
+  in which no document lists `ENV_PARAMS` can show it, and these tests use none.
 - That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
-  (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's are resolved and
-  checked (RFC 0010's Template Schemas §3.2.2). Both need `ENV_PARAMS`.
+  (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
+  Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph
+  after item 6). Both need `ENV_PARAMS`.
 - Re-runs and retries, including the recovery of a loop, which is `FAILED` until every
   failed body Step instance of the iteration in progress has succeeded after a retry or
   requeue of its Tasks and then returns to `RUNNING`, and the rule that no recovery
