@@ -1,0 +1,40 @@
+# RFC 0011 §<StepTemplate> enableIf: an expression field of type bool, where an expression
+# of type bool? is accepted (RFC 0010's Template Schemas §7.6 rule 2). Q has an enableIf,
+# so Steps.Q.Output.Go is typed bool? (RFC 0011 §The Steps.* scope), and P's enableIf,
+# which reads it, is accepted and true, so P runs. The valid companion of
+# 3--enableif-null-fails.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    enableIf: true
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=true')
+  - name: P
+    enableIf: 'Steps.Q.Output.Go'
+    dependencies:
+    - dependsOn: Q
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN')
+expected:
+  output:
+  - P_RAN

@@ -5,12 +5,12 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 434 tests: 4 in `env_templates`, 215 in `job_templates`, and 215 in
+> **Status.** There are 435 tests: 4 in `env_templates`, 215 in `job_templates`, and 216 in
 > `jobs`. A Step's and a loop's `enableIf`, and a loop's `while` and `until`, are written as
 > expression fields (RFC 0010's Template Schemas §7.6), without `{{ }}`. The openjd-rs
 > prototype (branch `control-flow-prototype`), the only implementation that has run these
 > tests, still reads those fields as format strings. At commit `116bb23` it passes 358 of
-> the 434 on Linux. Every test it fails either writes one of those fields as an expression
+> the 435 on Linux. Every test it fails either writes one of those fields as an expression
 > or checks that a value written with `{{ }}` or a `null` value is rejected. Before this
 > change, all 418 tests then present passed at the same commit. The tests were written from
 > the RFC text. If a test and the RFC disagree, the RFC wins: fix the test, or raise the
@@ -114,10 +114,11 @@ and its section.
   expression whose type is not `bool` or `bool?` (an `int` or a `STRING`, with a valid
   companion that compares the `STRING`) are rejected; allowed and forbidden symbols, static
   and dynamic decisions, `null` outputs of a skipped Step (`== null`, `or`), skipped Steps
-  don't evaluate their `let`, a `null` `enableIf` result fails the Step, and a skipped Step
-  whose own dependency failed never satisfies `dependsOn` (failure is not skipping). The
-  Environment `enableIf` tests (`job_templates/4--*`, `jobs/4--*`) are not yet in the form
-  the RFCs require; see *Not covered*.
+  don't evaluate their `let`, a `null` `enableIf` result is an error (here at Job creation),
+  while an `enableIf` of type `bool?` is accepted, and a skipped Step whose own dependency
+  failed never satisfies `dependsOn` (failure is not skipping). The Environment `enableIf`
+  tests (`job_templates/4--*`, `jobs/4--*`) are not yet in the form the RFCs require; see
+  *Not covered*.
 - **Job outputs** (`*2.17--*`): count and name rules, separate namespace from parameters,
   `LIST[LIST[INT]]`, any Step readable without a dependency, path rules (`RawParam`,
   `RawOutput`, and `TaskRawParam` allowed; `Param` of `PATH` and `LIST[PATH]` parameters
@@ -130,18 +131,18 @@ and its section.
   Step); top-level Steps depend only on top-level Steps; a loop's `enableIf`, `while`, and
   `until` are expression fields of type `bool`, so a value written with `{{ }}` is rejected,
   as are a `while` or `until` of type `int` or `STRING` (with a valid companion that
-  compares the `STRING`), a loop `enableIf` of type `STRING`, and a `null` loop `enableIf`,
-  and a YAML bool literal in any of them is used as written; exactly one of `while` and
-  `until`; `maxIterations` required, 1 to 1,000, from `Param.*` but not from `Steps.*` or
-  `Loop.*`; no nested loops; a non-empty, acyclic body whose dependencies stay inside it;
-  `while` can't read body Steps; 1 to 32 variables, unique, not named `Iteration`, with no
-  `unit`, `initial` without `Loop.*` and only from the loop's dependencies, `next` with the
-  variable's type; constraint properties valid for the type (all 12 types; none on `BOOL`,
-  none from another type, `minValue` not above `maxValue`); `PATH` variables through
-  `RawLoop.*` in TEMPLATE scope; 1 to 32 loop outputs, which need `value` and `collect`
-  (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a list, its value of the element type),
-  with unique names, `LAST` scalar and `APPEND` list types, the `unit` rules, and constraint
-  properties valid for the type.
+  compares a `STRING` in `while`), a loop `enableIf` of type `STRING`, and a `null` loop
+  `enableIf`, and a YAML bool literal in any of them is used as written; exactly one of
+  `while` and `until`; `maxIterations` required, 1 to 1,000, from `Param.*` but not from
+  `Steps.*` or `Loop.*`; no nested loops; a non-empty, acyclic body whose dependencies stay
+  inside it; `while` can't read body Steps; 1 to 32 variables, unique, not named
+  `Iteration`, with no `unit`, `initial` without `Loop.*` and only from the loop's
+  dependencies, `next` with the variable's type; constraint properties valid for the type
+  (all 12 types; none on `BOOL`, none from another type, `minValue` not above `maxValue`);
+  `PATH` variables through `RawLoop.*` in TEMPLATE scope; 1 to 32 loop outputs, which need
+  `value` and `collect` (`LAST` or `APPEND`, not `ONCE`, `APPEND` only for a list, its value
+  of the element type), with unique names, `LAST` scalar and `APPEND` list types, the `unit`
+  rules, and constraint properties valid for the type.
 - **Loop scopes** (`job_templates/3.8.4--*`): a body Step reads the loop's dependencies, but
   not other outside Steps nor body Steps it doesn't depend on; `until`/`next`/`value` read
   any body Step; outside Steps and job outputs read loop outputs, never body Steps, and
@@ -240,6 +241,10 @@ and its section.
   `env_templates/4--enableif-in-environment-template` and
   `jobs/4--enableif-in-environment-template-with-control-flow-job` cite an RFC 0011 rule
   that RFC 0010 has replaced. They are to be rewritten with `ENV_PARAMS`.
+- A `null` value for `while` or `until`. It is an error, but an implementation that read it
+  as an omitted field would reject the template too, for having neither `while` nor `until`,
+  so a test could not tell the two apart; the `null` value tests are for `enableIf`, which
+  may be omitted.
 - Which Steps are *known to be enabled* before Job creation (RFC 0011 §`<Environment>` item
   3): a Step whose `enableIf` is absent or the literal `true`, and for a body Step also a
   loop whose `enableIf` is absent or the literal `true` and that has no `while`, but not a
