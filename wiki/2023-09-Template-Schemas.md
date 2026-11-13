@@ -1053,10 +1053,7 @@ Where:
        In a Step of a loop's body it is evaluated for each instance, within the instance's iteration (see
        [3.8.5](#385-running-a-loop)). Either way it is decided before the Step's *let* and every other materialization
        expression of the Step is evaluated, and if it is `false` none of them is: the Step's parameter space is the
-       empty set (its `Steps.*` values are `null`, not `[]`). Template validation reports an error in a value of the
-       Step's fields that it can compute (see [7.6](#76-expression-fields) rule 5) only for a Step known to be enabled
-       (see [4](#4-environment) `CONTROL_FLOW` rule 3), since a skipped Step's fields are not evaluated; parse, type,
-       scope, and schema errors are reported whatever the *enableIf*.
+       empty set (its `Steps.*` values are `null`, not `[]`).
 4. *let* — An ordered list of expression bindings evaluated once per step. Bound names are available in
    *stepEnvironments*, *hostRequirements*, *parameterSpace*, and *script* fields, and with the `ENV_PARAMS` extension in
    the *parameters* values and *enableIf* of *dependencies* entries. See: [&lt;LetBindings&gt;](#36-letbindings).
@@ -2452,12 +2449,10 @@ Where:
 1. *name* — The loop's name. It must differ from the names of all other Steps of the Job Template, including the
    Steps in every loop's body. See: [&lt;StepName&gt;](#31-stepname).
 2. *description* — As on [&lt;StepTemplate&gt;](#3-steptemplate).
-3. *enableIf* — Whether the loop runs. The same field as a `<StepTemplate>`'s *enableIf*, an [expression
-   field](#76-expression-fields) of type `bool`, with the same meaning and constraints. If it is `false`, the loop is
-   skipped: no iteration runs, none of its other fields is evaluated, and its `Steps.<name>.*` values are `null`. As for
-   a Step, template validation reports an error in a value that it can compute in the loop's fields only if the loop's
-   *enableIf* is absent or known to be `true`, and in a Step of its body only if that Step is known to be enabled (see
-   [4](#4-environment) `CONTROL_FLOW` rule 3).
+3. *enableIf* — Whether the loop runs. The same field as a `<StepTemplate>`'s *enableIf*, an
+   [expression field](#76-expression-fields) of type `bool`, with the same meaning and constraints. If it is
+   `false`, the loop is skipped: no iteration runs, none of its other fields is evaluated, and its `Steps.<name>.*`
+   values are `null`.
 4. *dependencies* — The elements of the Job Template's *steps* that the loop depends on. Its first iteration starts
    only when every one is satisfied, and these are the Steps whose `Steps.*` values the loop's expressions and the
    Steps of its body may read. See: [&lt;StepDependency&gt;](#32-stepdependency).
@@ -2843,13 +2838,13 @@ attached Environment Template lists `ENV_PARAMS` (see [7.4.1](#741-job-creation-
    Sessions run, which with the `FEATURE_BUNDLE_1` extension are its Actions' *timeout* and *cancelation*. If it is
    `false`, they are not evaluated. That holds only for a Step Environment: the fields of a Job Environment or an
    attached Environment that are resolved when the Job is created are resolved and checked whether or not it is disabled
-   for any Step (see [3.2.2](#322-effective-environment-parameter-values)). Before the Job is created, template
-   validation reports an error in a value of these fields that it can compute only for a Step Environment whose
-   *enableIf* is absent or known to be `true`, of a Step known to be enabled (rule 3). The Step's *let* bindings are
-   still evaluated, so a binding that only a disabled Step Environment needs must allow for the missing value. A
-   failure, including a `null` result, fails the Step, or Job creation for a group evaluated then. The *enableIf* of a
-   Job Environment or an attached Environment, every Environment's *hostRequirements*, and Environment parameter
-   `default`s may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`.
+   for any Step (see [3.2.2](#322-effective-environment-parameter-values)). Before the Job is created,
+   [7.6](#76-expression-fields) rule 5 decides which errors in them template validation reports, with the Step
+   Environment's *enableIf* and the Step's among the fields such a check depends on. The Step's *let* bindings are still
+   evaluated, so a binding that only a disabled Step Environment needs must allow for the missing value. A failure,
+   including a `null` result, fails the Step, or Job creation for a group evaluated then. The *enableIf* of a Job
+   Environment or an attached Environment, every Environment's *hostRequirements*, and Environment parameter `default`s
+   may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`.
 2. An *environment* entry's *parameters* values and *enableIf* may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`,
    directly or through a *let* binding that does.
 3. What `ENV_PARAMS` does for one Step when the Job is created is the Step's *Environment selection*: evaluating its
