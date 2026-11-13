@@ -2,7 +2,7 @@
 # type bool? is accepted, but a null result (a skipped producer's output) is an error
 # (RFC 0010's Template Schemas §7.6 rule 2) and fails instead of enabling the Step. Q is
 # skipped at Job creation, so P's enableIf is decided then (§When groups are evaluated)
-# and Job creation fails.
+# and Job creation fails. 3--enableif-optional-type-runs is the valid companion.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
