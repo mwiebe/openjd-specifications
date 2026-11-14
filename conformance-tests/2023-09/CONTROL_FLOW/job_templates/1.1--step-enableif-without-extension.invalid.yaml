@@ -2,6 +2,7 @@
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
+- ENV_PARAMS
 name: TestJob
 steps:
 - name: S

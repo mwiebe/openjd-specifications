@@ -6,6 +6,7 @@ template:
   extensions:
   - EXPR
   - FEATURE_BUNDLE_1
+  - ENV_PARAMS
   - CONTROL_FLOW
   name: TestJob
   steps:

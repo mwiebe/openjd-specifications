@@ -3,6 +3,7 @@
 specificationVersion: environment-2023-09
 extensions:
 - EXPR
+- ENV_PARAMS
 - CONTROL_FLOW
 environment:
   name: Env
