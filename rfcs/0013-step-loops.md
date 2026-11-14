@@ -11,10 +11,10 @@
 * Depends On:
   * RFC 0011, Control Flow, for the `Steps.*` scope, step input binding, `enableIf`, and the Step states
   * RFC 0012, Step Output Variables, for the output variable types, collect modes, and the re-run rule
-  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), which `CONTROL_FLOW` requires (see [RFC 0011 Design
-    Choice 13](0011-control-flow.md#13-control_flow-requires-env_params)): for expression fields (its Template Schemas
-    §7.6), the form of a loop's *enableIf*, *while*, and *until*, and for the parts that apply its Environment rules to
-    body Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends them
+  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), which `CONTROL_FLOW` requires (see [RFC 0011 Design Choice
+    13](0011-control-flow.md#13-control_flow-requires-env_params)), for expression fields (its Template Schemas §7.6),
+    the form of a loop's *enableIf*, *while*, and *until*, and for the parts that apply its Environment rules to body
+    Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends them
 * Related:
   * Use case U17 of [RFC 0011 §Use cases](0011-control-flow.md#use-cases), which this RFC covers
   * Discussion #22, immutability vs. dynamic adjustments

@@ -446,7 +446,7 @@ At each stage, known values are evaluated concretely while unresolved values pro
    and for conditionals with unknown conditions (above), as [Template Schemas
    §7.6](2023-09-Template-Schemas#76-expression-fields) rule 5 describes.
    With the `CONTROL_FLOW` extension, a Step that may be skipped, a Step Environment that may be disabled, and a loop
-   that may run no iteration are not among those parts: an error that this stage can compute in their fields is
+   that may run no iteration are not treated as such parts: an error that this stage can compute in their fields is
    reported whatever their `enableIf` and `while`, except the checks of the `ENV_PARAMS` extension that depend on
    whether a Step runs or on which Environments its Sessions enter, which are made only for a Step known to be enabled
    ([Template Schemas §3](2023-09-Template-Schemas#3-steptemplate) and

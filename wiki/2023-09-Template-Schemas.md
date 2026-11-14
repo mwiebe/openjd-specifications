@@ -1290,12 +1290,13 @@ Templates a scheduler will attach can resolve the entry as [§3.2.1](#321-resolv
 can then check constraints 5–7 before the Job is created.
 
 With the `CONTROL_FLOW` extension, the work this section does for a Step when the Job is created is part of the Step's
-Environment selection: evaluating its entries' *enableIf*, and checking constraints 5 to 7 and *required* for it. It is
-done once the Step's own *enableIf* is `true`, which may be after the Job is created, and not at all for a skipped Step.
-Resolving every entry's name against the attached Environments, enabled or disabled, stays at Job creation, so names are
-resolved before the entries' *enableIf* is evaluated rather than after. The result is the same, because a disabled
-entry's name is resolved too. Before the Job is created, the checks of constraints 5 to 7 above are made only for a Step
-known to be enabled. See `CONTROL_FLOW` rule 3 of [&lt;Environment&gt;](#4-environment).
+Environment selection: evaluating its entries' *enableIf*, checking constraints 5 to 7 and *required* for it, and
+rejecting a disabled entry for an `ALWAYS` Environment. It is done once the Step's own *enableIf* is `true`, which may
+be after the Job is created, and not at all for a skipped Step. Resolving every entry's name against the attached
+Environments, enabled or disabled, stays at Job creation, so names are resolved before the entries' *enableIf* is
+evaluated rather than after. The result is the same, because a disabled entry's name is resolved too. Before the Job is
+created, the checks of constraints 5 to 7 above, and the error for a disabled entry that names an `ALWAYS` Environment,
+are made only for a Step known to be enabled. See `CONTROL_FLOW` rule 3 of [&lt;Environment&gt;](#4-environment).
 
 > **NOTE:** Instead of two entries for one Environment with complementary *enableIf* conditions, write one entry whose
 > values are conditional.
@@ -2343,8 +2344,9 @@ Where:
    lists `ENV_PARAMS`, which a Job Template that lists `CONTROL_FLOW` does. The same holds for the values of Job outputs
    ([2.17](#217-joboutputdefinition-extension-control_flow)) and of loop variables and loop outputs
    ([3.8.2](#382-loopvariabledefinition), [3.8.3](#383-loopoutputvariabledefinition)), whose value as written is the
-   string their format string resolves to, as [§4.5](#45-environmentparameterdefinition-extension-env_params) item 4
-   says for a computed value: a single `{{ }}` expression whose result is a `range_expr` has only its canonical form.
+   string their format string resolves to, except that a single `{{ }}` expression whose result is a `range_expr` has
+   only its canonical form, as [§4.5](#45-environmentparameterdefinition-extension-env_params) item 4 says for a
+   computed value.
 
 Constraints:
 
@@ -2873,8 +2875,8 @@ The `ENV_PARAMS` extension decides an Environment's and an *environment* entry's
 *hostRequirements*, and a Step's effective values for each Step when the Job is created, and reports the `ALWAYS` errors
 then or, where item 4 says, at template validation (items 4 to 6 above, [&lt;StepDependency&gt;](#32-stepdependency)
 *enableIf* and the checks of its constraints, [3.2.2](#322-effective-environment-parameter-values),
-[7.3.2](#732-env_params-scope-summary), and [4.5](#45-environmentparameterdefinition-extension-env_params) items 1 and
-3, [7.4.1](#741-job-creation-with-env_params)). A Job Template that lists `CONTROL_FLOW` also lists `ENV_PARAMS`
+[7.3.2](#732-env_params-scope-summary), [4.5](#45-environmentparameterdefinition-extension-env_params) items 1 and 3,
+and [7.4.1](#741-job-creation-with-env_params)). A Job Template that lists `CONTROL_FLOW` also lists `ENV_PARAMS`
 ([§1.1](#11-job-template) item 3), so the `ENV_PARAMS` rules apply to every submission of it, and a rule that
 `ENV_PARAMS` adds for a document's content still applies only to a document that lists it: the Environment of an
 attached Environment Template that does not list it behaves as *activation* (item 4 above) says for such an Environment.
@@ -2942,22 +2944,26 @@ when that work is done, and the `ENV_PARAMS` rules hold except where they say ot
    single `{{ }}` expression, and a value, or a non-literal `default` that the Step takes, that fails to resolve or
    convert), constraint 7, a disabled entry that names an Environment whose *activation* is `ALWAYS` as written, an
    enabled `required: true` entry that resolves to no Environment, each Environment's *hostRequirements* resolved for
-   the Step, a Step's combined host requirements, its own together with those of the Environments its Sessions would
-   enter (see [3.3.3](#333-combined-host-requirements)), and the checks over a Step's whole set of Environments,
+   the Step, a conflict in a Step's combined host requirements, its own together with those of the Environments its
+   Sessions would enter (see [3.3.3](#333-combined-host-requirements)), but not an *anyOf* or *allOf* of the Step's own
+   that resolves to no values (see [3](#3-steptemplate)), and the checks over a Step's whole set of Environments,
    wherever `ENV_PARAMS` makes them before the Job is created, including for an external entry when a validator is given
    the Environment Templates. An error in an entry's or an Environment's *enableIf* itself, such as a type error or an
    evaluation error that holds whatever values it reads, is not excepted, nor is an error in an Environment's fields
-   that do not depend on the Step, such as a literal `default`. The attached Environment named like a Job Environment of
-   the paragraph before is not excepted: a validator given the Environment Templates rejects it whatever any Step's
-   *enableIf*. Such a check is made then only for a Step known to be enabled: its *enableIf* is absent or known to be
-   `true` as [7.6](#76-expression-fields) rule 5 says, with `Steps.*`, `Loop.*`, and `RawLoop.*` values not yet known,
-   so with a BOOL Job Parameter `F`, `"true"` and `"Param.F or true"` are known to be `true`; and for a Step of a loop's
-   body, the loop's *enableIf* is too, and the loop has no *while* or one known to be `true`. Otherwise it is made in
-   the Step's Environment selection (or, for a check of `CONTROL_FLOW` rule 5, as that rule says), or never if the Step
-   is skipped. Being known to be enabled decides only which checks are made before the Job is created: a Step's
-   *enableIf* is still evaluated only once every value it reads is concrete, so its Environment selection may come
-   later. From the Job's creation on, the checks of Environment selection are made when it is made, even where one would
-   already hold, or all its fields would be known, at an earlier stage, except the work that stays at Job creation.
+   that `ENV_PARAMS` checks whether or not any Step enters it, such as a literal `default`. An Environment's
+   *hostRequirements* and non-literal `default`s are resolved per Step, so their errors are excepted above. The attached
+   Environment named like a Job Environment of the paragraph before is not excepted: a validator given the Environment
+   Templates rejects it whatever any Step's *enableIf*. Such a check is made then only for a Step known to be enabled:
+   its *enableIf* is absent or known to be `true` as [7.6](#76-expression-fields) rule 5 says, with `Steps.*`, `Loop.*`,
+   and `RawLoop.*` values not yet known, so with a BOOL Job Parameter `F`, `"true"` and `"Param.F or true"` are known to
+   be `true`; and for a Step of a loop's body, the loop's *enableIf* is too, and the loop has no *while* or one known to
+   be `true`. Otherwise it is made in the Step's Environment selection, except a check of `CONTROL_FLOW` rule 5, made as
+   that rule says, and a conflict between the Step's own host requirements and its Environments', found as
+   `CONTROL_FLOW` rule 4 says; or never if the Step is skipped. Being known to be enabled decides only which checks are
+   made before the Job is created: a Step's *enableIf* is still evaluated only once every value it reads is concrete, so
+   its Environment selection may come later. From the Job's creation on, the checks of Environment selection are made
+   when it is made, even where one would already hold, or all its fields would be known, at an earlier stage, except the
+   work that stays at Job creation.
 4. A Step's combined host requirements are completed when its *hostRequirements* are evaluated: its own requirements
    that resolve to nothing are discarded, an *anyOf* or *allOf* of its own that resolves to no values is rejected, the
    rest are combined with the Environments' combined requirements, and the result is checked. Its host requirements are
@@ -3797,8 +3803,9 @@ then and a loop's first *while*, and otherwise later. Rule 5 holds for each of t
 evaluated, so an *environment* entry or an Environment whose *enableIf* is not known stays undetermined for a Step until
 that Step's Environment selection is made, or, for a Step Environment, until its *enableIf* is evaluated with the Step's
 last materialization group. Before the Job is created, rule 5 applies as `CONTROL_FLOW` rule 3 says to the checks that
-depend on whether a Step runs; from the Job's creation on, those checks are made when the Step's Environment selection
-is made.
+depend on whether a Step runs or on which Environments its Sessions enter; from the Job's creation on, those checks are
+made as that rule says. For any other check, no Step's, loop's, or Step Environment's *enableIf*, nor a loop's *while*,
+is among the fields it depends on (see [3](#3-steptemplate)).
 
 ## 8. `<SimpleAction>`
 

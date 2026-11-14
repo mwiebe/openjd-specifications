@@ -20,12 +20,12 @@
     12](#12-enableif-is-rfc-0010s-field-on-more-entities)), and changes when RFC 0010's per-Step Environment work is
     done, so that it follows the Step's own *enableIf* (see [`<Environment>`](#environment)). RFC 0010 is to be accepted
     first. The wiki text of this RFC refers to RFC 0010's wiki edits, so it is to be merged after them. RFC 0010's wiki
-    text says that every Environment decision is made when the Job is created. That holds in a Job Template that lists
-    `CONTROL_FLOW` only as `<Environment>` items 3 to 7 qualify it, and the wiki's `CONTROL_FLOW` text says so beside
-    each such statement rather than rewording RFC 0010's. That covers RFC 0010's statements that a parameter a Step does
-    not supply, an Environment `enableIf` that reads a value that cannot be worked out, a Step declining an `ALWAYS`
-    Environment, an `ALWAYS` Environment's `enableIf` being `false` for some Step, and contradictory combined host
-    requirements reject the Job when it is created. With `CONTROL_FLOW`, those errors, except the errors in an
+    text says that every Environment decision is made when the Job is created. In a Job Template that lists
+    `CONTROL_FLOW`, that holds only as `<Environment>` items 3 to 7 qualify it, and the wiki's `CONTROL_FLOW` text says
+    so beside each such statement rather than rewording RFC 0010's. That covers RFC 0010's statements that a parameter a
+    Step does not supply, an Environment `enableIf` that reads a value that cannot be worked out, a Step declining an
+    `ALWAYS` Environment, an `ALWAYS` Environment's `enableIf` being `false` for some Step, and contradictory combined
+    host requirements reject the Job when it is created. With `CONTROL_FLOW`, those errors, except the errors in an
     Environment's definition that `<Environment>` item 3 reports whatever any Step's *enableIf*, apply only to a Step
     that is enabled, are reported when its Environment selection is made or, for a conflict between its own host
     requirements and its Environments', when its host selection group is evaluated, and fail only that Step if found
@@ -1525,19 +1525,23 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
       0010 checks it before Job creation; the error for a disabled entry that names an Environment whose *activation* is
       `ALWAYS` as written in its document; the rejection of an enabled `required: true` entry that resolves to no
       Environment (its Template Schemas §3.2.1 item 2), where a validator given the Environment Templates makes it; each
-      entered Environment's *hostRequirements* resolved with the Step's values, and the combined host requirements (its
-      Template Schemas §3.3 and §3.3.3); and the checks over a Step's whole set of Environments. An error in an entry's
-      or an Environment's *enableIf* itself, such as a type error or an evaluation error that holds whatever values it
-      reads, is not excepted, nor is an error in an Environment's fields that do not depend on the Step, such as a
-      literal `default`. The attached Environment named like a Job Environment of the first bullet is not excepted: a
-      validator given the Environment Templates reports it whatever any Step's *enableIf*. RFC 0010 reports some of them
-      early only when the violation holds whatever every undetermined *enableIf* resolves to. Each of them is made
-      before Job creation only for a Step known to be enabled, and otherwise in the Step's Environment selection (for
-      the checks over the Step's whole set of Environments, as item 6 says), or never if the Step is skipped. This list
-      has no separate entry for an Environment *enableIf* that reads a missing value. RFC 0010 rejects a missing value
-      under constraint 7, which is checked before any Environment's *enableIf*, and a value that an *enableIf* reads but
-      that does not resolve or convert under constraint 6 (its Template Schemas §3.2.2 item 2), and both are deferred
-      above.
+      entered Environment's *hostRequirements* resolved with the Step's values (its Template Schemas §3.3), and a
+      conflict in the combined host requirements (its §3.3.3), but not an *anyOf* or *allOf* of the Step's own that
+      resolves to no values, which is an error in the Step's own field (see [Validation](#validation) item 10); and the
+      checks over a Step's whole set of Environments. An error in an entry's or an Environment's *enableIf* itself, such
+      as a type error or an evaluation error that holds whatever values it reads, is not excepted, nor is an error in an
+      Environment's fields that RFC 0010 checks whether or not any Step enters it, such as a literal `default`. An
+      Environment's *hostRequirements* and non-literal `default`s are resolved per Step, so their errors are excepted
+      above. The attached Environment named like a Job Environment of the first bullet is not excepted: a validator
+      given the Environment Templates reports it whatever any Step's *enableIf*. RFC 0010 reports some of them early
+      only when the violation holds whatever every undetermined *enableIf* resolves to. Each of them is made before Job
+      creation only for a Step known to be enabled, and otherwise in the Step's Environment selection, except that the
+      checks over the Step's whole set of Environments are made as item 6 says and a conflict between the Step's own
+      host requirements and its Environments' when its host selection group is evaluated, as item 5 says; or never if
+      the Step is skipped. This list has no separate entry for an Environment *enableIf* that reads a missing value. RFC
+      0010 rejects a missing value under constraint 7, which is checked before any Environment's *enableIf*, and a value
+      that an *enableIf* reads but that does not resolve or convert under constraint 6 (its Template Schemas §3.2.2 item
+      2), and both are deferred above.
     * **Known to be enabled.** A Step is known to be enabled before Job creation when its *enableIf* is absent or known
       there to be `true`, as RFC 0010's Template Schemas §7.6 rule 5 says, with `Steps.*`, `Loop.*`, and `RawLoop.*`
       among the values not yet known. So, with a BOOL Job Parameter `F`, `true`, `"true"`, and `"Param.F or true"` are
@@ -2451,11 +2455,11 @@ are in [RFC 0012 §Open Questions](0012-step-output-variables.md#open-questions)
     a Step Environment that holds it is (see [Validation](#validation) item 10 and [`<Environment>`](#environment) item
     4). Such an expression fails wherever it is evaluated, so reporting it early helps the author, especially in
     `openjd check`, and which such errors template validation reports does not depend on the Step's, its loop's, or a
-    Step Environment's *enableIf*. The other choice was to read RFC 0010's Template Schemas §7.6 rule 5 with the
-    *enableIf* among the fields such a check depends on, so that template validation would report the error only for a
-    Step known to be enabled. The exceptions are the checks that [`<Environment>`](#environment) item 3 lists as
+    Step Environment's *enableIf*. The exceptions are the checks that [`<Environment>`](#environment) item 3 lists as
     depending on whether the Step runs or on which Environments its Sessions enter, such as constraints 5 to 7: before
-    Job creation they are still made only for a Step known to be enabled. A skipped Step's fields and a disabled Step
+    Job creation they are still made only for a Step known to be enabled. The other choice was to read RFC 0010's
+    Template Schemas §7.6 rule 5 with the *enableIf* among the fields such a check depends on, so that template
+    validation would report the error only for a Step known to be enabled. A skipped Step's fields and a disabled Step
     Environment's TEMPLATE-scope format strings are still not evaluated at run time ([How a Step is
     bound](#how-a-step-is-bound) item 1 and [`<Environment>`](#environment) item 4). For a loop, the same holds for the
     fields that its *enableIf* and *while* guard ([RFC 0013 §Validation](0013-step-loops.md#validation)).

@@ -398,8 +398,8 @@ Where:
    §`<JobOutputDefinition>`](0011-control-flow.md#joboutputdefinition), [RFC 0013
    §`<LoopVariableDefinition>`](0013-step-loops.md#loopvariabledefinition), [RFC 0013
    §`<LoopOutputVariableDefinition>`](0013-step-loops.md#loopoutputvariabledefinition)). Their value as written is the
-   string their format string resolves to, as Template Schemas §4.5 item 4 says for a computed value: a single `{{ }}`
-   expression whose result is a `range_expr` has only its canonical form.
+   string their format string resolves to, except that a single `{{ }}` expression whose result is a `range_expr` has
+   only its canonical form, as Template Schemas §4.5 item 4 says for a computed value.
 
 Constraints:
 
