@@ -261,7 +261,8 @@ and its section.
 - That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
   (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
   Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph
-  after item 6). No test disables a Step Environment yet.
+  after item 6). No test yet disables a Step Environment that has an Action `timeout` or
+  `cancelation`.
 - Re-runs and retries, including the recovery of a loop, which is `FAILED` until every
   failed body Step instance of the iteration in progress has succeeded after a retry or
   requeue of its Tasks and then returns to `RUNNING`, and the rule that no recovery

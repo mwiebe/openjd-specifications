@@ -845,6 +845,8 @@ This RFC is additive and gated by the `CONTROL_FLOW` extension name declared und
 * No existing field changes meaning in a template that doesn't list `CONTROL_FLOW`. A scheduler that does not
   implement `CONTROL_FLOW` rejects a template that lists it, so a Job is never run with its outputs or conditions
   silently ignored.
+* Listing `CONTROL_FLOW` requires listing `ENV_PARAMS`, which changes a few rules for the Job Template's own content
+  (see [Design Choice 13](#13-control_flow-requires-env_params)).
 * Within a template that lists `CONTROL_FLOW`, one existing rule is relaxed: a Task parameter range given as an
   expression may evaluate to an empty list (see [Empty parameter spaces](#empty-parameter-spaces)).
 * A Step that declares no outputs, has no `enableIf`, and reads no `Steps.*` symbols behaves exactly as it does
@@ -1746,15 +1748,16 @@ CONTROL_FLOW adds no types, functions, or operators to EXPR, and no new kind of 
   [The `Steps.*` scope](#the-steps-scope).
 * The empty-list rule of [Empty parameter spaces](#empty-parameter-spaces) for Task parameter ranges.
 * Two notes in its Progressive Expression Evaluation. At template validation, a Step that may be skipped, a Step
-  Environment that may be disabled, and a loop that may run no iteration are not parts a run may not evaluate, so an
-  error that can be computed in their fields is reported, except the checks of [`<Environment>`](#environment) item 3
-  (see [Validation](#validation) item 10). After Job parameter binding, beside RFC 0010's note on an Environment's
-  *enableIf*, some TEMPLATE-scope expressions may be evaluated later, at step input binding or within a loop's
-  iteration: those of a group that reads `Steps.*` values not yet concrete at Job creation, every field of a Step
-  whose *enableIf* is present and not decided `true` at Job creation, including the fields its Environment selection
-  evaluates (`environment:` entries' *parameters* and *enableIf*, and the *enableIf*, *hostRequirements*, and
-  non-literal `default`s of the Environments that apply to it), every field of a Step of a loop's body, and a loop's
-  expressions evaluated at an iteration boundary (see [When groups are evaluated](#when-groups-are-evaluated)).
+  Environment that may be disabled, and a loop that may run no iteration are not treated as parts a run may not
+  evaluate, so an error that can be computed in their fields is reported, except the checks of
+  [`<Environment>`](#environment) item 3 (see [Validation](#validation) item 10). After Job parameter binding, beside
+  RFC 0010's note on an Environment's *enableIf*, some TEMPLATE-scope expressions may be evaluated later, at step input
+  binding or within a loop's iteration: those of a group that reads `Steps.*` values not yet concrete at Job creation,
+  every field of a Step whose *enableIf* is present and not decided `true` at Job creation, including the fields its
+  Environment selection evaluates (`environment:` entries' *parameters* and *enableIf*, and the *enableIf*,
+  *hostRequirements*, and non-literal `default`s of the Environments that apply to it), every field of a Step of a
+  loop's body, and a loop's expressions evaluated at an iteration boundary (see [When groups are
+  evaluated](#when-groups-are-evaluated)).
 * A validation warning. EXPR discards a `null` silently in three places (§1.3.2 of the Expression Language): an
   interpolation with text around it becomes the empty string, so `"--size {{Steps.P.Output.X}}"` becomes
   `"--size "`; a list item (such as an entry of `args`) is dropped; and an optional field is omitted. An
@@ -2181,8 +2184,8 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
    entry's *parameters* and *enableIf* reference no `Steps.*`, `Loop.*`, or `RawLoop.*` symbol, directly or through a
    *let* binding ([`<Environment>`](#environment) item 2). A check that RFC 0010 makes at template validation, or before
    Job creation, and whose outcome depends on whether a Step runs or on which Environments its Sessions enter is made
-   then only for a Step known to be enabled, except the errors in an Environment's definition that
-   [`<Environment>`](#environment) item 3 reports whatever any Step's *enableIf*.
+   then only for a Step known to be enabled: these are the checks that [`<Environment>`](#environment) item 3's "Before
+   Job creation" bullet lists, and every other check is made whatever any *enableIf* (see item 10).
 6. Every expression type-checks with `Steps.*` symbols as `unresolved` values of their types. A Step's *enableIf* is an
    expression field of type `bool` (RFC 0010's Template Schemas §7.6 rules 1, 2, and 4): it parses as one expression,
    so a value written as a format string, such as `"{{Param.Run}}"`, is an error, and its static type fits `bool` or
