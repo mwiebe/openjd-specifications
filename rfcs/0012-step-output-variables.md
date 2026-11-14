@@ -13,6 +13,8 @@
     read, and step input binding
   * RFC 0005, Expression Language (EXPR) (https://github.com/OpenJobDescription/openjd-specifications/issues/112)
   * RFC 0007, Extended Parameter Types, whose job parameter types output variables reuse
+  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), which `CONTROL_FLOW` requires (see [RFC 0011 Design
+    Choice 13](0011-control-flow.md#13-control_flow-requires-env_params))
 * Related:
   * Discussion #111, variable data flow along step dependencies, which proposed the `openjd_output_var:` directive
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/111)
@@ -391,7 +393,10 @@ Where:
    properties of job parameter definitions are not available. A `RANGE_EXPR` value's `minLength` and `maxLength` are
    checked against both the value as reported and its canonical form, as Template Schemas §2.10 says for a document that
    lists `ENV_PARAMS`, which a Job Template that lists `CONTROL_FLOW` does (see [RFC 0011 Design Choice
-   13](0011-control-flow.md#13-control_flow-requires-env_params)).
+   13](0011-control-flow.md#13-control_flow-requires-env_params)). The same holds for job outputs and for loop variables
+   and loop outputs, whose constraint properties are those of this object ([RFC 0011
+   §`<JobOutputDefinition>`](0011-control-flow.md#joboutputdefinition), [RFC 0013
+   §`<StepLoop>`](0013-step-loops.md#steploop)).
 
 Constraints:
 

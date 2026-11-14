@@ -154,11 +154,13 @@ templates. So before anything runs, the render management system knows which **E
 [§4](2023-09-Template-Schemas#4-environment) give the exact rules, including when a submission is rejected.
 
 With the CONTROL_FLOW extension, these values and decisions, and the checks above, are worked out for each Step only
-once the Step is enabled, which can be after the Job is created, and for a Step in a loop's body, in each iteration
-(see [Step States and Step Input Binding](#step-states-and-step-input-binding)). They still depend only on the Job
-Parameters and the templates, so they come out the same whenever they are worked out. An error in them fails only that
-Step when it is found after the Job is created, and a skipped Step is not held to them. Whether each of a Step's own
-Step Environments is entered is decided later still, with its other fields.
+once the Step is enabled, which can be after the Job is created, and for a Step in a loop's body, in each iteration (see
+[Step States and Step Input Binding](#step-states-and-step-input-binding)). They still depend only on the Job Parameters
+and the templates, so they come out the same whenever they are worked out. An error in them fails only that Step when it
+is found after the Job is created, and a skipped Step is not held to them, except an error in an Environment's own
+definition, which is reported whatever any Step's `enableIf`. Checking the Job Template still reports them for a Step
+known to be enabled. Whether each of a Step's own Step Environments is entered is decided later still, with its other
+fields.
 
 When a **Session** enters an **Environment**, it keeps the same parameter values until it exits that **Environment**.
 The **Environment**'s `onEnter`, its `onExit`, and what it provides to every Task run while it is entered, such as its
@@ -430,9 +432,9 @@ it to use one. A Step whose **Sessions** do not enter the **Environment** is not
 requirements contradict each other, such as a minimum amount above a maximum, the Job is rejected when it is created.
 [Template Schemas §3.3.3](2023-09-Template-Schemas#333-combined-host-requirements) gives the rules for combining them.
 
-With the CONTROL_FLOW extension, a Step's requirements are combined once it is enabled and its own host requirements
-are evaluated, which can be after the Job is created, and a contradiction found then fails only that Step (see
-[Step States and Step Input Binding](#step-states-and-step-input-binding)).
+With the CONTROL_FLOW extension, a Step's **Environments**' requirements are combined once the Step is enabled, and its
+own host requirements once they are evaluated, either of which can be after the Job is created, and a contradiction
+found then fails only that Step (see [Step States and Step Input Binding](#step-states-and-step-input-binding)).
 
 ## Stdout/Stderr Messages
 

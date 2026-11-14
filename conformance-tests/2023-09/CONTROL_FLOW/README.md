@@ -237,11 +237,11 @@ and its section.
 
 - The `enableIf` of an Environment and of an `environment:` entry, which RFC 0010
   (`ENV_PARAMS`) defines and RFC 0011 extends, beyond the Environment `enableIf` tests
-  (`job_templates/4--enableif-*`, `jobs/4--enableif-*`). Those must use the expression-field
-  form that RFC 0010 defines, and
+  (`job_templates/4--enableif-*`, `jobs/4--enableif-*`). Those tests are still to be
+  rewritten in the expression-field form that RFC 0010 defines, and
   `job_templates/1.1--environment-enableif-without-extension`,
   `env_templates/4--enableif-in-environment-template` and
-  `jobs/4--enableif-in-environment-template-with-control-flow-job` must cite RFC 0010's
+  `jobs/4--enableif-in-environment-template-with-control-flow-job` are still to cite RFC 0010's
   rule that an `enableIf` needs `ENV_PARAMS` in the document that has it.
 - A `null` value for `while` or `until`. It is an error, but alone it gives the same result
   as an implementation that read it as an omitted field, which rejects a loop with neither
@@ -260,7 +260,7 @@ and its section.
 - That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
   (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
   Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph
-  after item 6). Both need `ENV_PARAMS`.
+  after item 6). No test disables a Step Environment yet.
 - Re-runs and retries, including the recovery of a loop, which is `FAILED` until every
   failed body Step instance of the iteration in progress has succeeded after a retry or
   requeue of its Tasks and then returns to `RUNNING`, and the rule that no recovery

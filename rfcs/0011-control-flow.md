@@ -22,14 +22,14 @@
     first. The wiki text of this RFC refers to RFC 0010's wiki edits, so it is to be merged after them. RFC 0010's wiki
     text says that every Environment decision is made when the Job is created. That holds in a Job Template that lists
     `CONTROL_FLOW` only as `<Environment>` items 3 to 7 qualify it, and the wiki's `CONTROL_FLOW` text says so beside
-    each such statement rather than rewording RFC 0010's. That covers RFC 0010's statements that a parameter a Step
-    does not supply, an Environment `enableIf` that reads a value that cannot be worked out, a Step declining an
-    `ALWAYS` Environment, an `ALWAYS` Environment's `enableIf` being `false` for some Step, and contradictory combined
-    host requirements reject the Job when it is created. With `CONTROL_FLOW`, except the errors in an Environment's
+    each such statement rather than rewording RFC 0010's. That covers RFC 0010's statements that a parameter a Step does
+    not supply, an Environment `enableIf` that reads a value that cannot be worked out, a Step declining an `ALWAYS`
+    Environment, an `ALWAYS` Environment's `enableIf` being `false` for some Step, and contradictory combined host
+    requirements reject the Job when it is created. With `CONTROL_FLOW`, except the errors in an Environment's
     definition that `<Environment>` item 3 reports whatever any Step's *enableIf*, they hold only for a Step that is
-    enabled, are reported when its Environment selection is made or, for its combined host requirements, when its host
-    selection group is evaluated, and fail only that Step if that is after Job creation. Checking the Job Template
-    reports them only for a Step known to be enabled.
+    enabled, are reported when its Environment selection is made or, for a conflict between its own host requirements
+    and its Environments', when its host selection group is evaluated, and fail only that Step if that is after Job
+    creation. Checking the Job Template reports them only for a Step known to be enabled.
 * Related:
   * Discussion #111, variable data flow along step dependencies, the seed idea for this RFC
     (https://github.com/OpenJobDescription/openjd-specifications/discussions/111)
@@ -1097,9 +1097,9 @@ Templates, and is decided per Step with the Step's Environment parameter values.
   checks its other fields that are resolved at Job creation, such as an action's *timeout*, whether or not it is
   disabled (its Template Schemas §3.2.2, the paragraph after item 6). Under RFC 0010 alone those fields can read only
   values known at Job creation, which is its reason for the rule ([RFC 0010 §A disabled Environment's other fields are
-  resolved](0010-environment-parameters.md#a-disabled-environments-other-fields-are-resolved)). This RFC therefore
-  keeps the rule for every Environment whose fields read no `Steps.*`, and makes an exception only for a Step
-  Environment's, which may read `Steps.*` (see Open Question 15).
+  resolved](0010-environment-parameters.md#a-disabled-environments-other-fields-are-resolved)). This RFC therefore keeps
+  the rule for Job Environments and attached Environments, which read no `Steps.*`, and makes an exception only for a
+  Step Environment's fields, which may read `Steps.*` (see Open Question 15).
 * **The cost.** For a Step whose *enableIf* is not decided at Job creation, and for every body Step of a loop, an error
   that RFC 0010 alone would report at Job creation, such as constraint 7 or a missing `required: true` external
   Environment, is reported only once the Step is enabled, which may be after other Steps have run, and never if the Step
@@ -1162,8 +1162,8 @@ together with RFC 0010's question of the name, which RFC 0010 lists as decided (
 ### 13. `CONTROL_FLOW` requires `ENV_PARAMS`
 
 A Job Template that lists `CONTROL_FLOW` must also list `ENV_PARAMS`. Mark Wiebe decided this on 2026-11-13. Earlier
-drafts let a Job Template list `CONTROL_FLOW` alone, and applied the rules for Environments only when the Job Template
-or an attached Environment Template listed `ENV_PARAMS`.
+drafts let a Job Template list `CONTROL_FLOW` without `ENV_PARAMS`, and applied the rules for Environments only when the
+Job Template or an attached Environment Template listed `ENV_PARAMS`.
 
 * **One `enableIf`.** A Step, a loop, an Environment, and an `environment:` entry each have an *enableIf*, and it is one
   design: one form, one meaning of `false`, and one rule for which values are known before it is evaluated (Design
@@ -1175,11 +1175,12 @@ or an attached Environment Template listed `ENV_PARAMS`.
 * **What stays conditional.** An attached Environment Template need not list `ENV_PARAMS`, so the rules RFC 0010 gives
   for an Environment Template that does not list it still apply.
 * **The cost.** A Job Template that uses only Step outputs or loops must list `ENV_PARAMS` too, and a scheduler must
-  implement RFC 0010 before it can implement `CONTROL_FLOW`. Listing `ENV_PARAMS` also changes a few rules for the
-  Job Template's own content, which RFC 0010 lists ([RFC 0010 §Backward
-  compatibility](0010-environment-parameters.md#backward-compatibility)): for example, a host requirement that resolves
-  to nothing is discarded rather than rejected, and a RANGE_EXPR Job Parameter's *minLength* and *maxLength* are
-  checked against its canonical form too. `CONTROL_FLOW` is new, so no existing Job Template changes meaning.
+  implement RFC 0010 before it can implement `CONTROL_FLOW`. Listing `ENV_PARAMS` also changes a few rules for the Job
+  Template's own content: for example, a host requirement that resolves to nothing is discarded rather than rejected
+  ([RFC 0010 §Host requirements](0010-environment-parameters.md#host-requirements)), and a RANGE_EXPR Job Parameter's
+  *minLength* and *maxLength* are checked against its canonical form too ([RFC 0010 §Backward
+  compatibility](0010-environment-parameters.md#backward-compatibility)). `CONTROL_FLOW` is new, so no existing Job
+  Template changes meaning.
 
 ### 14. Design tenets
 
@@ -1214,9 +1215,10 @@ The extension name is `CONTROL_FLOW`. Every field, symbol, and behavior in this 
 Template whose `extensions` list includes `CONTROL_FLOW`.
 
 * A template that lists `CONTROL_FLOW` MUST also list `ENV_PARAMS` and `EXPR`. A scheduler or validator MUST reject a
-  template that lists `CONTROL_FLOW` without both (see [Design Choice 13](#13-control_flow-requires-env_params)). RFC
-  0002 does not define dependencies between extensions; this is a rule of the `CONTROL_FLOW` extension, as the same
-  rule is for `WRAP_ACTIONS`, and RFC 0010 requires `EXPR` for `ENV_PARAMS` in the same way.
+  template that lists `CONTROL_FLOW` but not both `ENV_PARAMS` and `EXPR` (see [Design Choice
+  13](#13-control_flow-requires-env_params)). RFC 0002 does not define dependencies between extensions; this is a rule
+  of the `CONTROL_FLOW` extension, as the same rule is for `WRAP_ACTIONS`, and RFC 0010 requires `EXPR` for `ENV_PARAMS`
+  in the same way.
 * `CONTROL_FLOW` applies to Job Templates. An Environment Template cannot declare it, and nothing in an Environment
   Template can reference the symbols it adds. An Environment Template attached to a Job whose Job Template lists
   `CONTROL_FLOW` need not list `ENV_PARAMS`. Its Environment then behaves as RFC 0010 says for an Environment Template
@@ -1443,7 +1445,7 @@ that an Environment's is decided once per Step that it applies to and for which 
 Environment parameter values, and an entry's once for its Step, before those values are resolved; what `false` and
 `null` mean; and how they interact with `activation`, `exclusiveGroup`, constraint 7, and combined host requirements. A
 document can use them only if it lists `ENV_PARAMS`, which a Job Template that lists `CONTROL_FLOW` always does, and an
-attached Environment Template may not. A Step's and a loop's *enableIf* are the same kind of field, with the same form
+attached Environment Template need not. A Step's and a loop's *enableIf* are the same kind of field, with the same form
 and the same meaning of `false` (see [Design Choice 12](#12-enableif-is-rfc-0010s-field-on-more-entities)). Since the
 Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a Job Template that lists `CONTROL_FLOW`
 (its Template Schemas §7.4.1). These rules extend them, and RFC 0010's rules hold except where these say otherwise:
@@ -1573,14 +1575,13 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
 5. **Combined host requirements.** A Step's own *hostRequirements* may be evaluated at step input binding, so its
    combined host requirements ([RFC 0010 §Host requirements](0010-environment-parameters.md#host-requirements)) are
    completed when its host selection group is evaluated: the Step's own requirements that resolve to nothing are
-   discarded, as RFC 0010's Template Schemas §7.4.1 step 8 says for a Job Template that lists `ENV_PARAMS`, an *anyOf*
-   or *allOf* of its own that resolves to no values is rejected, and the rest are combined with the Environments'
-   requirements that its Environment selection combined, and the result is checked. A conflict among the Environments'
-   requirements alone is found earlier, by Environment selection. The Step's **host requirements are known** (see
-   [Terminology](#terminology)) when its combined host requirements are. The checks are RFC 0010's (its Template Schemas
-   §3.3.3), including that an implementation may reject combined requirements that name more capabilities than a limit
-   it documents, which must be at least 50. A failure fails the Step at once, or fails Job creation if the group is
-   evaluated then.
+   discarded (RFC 0010's Template Schemas §7.4.1 step 8), an *anyOf* or *allOf* of its own that resolves to no values is
+   rejected, and the rest are combined with the Environments' requirements that its Environment selection combined, and
+   the result is checked. A conflict among the Environments' requirements alone is found earlier, by Environment
+   selection. The Step's **host requirements are known** (see [Terminology](#terminology)) when its combined host
+   requirements are. The checks are RFC 0010's (its Template Schemas §3.3.3), including that an implementation may
+   reject combined requirements that name more capabilities than a limit it documents, which must be at least 50. A
+   failure fails the Step at once, or fails Job creation if the group is evaluated then.
 6. **Checks over a Step's whole set of Environments.** A check over the whole set of Environments a Step's Sessions
    enter (in step 7 of RFC 0010's Template Schemas §7.4.1, other than the value checks), such as the `WRAP_ACTIONS`
    single-layer rule, needs the Step Environments the Step enters, which are known once its remaining group has been
@@ -1732,10 +1733,11 @@ CONTROL_FLOW adds no types, functions, or operators to EXPR, and no new kind of 
   scopes of
   [The `Steps.*` scope](#the-steps-scope).
 * The empty-list rule of [Empty parameter spaces](#empty-parameter-spaces) for Task parameter ranges.
-* A note in its Progressive Expression Evaluation, after RFC 0010's note on an Environment's *enableIf* at Job
-  parameter binding, that some TEMPLATE-scope expressions are evaluated later, at step input binding or within a
-  loop's iteration: those that read `Steps.*`, `Loop.*`, or `RawLoop.*`, a Step Environment's *enableIf*, and, for a
-  Step not enabled at Job creation, the *enableIf* fields of its Environment selection.
+* A note in its Progressive Expression Evaluation, after RFC 0010's note on an Environment's *enableIf* at Job parameter
+  binding, that some TEMPLATE-scope expressions may be evaluated later, at step input binding or within a loop's
+  iteration: those that read `Steps.*` values not yet concrete at Job creation, every field of a Step whose *enableIf*
+  is not decided `true` at Job creation, including the *enableIf* fields of its Environment selection, and every field
+  of a Step of a loop's body (see [When groups are evaluated](#when-groups-are-evaluated)).
 * A validation warning. EXPR discards a `null` silently in three places (§1.3.2 of the Expression Language): an
   interpolation with text around it becomes the empty string, so `"--size {{Steps.P.Output.X}}"` becomes
   `"--size "`; a list item (such as an entry of `args`) is dropped; and an optional field is omitted. An
@@ -2144,7 +2146,7 @@ Every rule this RFC adds, and when it is checked. The rules of RFC 0012 and RFC 
 
 **At template validation** (by the model library, before submission):
 
-1. `CONTROL_FLOW` is listed only together with `EXPR`.
+1. `CONTROL_FLOW` is listed only together with both `ENV_PARAMS` and `EXPR`.
 2. Every `Steps.<StepName>.Output.<VarName>` and `RawOutput.<VarName>` names a Step with an `<Identifier>` name
    that declares output `<VarName>`. Every `Steps.<StepName>.TaskParam.<ParamName>` and `TaskRawParam.<ParamName>`
    names a Step that has Task parameter `<ParamName>`.
