@@ -1331,11 +1331,11 @@ Every rule this RFC adds, and when it is checked, in the form of
     4): a value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type
     that does not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each
     loop output *value* has its output's type, or under `APPEND` its element type.
-11. Template validation reports an error that it can compute in a body Step's materialization expressions, and in the
-    loop's own expressions, whatever the loop's *enableIf* and *while* and the body Step's *enableIf*, as [RFC 0011
-    §Validation](0011-control-flow.md#validation) item 10 says for a Step ([RFC 0011 Open Question
-    16](0011-control-flow.md#open-questions), answered). With `FEATURE_BUNDLE_1`, a body Step's *timeout* of
-    `"{{1 - 1}}"` is an error at template validation even in a loop whose *while* is `"Param.Run"`.
+11. Template validation reports an error that it can compute in a body Step's materialization expressions, other than
+    the fields of its Environment selection, and in the loop's own expressions, whatever the loop's *enableIf* and
+    *while* and the body Step's *enableIf*, as [RFC 0011 §Validation](0011-control-flow.md#validation) item 10 says for
+    a Step ([RFC 0011 Open Question 16](0011-control-flow.md#open-questions), answered). With `FEATURE_BUNDLE_1`, a body
+    Step's *timeout* of `"{{1 - 1}}"` is an error at template validation even in a loop whose *while* is `"Param.Run"`.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`

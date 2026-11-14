@@ -253,10 +253,10 @@ and its section.
   Parameter `F`, `"Param.F or true"`, and for a body Step also a loop whose `enableIf` is
   absent or known to be `true` and that has no `while` or one known to be `true`. It decides
   when `ENV_PARAMS`'s checks that depend on whether a Step runs are made.
-- That template validation reports an error in a value it can compute, such as, with
-  `FEATURE_BUNDLE_1`, a `timeout` of `"{{1 - 1}}"`, whether or not the Step, or a Step
-  Environment that holds it, is known to be enabled (RFC 0011 §Validation item 10; Open
-  Question 16, answered). No test checks it yet.
+- That template validation reports an error in a value it can compute, such as, with `FEATURE_BUNDLE_1`, a `timeout` of
+  `"{{1 - 1}}"`, whether or not the Step, or a Step Environment that holds it, is known to be enabled, except in the
+  fields of the Step's Environment selection (RFC 0011 §Validation item 10; Open Question 16, answered). No test checks
+  it yet.
 - That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
   (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
   Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph

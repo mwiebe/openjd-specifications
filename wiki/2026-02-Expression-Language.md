@@ -459,7 +459,8 @@ At each stage, known values are evaluated concretely while unresolved values pro
    input binding or within a loop's iteration: those that read outputs of other Steps (`Steps.*`) that are not yet
    known, every expression of a Step whose `enableIf` is not decided `true` at this stage, including the *enableIf* of
    its `environment:` entries and of the Environments that apply to it, and every expression of a Step of a loop's
-   body, which may also read the loop's values (`Loop.*`, `RawLoop.*`) ([Template Schemas
+   body, which may also read the loop's values (`Loop.*`, `RawLoop.*`), and a loop's expressions evaluated at an
+   iteration boundary, such as its `until` ([Template Schemas
    §7.4](2023-09-Template-Schemas#74-template-processing-stages)).
 
 3. **Worker host execution**. All symbols are known — `Task.Param.*`, `Session.*`, file paths,

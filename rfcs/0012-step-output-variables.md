@@ -396,7 +396,9 @@ Where:
    13](0011-control-flow.md#13-control_flow-requires-env_params)). The same holds for job outputs and for loop variables
    and loop outputs, whose constraint properties are those of this object ([RFC 0011
    §`<JobOutputDefinition>`](0011-control-flow.md#joboutputdefinition), [RFC 0013
-   §`<StepLoop>`](0013-step-loops.md#steploop)).
+   §`<StepLoop>`](0013-step-loops.md#steploop)). Their value as written is the string their format string resolves to,
+   as Template Schemas §4.5 item 4 says for a computed value: a single `{{ }}` expression whose result is a `range_expr`
+   has only its canonical form.
 
 Constraints:
 
