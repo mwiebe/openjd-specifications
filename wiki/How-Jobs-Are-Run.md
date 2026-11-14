@@ -158,13 +158,12 @@ made for each Step only once the Step is enabled, which can be after the Job is 
 body, in each iteration (see [Step States and Step Input Binding](#step-states-and-step-input-binding)). They still
 depend only on the Job Parameters and the templates, so they come out the same whenever they are worked out. An error in
 them fails only that Step (and for a Step in a loop's body, so the loop) when it is found after the Job is created, and
-a skipped Step is not held to them. The exceptions are errors that hold whatever the Step's values, which are reported
-whatever any Step's `enableIf`: an error in an Environment's own definition that is checked whether or not any Step
-enters it, such as an `ALWAYS` Environment whose `enableIf` is known to be `false` from the template alone or a literal
-default that is wrong, and an `enableIf` that fails to evaluate whatever it reads. Checking the Job Template reports the
-other errors only for a Step known to be enabled (see [Step States and Step Input
-Binding](#step-states-and-step-input-binding)). Whether each of a Step's own Step Environments is entered is decided
-later still, with its other fields.
+a skipped Step is not held to them. The exceptions, which are reported whatever any Step's `enableIf`, are an error in
+an Environment's own definition that is checked whether or not any Step enters it, such as an `ALWAYS` Environment whose
+`enableIf` is known to be `false` from the template alone or a literal default that is wrong, and an `enableIf` that
+fails to evaluate whatever it reads. Checking the Job Template reports the other errors only for a Step known to be
+enabled (see [Step States and Step Input Binding](#step-states-and-step-input-binding)). Whether each of a Step's own
+Step Environments is entered is decided later still, with its other fields.
 
 When a **Session** enters an **Environment**, it keeps the same parameter values until it exits that **Environment**.
 The **Environment**'s `onEnter`, its `onExit`, and what it provides to every Task run while it is entered, such as its
@@ -237,13 +236,12 @@ should evaluate it then, and must have evaluated every group before it schedules
    when it is enabled, and for a Step in a loop's body, in each iteration. Whether each of its Step Environments is
    entered is decided later, with its other fields. An error in that choice, which would reject the Job if found when
    the Job is created, fails only that Step when found later (and for a Step in a loop's body, so the loop). A skipped
-   Step enters none, and is held to none of those checks except errors that hold whatever the Step's values, which are
-   reported whatever any Step's `enableIf`: an error in an Environment's own definition that is checked whether or not
-   any Step enters it, such as an `ALWAYS` Environment whose `enableIf` is known to be `false` from the template alone,
-   and an `enableIf` that fails to evaluate whatever it reads. Since any Step may be skipped, checking the Job Template
-   reports the other errors of that choice only for a Step known to be enabled: one whose `enableIf` is absent or known
-   to be `true` from the template alone, and, in a loop's body, whose loop's `enableIf` is too and whose loop has no
-   `while` or one known to be `true`.
+   Step enters none, and is held to none of those checks except these, which are reported whatever any Step's
+   `enableIf`: an error in an Environment's own definition that is checked whether or not any Step enters it, such as an
+   `ALWAYS` Environment whose `enableIf` is known to be `false` from the template alone, and an `enableIf` that fails to
+   evaluate whatever it reads. Since any Step may be skipped, checking the Job Template reports the other errors of that
+   choice only for a Step known to be enabled: one whose `enableIf` is absent or known to be `true` from the template
+   alone, and, in a loop's body, whose loop's `enableIf` is too and whose loop has no `while` or one known to be `true`.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and

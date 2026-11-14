@@ -446,10 +446,10 @@ At each stage, known values are evaluated concretely while unresolved values pro
    and for conditionals with unknown conditions (above), as [Template Schemas
    §7.6](2023-09-Template-Schemas#76-expression-fields) rule 5 describes.
    With the `CONTROL_FLOW` extension, a Step that may be skipped, a Step Environment that may be disabled, and a loop
-   that may run no iteration are not treated as such parts: an error that this stage can compute in their fields is
-   reported whatever their `enableIf` and `while`, except the checks of the `ENV_PARAMS` extension that depend on
-   whether a Step runs or on which Environments its Sessions enter, which are made only for a Step known to be enabled
-   ([Template Schemas §3](2023-09-Template-Schemas#3-steptemplate) and
+   that may run no iteration are not treated as parts a run may not evaluate: an error that this stage can compute in
+   their fields is reported whatever their `enableIf` and `while`, except the checks of the `ENV_PARAMS` extension that
+   depend on whether a Step runs or on which Environments its Sessions enter, which are made only for a Step known to be
+   enabled ([Template Schemas §3](2023-09-Template-Schemas#3-steptemplate), and
    [§4](2023-09-Template-Schemas#4-environment) `CONTROL_FLOW` rule 3).
 
 2. **Job parameter binding** ("submit time"). Job parameter values are now known, so `Param.*`
@@ -468,9 +468,9 @@ At each stage, known values are evaluated concretely while unresolved values pro
      and the others of the same group of the Step's fields;
    * every expression of a Step whose `enableIf` is present and not decided `true` at this stage, including the fields
      evaluated for that Step's Environments: its `environment:` entries' *parameters* and *enableIf*, and the
-     *enableIf*, *hostRequirements*, and non-literal `default`s of the Environments that apply to it, which RFC 0010
-     evaluates at this stage (see [Template Schemas §4](2023-09-Template-Schemas#4-environment) `CONTROL_FLOW`
-     rule 3);
+     *enableIf*, *hostRequirements*, and non-literal `default`s of the Environments that apply to it, which the
+     `ENV_PARAMS` extension evaluates at this stage (see [Template Schemas §4](2023-09-Template-Schemas#4-environment)
+     `CONTROL_FLOW` rule 3);
    * every expression of a Step of a loop's body, which may also read the loop's values (`Loop.*`, `RawLoop.*`);
    * a loop's expressions evaluated at an iteration boundary, such as its `until`.
 
