@@ -5,7 +5,7 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 522 tests: 4 in `env_templates`, 258 in `job_templates`, and 260 in
+> **Status.** There are 524 tests: 4 in `env_templates`, 258 in `job_templates`, and 262 in
 > `jobs`. Every Job Template that lists `CONTROL_FLOW` lists `ENV_PARAMS`, except
 > `1.1--control-flow-without-env-params`, because a Job Template that lists `CONTROL_FLOW`
 > must also list `ENV_PARAMS` and `EXPR` (RFC 0011 Design Choice 13). No
@@ -251,7 +251,8 @@ and its section.
   accepted, with each `APPEND` element counted on its own and replaced loop variable and
   `LAST` output values not counted. A `RANGE_EXPR` loop output's `maxLength` and loop
   variable's `minLength`, checked against both the value as written and its canonical form,
-  fail the loop (`3.8.5--loop-*-range-expr-*`).
+  fail the loop (`3.8.5--loop-*-range-expr-*`), with `3.8.5--loop-range-expr-format-string-fits`
+  as the valid companion.
 
 ## Conventions in this directory
 

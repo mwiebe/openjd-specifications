@@ -1,6 +1,7 @@
 # RFC 0011 §The Steps.* scope, Where available item 3: a direct dependent may read
 # Steps.P.* in its enableIf, let, parameterSpace range, stepEnvironments, and script.
 # CEnv reads Steps.P.* in its enableIf (RFC 0011 §<Environment> item 1) and its variables.
+# 7.3.1--steps-in-host-requirements and 7.3.1--steps-in-action-timeout cover the other fields.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

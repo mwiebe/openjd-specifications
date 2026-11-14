@@ -1,8 +1,9 @@
 # RFC 0011 §Extension name and dependencies (Template Schemas §1.1 item 3): a template that
 # lists CONTROL_FLOW must also list EXPR. This one lists ENV_PARAMS and CONTROL_FLOW, not
-# EXPR, and uses no feature of either. ENV_PARAMS also requires EXPR, so RFC 0010's rule
-# rejects it too; no template can list CONTROL_FLOW and ENV_PARAMS without EXPR and break
-# only one of the two rules. 1.1--control-flow-without-env-params is the other half.
+# EXPR, and uses no feature of ENV_PARAMS or CONTROL_FLOW. ENV_PARAMS also requires EXPR, so
+# RFC 0010's rule rejects it too; no template can list CONTROL_FLOW and ENV_PARAMS without
+# EXPR and break only one of the two rules. 1.1--control-flow-without-env-params is the other
+# half.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - ENV_PARAMS

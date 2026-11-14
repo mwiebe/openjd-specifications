@@ -1,10 +1,11 @@
 # RFC 0011 §<Environment> item 4 and RFC 0010's Template Schemas §4 item 6: a Step
 # Environment's enableIf is an expression field of type bool whose null result is an error.
 # It is evaluated in the Step's remaining group (RFC 0011 §Materialization groups item 5), so
-# the null output of a skipped producer fails P before any of its Tasks runs. Q is skipped at
-# Job creation, so the null is concrete then and the Environment's enableIf is evaluated
-# then, which fails Job creation. The field's static type is bool? (Steps.Q is conditional),
-# which an expression field of type bool accepts (Template Schemas §7.6 rule 2).
+# the null output of a skipped producer fails P before any of its Tasks runs. A reports
+# Go=false, so Q is skipped at step input binding, its output is null, and SEnv's enableIf
+# is null when P's remaining group is evaluated. The field's static type is bool? (Steps.Q is
+# conditional), which an expression field of type bool accepts (Template Schemas §7.6 rule
+# 2); A_RAN shows that the template was accepted.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -13,8 +14,22 @@ template:
   - CONTROL_FLOW
   name: TestJob
   steps:
+  - name: A
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('A_' + 'RAN'); print('openjd_output_var: Go=false')
   - name: Q
-    enableIf: false
+    enableIf: Steps.A.Output.Go
+    dependencies:
+    - dependsOn: A
     outputVariables:
     - name: Go
       type: BOOL
@@ -44,5 +59,7 @@ template:
             print('P_' + 'RAN')
 expected:
   taskFailure: {}
+  output:
+  - A_RAN
   forbidden:
   - P_RAN

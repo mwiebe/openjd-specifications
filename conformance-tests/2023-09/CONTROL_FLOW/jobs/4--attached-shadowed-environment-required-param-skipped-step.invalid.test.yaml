@@ -7,8 +7,8 @@
 #
 # Its Pkg has no default, and the only Step, S, has the enableIf Param.Run, which is false, so S
 # is skipped, and the submission is still rejected. Every Step that runs would itself break the
-# rule, so the test can't include one; a Job whose Steps are all skipped is valid (RFC 0011
-# §Step states). 4--attached-shadowed-environment-with-default-runs is the valid companion: the
+# rule, so the test can't include one; RFC 0011 §Step states implies that a Job whose Steps
+# are all skipped is valid, though no test can show it succeeds. 4--attached-shadowed-environment-with-default-runs is the valid companion: the
 # same template with a default for Pkg and a Step T without enableIf, which shows the
 # template is otherwise accepted.
 template:
