@@ -1,0 +1,52 @@
+# RFC 0011 §<Environment> items 1 and 4: a Step Environment's enableIf may read the Steps.*
+# symbols of the Step's direct dependencies, and is evaluated with the Step's remaining group
+# once Q's output is concrete. It is true, so C's Sessions enter CEnv and its Tasks see CEnv's
+# variable. 4--step-environment-enableif-false-not-entered is the companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: Q
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=true')
+  - name: C
+    dependencies:
+    - dependsOn: Q
+    stepEnvironments:
+    - name: CEnv
+      enableIf: Steps.Q.Output.Go
+      script:
+        actions:
+          onEnter:
+            command: python
+            args:
+            - -c
+            - |-
+              print('ENV_E' + 'NTERED')
+      variables:
+        CF_VAR: set
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import os; print('VAR:' + os.environ.get('CF_VAR', 'UNSET'))
+expected:
+  output:
+  - ENV_ENTERED
+  - VAR:set

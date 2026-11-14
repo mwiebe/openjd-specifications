@@ -8,6 +8,7 @@
 # Run is false, so S is skipped at Job creation and the Job runs. This is the counter-case
 # of Open Question 16: the error is excepted because it depends on whether S runs.
 # 4--entry-value-unresolvable-enabled-step-fails-job-creation is the companion.
+# D, which depends on S, runs, as it would not if S had failed.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -56,11 +57,23 @@ template:
           - -c
           - |-
             print('S_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: S
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
 parameters:
   Run: false
 expected:
   output:
   - E_IN 1
   - T_RAN
+  - D_RAN
   forbidden:
   - S_RAN

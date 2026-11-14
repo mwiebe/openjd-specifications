@@ -7,6 +7,7 @@
 # at Job creation and has no Environment selection, and the check is never made for it. T
 # supplies Pkg, so the Job runs. 4--constraint-7-enabled-step-fails-job-creation is the
 # companion; job_templates/4--not-known-enabled-param checks a template like this one.
+# D, which depends on S, runs, as it would not if S had failed.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -54,11 +55,26 @@ template:
           - -c
           - |-
             print('S_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: S
+    - environment: E
+      parameters:
+        Pkg: d
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
 parameters:
   Run: false
 expected:
   output:
   - E_IN t
   - T_RAN
+  - D_RAN
   forbidden:
   - S_RAN

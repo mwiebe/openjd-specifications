@@ -5,7 +5,8 @@
 # Sessions would enter both. T's Sessions enter only W1, whose onWrapTaskRun runs in place of
 # T's onRun.
 #
-# Run is false, so S is skipped and the Job runs.
+# Run is false, so S is skipped and the Job runs: D, which depends on S, runs, as it
+# would not if S had failed. W1's onWrapTaskRun prints the name of the Step it wraps.
 # 4--wrap-single-layer-enabled-step-fails is the companion.
 template:
   specificationVersion: jobtemplate-2023-09
@@ -39,7 +40,7 @@ template:
           args:
           - -c
           - |-
-            print('W1_' + 'WRAP')
+            print('W1_' + 'WRAP_' + '{{WrappedStep.Name}}')
         onWrapEnvExit:
           command: python
           args:
@@ -96,11 +97,23 @@ template:
           - -c
           - |-
             print('S_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: S
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
 parameters:
   Run: false
 expected:
   output:
-  - W1_WRAP
+  - W1_WRAP_T
+  - W1_WRAP_D
   forbidden:
   - W2_IN
   - W2_WRAP

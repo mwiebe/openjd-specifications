@@ -5,9 +5,11 @@
 # Job Environment whose anyOf is empty unless its INT parameter N is 1. T supplies N: 1, and
 # S supplies N: 2 and has the enableIf Param.Run.
 #
-# S is not known to be enabled, so the template is valid.
+# Template validation cannot resolve E's anyOf, which reads Env.Param.N, a value not known
+# there (Template Schemas §7.6 rule 5), so this template is valid whatever S's enableIf; it
+# shows only that such an anyOf is accepted. The rule is checked at run time by
 # jobs/4--environment-host-requirements-skipped-step-runs and
-# jobs/4--environment-host-requirements-enabled-step-fails run it.
+# jobs/4--environment-host-requirements-enabled-step-fails.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR

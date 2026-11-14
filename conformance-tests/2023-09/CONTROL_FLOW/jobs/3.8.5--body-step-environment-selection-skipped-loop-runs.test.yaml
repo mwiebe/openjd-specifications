@@ -1,8 +1,8 @@
 # RFC 0011 §<Environment> item 3 and RFC 0013 §<StepLoop>: a body Step's Environment selection
 # is made within each iteration, for each body Step instance, even for a body Step without an
 # enableIf, since nothing of a body Step is evaluated at Job creation. E is a BY_DEFAULT Job
-# Environment whose Pkg has no default. T supplies Pkg, and the body Step B of loop L, which
-# depends on T and has the enableIf Param.Run, supplies nothing.
+# Environment whose Pkg has no default. T supplies Pkg. Loop L depends on T and has the
+# enableIf Param.Run, and its body Step B supplies nothing.
 #
 # Run is false, so L is skipped, B has no Environment selection, and the Job runs: D, which
 # depends on L, runs.

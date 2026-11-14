@@ -1,0 +1,61 @@
+# RFC 0011 §<Environment> item 5 and Template Schemas §3.3 item 1: with ENV_PARAMS, an amount
+# whose min and max both resolve to null is discarded, and with CONTROL_FLOW that rule applies
+# when the Step's hostRequirements are evaluated at step input binding. P is skipped, so its
+# output N is null, and C's only amount, whose min is N and which has no max, is discarded, so
+# C runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - FEATURE_BUNDLE_1
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: A
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: Go=false')
+  - name: P
+    enableIf: Steps.A.Output.Go
+    dependencies:
+    - dependsOn: A
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: N=1')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    hostRequirements:
+      amounts:
+      - name: conformance:amount.widgets
+        min: '{{Steps.P.Output.N}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  output:
+  - C_RAN
+  forbidden:
+  - P_RAN

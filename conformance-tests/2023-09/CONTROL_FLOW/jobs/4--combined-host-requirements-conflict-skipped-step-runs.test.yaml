@@ -8,6 +8,7 @@
 # 4--combined-host-requirements-conflict-enabled-step-fails is the companion, and
 # job_templates/4--combined-host-requirements-conflict-step-not-known-enabled checks a
 # template like this one.
+# D, which depends on S, runs, as it would not if S had failed.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -56,11 +57,23 @@ template:
           - -c
           - |-
             print('S_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: S
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
 parameters:
   Run: false
 expected:
   output:
   - H_IN
   - T_RAN
+  - D_RAN
   forbidden:
   - S_RAN

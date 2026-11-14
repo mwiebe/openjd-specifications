@@ -5,7 +5,7 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 515 tests: 4 in `env_templates`, 256 in `job_templates`, and 255 in
+> **Status.** There are 522 tests: 4 in `env_templates`, 258 in `job_templates`, and 260 in
 > `jobs`. Every Job Template that lists `CONTROL_FLOW` lists `ENV_PARAMS`, except
 > `1.1--control-flow-without-env-params`, because a Job Template that lists `CONTROL_FLOW`
 > must also list `ENV_PARAMS` and `EXPR` (RFC 0011 Design Choice 13). No
@@ -108,7 +108,10 @@ and its section.
   min/max/sum/nested lists, metrics with no consumer, and the 1024 cap lifted for computed
   ranges but kept for list literals.
 - **Step input binding** (`jobs/7.4--*`, `jobs/3.2--*`): `let` and `hostRequirements`
-  bound from outputs; `fail(...)` or a required `null` fails the Step before any Task runs;
+  bound from outputs, with `ENV_PARAMS`'s rules for them applied then, so an amount that
+  resolves to `null` is discarded and an `anyOf` that resolves to `[]` fails the Step
+  (`7.4--host-requirements-*-at-binding-*`); `fail(...)` or a required `null`, such as a
+  `range`, fails the Step before any Task runs;
   a consumer that reads a failed producer's output in its `range` never runs (the failed
   attempt's value is not committed); a skipped Step in a chain keeps ordering. Progressive
   binding: a `false` `enableIf` skips a parameter space that would fail; no other group is
@@ -149,9 +152,10 @@ and its section.
   of a Step Environment's `enableIf`, which also reads the direct dependencies' `Steps.*`,
   directly or through the Step's `let`, and in a body Step `Loop.*`; no `Steps.*` in a Job
   Environment's `enableIf` or `hostRequirements` or a parameter `default`, and no `Steps.*`
-  or `Loop.*` in an `environment:` entry's `enableIf` or `parameters`, even through `let`
-  (RFC 0011 §`<Environment>` items 1 and 2). A Step Environment's `enableIf` decided at step
-  input binding, its `null` result failing the Step, and its `false` result leaving the
+  or `Loop.*` in an `environment:` entry's `enableIf` or `parameters`, with `Steps.*` also
+  through `let` (RFC 0011 §`<Environment>` items 1 and 2). A Step Environment's `enableIf`
+  decided in the Step's remaining group, its `true` and `false` results entering and not
+  entering it, its `null` result failing the Step, and its `false` result leaving the
   Environment's `timeout` unevaluated (item 4); a Job Environment's `enableIf` decided for a
   Step whose Environment selection comes at step input binding. *Known to be enabled*
   (RFC 0011 §Terminology, item 3), probed with constraint 7 at template validation: `true`,
@@ -169,7 +173,7 @@ and its section.
   (`jobs/4--*-enabled-step-fails*`) or at step input binding (`jobs/4--*-at-binding-fails`),
   for one that runs: constraint 7 for every Environment that applies, a `BY_DEFAULT` one even
   where its own `enableIf` is `false`, an `ALWAYS` one, and an `ON_REQUEST` one that the Step
-  requests; a disabled entry for an Environment whose `activation` is `ALWAYS`
+  requests, the last two at step input binding; a disabled entry for an Environment whose `activation` is `ALWAYS`
   as written, in a Job Environment and in an attached Environment Template, while a disabled
   entry for the Environment of an attached Environment Template that does not list
   `ENV_PARAMS` has no effect (`jobs/4--pre-extension-*`); an `ALWAYS` Environment whose
