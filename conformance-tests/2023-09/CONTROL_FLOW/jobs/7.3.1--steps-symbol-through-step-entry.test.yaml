@@ -34,7 +34,7 @@ template:
           args:
           - -c
           - |-
-            print('openjd_output_var: M=1')
+            print('Q_' + 'RAN'); print('openjd_output_var: M=1')
   - name: C
     dependencies:
     - step: P

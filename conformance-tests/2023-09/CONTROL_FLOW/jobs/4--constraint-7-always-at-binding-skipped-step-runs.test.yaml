@@ -1,0 +1,76 @@
+# RFC 0011 §<Environment> item 3 and RFC 0010's Template Schemas §3.2 constraint 7: a Step's
+# Environment selection checks constraint 7 for every Environment that applies to the Step,
+# before any of their enableIf is evaluated. 
+# E is an ALWAYS Job Environment whose Pkg has no default, so it applies to every Step, and C
+# supplies no value for Pkg. P reports Go=false, so C is skipped and the check is never made
+# for it: D, which depends on C, runs, as it would not if C had failed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  jobEnvironments:
+  - name: E
+    activation: ALWAYS
+    envParameterDefinitions:
+    - name: Pkg
+      type: STRING
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('E_' + 'IN', '{{Env.Param.Pkg}}')
+  steps:
+  - name: P
+    dependencies:
+    - environment: E
+      parameters:
+        Pkg: p
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: Go=false')
+  - name: C
+    enableIf: Steps.P.Output.Go
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: C
+    - environment: E
+      parameters:
+        Pkg: d
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
+expected:
+  output:
+  - P_RAN
+  - D_RAN
+  forbidden:
+  - C_RAN

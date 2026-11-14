@@ -1,0 +1,35 @@
+# RFC 0011 §<Environment> items 1, 4 and 7 and RFC 0013 §Sessions: a body Step's Step
+# Environment's enableIf may read Loop.*, and is evaluated for each iteration, so the instances
+# of one body Step may enter different Step Environments. BEnv is enabled only after the first
+# iteration, so B sees its variable in iteration 1 but not in iteration 0.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: L
+    loop:
+      until: Loop.Iteration >= 1
+      maxIterations: 3
+      steps:
+      - name: B
+        stepEnvironments:
+        - name: BEnv
+          enableIf: Loop.Iteration > 0
+          variables:
+            CF_B: 'on'
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                import os; print('IT_' + str({{Loop.Iteration}}) + ':' + os.environ.get('CF_B', 'off'))
+expected:
+  output:
+  - IT_0:off
+  - IT_1:on

@@ -1,0 +1,45 @@
+# RFC 0011 §<Environment> item 3 ("Before Job creation" bullet) and RFC 0010's Template Schemas
+# §3.2 constraint 7: an ON_REQUEST Environment applies to a Step that requests it with an
+# enabled entry, which must then supply every parameter without a default. Constraint 7 is
+# checked before Job creation only for a Step known to be enabled. E is an ON_REQUEST Job
+# Environment whose Pkg has no default, and S requests it with an entry that supplies nothing.
+#
+# S's enableIf is Param.F or true, so S is known to be enabled, and the missing value is an
+# error at template validation.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  activation: ON_REQUEST
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: S
+  enableIf: Param.F or true
+  dependencies:
+  - environment: E
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

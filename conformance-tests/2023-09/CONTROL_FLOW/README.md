@@ -5,7 +5,7 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 506 tests: 4 in `env_templates`, 254 in `job_templates`, and 248 in
+> **Status.** There are 515 tests: 4 in `env_templates`, 256 in `job_templates`, and 255 in
 > `jobs`. Every Job Template that lists `CONTROL_FLOW` lists `ENV_PARAMS`, except
 > `1.1--control-flow-without-env-params`, because a Job Template that lists `CONTROL_FLOW`
 > must also list `ENV_PARAMS` and `EXPR` (RFC 0011 Design Choice 13). No
@@ -24,8 +24,9 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 each Task reports with an `openjd_output_var: <Name>=<JSON>` (or `=@<file>`) stdout
 directive. Steps that depend *directly* on the producer read the values as
 `Steps.<Step>.Output.<Var>` (plus `TaskParam`, `RawOutput`, and `TaskRawParam`), so a Step
-can compute its parameter space (dynamic fan-out), decide whether it runs (`enableIf` on
-Steps and Environments), and reduce the values of a multi-Task producer (fan-in). Fields
+can compute its parameter space (dynamic fan-out), decide whether it runs (a Step's
+`enableIf`) and which Step Environments it enters (RFC 0010's `enableIf` on a Step
+Environment, which may read them), and reduce the values of a multi-Task producer (fan-in). Fields
 that read upstream outputs are evaluated at a new stage, *step input binding*, group by
 group as the values each group reads arrive (`enableIf` first), and no Task runs until
 every group has been evaluated. A Job can
@@ -156,16 +157,19 @@ and its section.
   (RFC 0011 §Terminology, item 3), probed with constraint 7 at template validation: `true`,
   `'true'`, `Param.F or true`, and `Steps.A.Output.Ok or true` are known, `Param.F` and
   `Steps.A.Output.Ok` are not, and a body Step is known to be enabled only when its loop's
-  `enableIf` is absent or known and its loop has no `while` or one known to be `true`
+  `enableIf` is absent or known to be `true` and its loop has no `while` or one known to be
+  `true`
   (`4--known-enabled-*`, `4--not-known-enabled-*`). The checks that depend on whether a Step
   runs or on which Environments it enters are not made before Job creation for a Step not
-  known to be enabled (the valid `job_templates/4--*-step-not-known-enabled` tests, with an
-  `.invalid` `4--*-step-known-enabled` companion where template validation makes the check
-  for a Step known to be enabled), never for a skipped Step (`jobs/4--*-skipped-step-runs`),
+  known to be enabled (the valid `job_templates/4--*-step-not-known-enabled` tests, with the
+  `.invalid` companions `4--always-disabled-entry-step-known-enabled`,
+  `4--constraint-7-on-request-step-known-enabled`, `4--entry-literal-value-step-known-enabled`
+  and `4--entry-undeclared-key-step-known-enabled` for a Step known to be enabled), never for a skipped Step (`jobs/4--*-skipped-step-runs`),
   and are made in the Step's Environment selection, at Job creation
   (`jobs/4--*-enabled-step-fails*`) or at step input binding (`jobs/4--*-at-binding-fails`),
-  for one that runs: constraint 7 for every Environment that applies, even one whose own
-  `enableIf` is `false`; a disabled entry for an Environment whose `activation` is `ALWAYS`
+  for one that runs: constraint 7 for every Environment that applies, a `BY_DEFAULT` one even
+  where its own `enableIf` is `false`, an `ALWAYS` one, and an `ON_REQUEST` one that the Step
+  requests; a disabled entry for an Environment whose `activation` is `ALWAYS`
   as written, in a Job Environment and in an attached Environment Template, while a disabled
   entry for the Environment of an attached Environment Template that does not list
   `ENV_PARAMS` has no effect (`jobs/4--pre-extension-*`); an `ALWAYS` Environment whose
@@ -174,7 +178,13 @@ and its section.
   resolved with the Step's values; a conflict in the combined host requirements; and the
   `WRAP_ACTIONS` single-layer rule. An entry's undeclared key and a literal value its
   parameter rejects are tested at template validation only. A `step:` entry is a whole-Step
-  dependency for `Steps.*` (`7.3.1--steps-symbol-through-step-entry`), a loop's
+  dependency for `Steps.*` (`7.3.1--steps-symbol-through-step-entry`); an attached
+  Environment named like a Job Environment, whose parameter without a `default` rejects the
+  submission whatever any Step's `enableIf` (`jobs/4--attached-shadowed-environment-*`); a
+  body Step's Environment selection made in each iteration, so that a skipped loop's body
+  Step is never checked and an enabled loop fails in iteration 0
+  (`jobs/3.8.5--body-step-environment-selection-*`), and a body Step's Step Environment
+  `enableIf` that reads `Loop.*` (`jobs/3.8.5--body-step-environment-enableif-reads-loop`); a loop's
   `dependencies` have no `environment:` entry while its body Steps' may
   (`3.8--loop-environment-entry`, `4--body-step-entry`), and `Job.EnvNames` may be read by the
   fields `CONTROL_FLOW` adds (`3--job-envnames-in-control-flow-fields`,
@@ -304,8 +314,10 @@ and its section.
 
 - Some of RFC 0010's per-Step work as it moves into a Step's Environment selection under
   `CONTROL_FLOW` (RFC 0011 §`<Environment>` items 3 and 8): `exclusiveGroup`, a non-literal
-  `default` that a Step takes, the 1024-character limit on a value, and constraint 7 for an
-  attached `ON_REQUEST` or `ALWAYS` Environment. The tests probe the deferral
+  `default` that a Step takes, the 1024-character limit on a value, constraint 7 for an
+  attached Environment that a Step reaches by name, and a known-enabled Step's combined
+  host-requirement conflict or `WRAP_ACTIONS` violation at template validation, which
+  `ENV_PARAMS`'s own tests check only at Job creation. The tests probe the deferral
   with the checks listed under *Environments and Environment selection*, and the
   `ENV_PARAMS` tests cover the checks themselves. A validator given the Environment
   Templates checks an external entry's keys and values before Job creation, but `openjd

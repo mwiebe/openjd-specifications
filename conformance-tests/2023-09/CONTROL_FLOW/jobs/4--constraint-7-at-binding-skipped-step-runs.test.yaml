@@ -5,7 +5,7 @@
 #
 # The companion of 4--constraint-7-at-binding-fails with P reporting Go=false: C is skipped at
 # step input binding, so it has no Environment selection and the check is never made for it,
-# and the Job succeeds.
+# and the Job succeeds: D, which depends on C, runs, as it would not if C had failed.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -60,8 +60,23 @@ template:
           - -c
           - |-
             print('C_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: C
+    - environment: E
+      parameters:
+        Pkg: d
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
 expected:
   output:
   - P_RAN
+  - D_RAN
   forbidden:
   - C_RAN

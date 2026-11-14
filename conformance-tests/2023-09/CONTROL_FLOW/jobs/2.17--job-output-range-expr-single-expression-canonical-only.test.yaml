@@ -5,7 +5,7 @@
 # only its canonical form. The output is evaluated at Job creation, so a failure fails it.
 #
 # R has maxLength 3 and its value is the single expression {{Param.F}}, whose result is the
-# range_expr of the RANGE_EXPR parameter F, submitted as 1,2,3. It has only its canonical
+# range_expr of the RANGE_EXPR parameter F, whose default is 1,2,3. It has only its canonical
 # form 1-3, which fits, so the Job runs.
 template:
   specificationVersion: jobtemplate-2023-09

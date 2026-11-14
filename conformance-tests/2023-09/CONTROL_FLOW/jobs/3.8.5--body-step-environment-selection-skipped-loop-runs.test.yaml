@@ -1,0 +1,85 @@
+# RFC 0011 §<Environment> item 3 and RFC 0013 §<StepLoop>: a body Step's Environment selection
+# is made within each iteration, for each body Step instance, even for a body Step without an
+# enableIf, since nothing of a body Step is evaluated at Job creation. E is a BY_DEFAULT Job
+# Environment whose Pkg has no default. T supplies Pkg, and the body Step B of loop L, which
+# depends on T and has the enableIf Param.Run, supplies nothing.
+#
+# Run is false, so L is skipped, B has no Environment selection, and the Job runs: D, which
+# depends on L, runs.
+# 3.8.5--body-step-environment-selection-fails-loop is the companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
+  jobEnvironments:
+  - name: E
+    envParameterDefinitions:
+    - name: Pkg
+      type: STRING
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('E_' + 'IN', '{{Env.Param.Pkg}}')
+  steps:
+  - name: T
+    dependencies:
+    - environment: E
+      parameters:
+        Pkg: t
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + 'RAN')
+  - name: L
+    enableIf: Param.Run
+    dependencies:
+    - dependsOn: T
+    loop:
+      until: Loop.Iteration >= 1
+      maxIterations: 3
+      steps:
+      - name: B
+        script:
+          actions:
+            onRun:
+              command: python
+              args:
+              - -c
+              - |-
+                print('B_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: L
+    - environment: E
+      parameters:
+        Pkg: d
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
+parameters:
+  Run: false
+expected:
+  output:
+  - T_RAN
+  - D_RAN
+  forbidden:
+  - B_RAN

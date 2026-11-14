@@ -1,0 +1,55 @@
+# RFC 0011 §<Environment> item 3 ("What stays at Job creation" bullet) and RFC 0010's Template
+# Schemas §3.2.1 item 4: an attached BY_DEFAULT or ALWAYS Environment with the name of a Job
+# Environment is not reachable by name, so no entry can supply its parameters, and a parameter
+# without a default rejects the submission whatever any Step's enableIf. The Job Template has
+# the Job Environment Conda, and the attached Environment Template's BY_DEFAULT Environment is
+# also named Conda.
+#
+# Its Pkg has no default, and the only Step, S, has the enableIf Param.Run, which is false, so S
+# is skipped, and the submission is still rejected.
+# 4--attached-shadowed-environment-with-default-runs is the valid companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
+  jobEnvironments:
+  - name: Conda
+    variables:
+      CF_CONDA: '1'
+  steps:
+  - name: S
+    enableIf: Param.Run
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+parameters:
+  Run: false
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  environment:
+    name: Conda
+    envParameterDefinitions:
+    - name: Pkg
+      type: STRING
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('A_' + 'IN', '{{Env.Param.Pkg}}')
