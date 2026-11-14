@@ -11,10 +11,10 @@
 * Depends On:
   * RFC 0011, Control Flow, for the `Steps.*` scope, step input binding, `enableIf`, and the Step states
   * RFC 0012, Step Output Variables, for the output variable types, collect modes, and the re-run rule
-  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), for expression fields (its Template Schemas §7.6), the
-    form of a loop's *enableIf*, *while*, and *until*, which need only `EXPR`, and for the parts that apply its
-    Environment rules to body Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends
-    them
+  * RFC 0010, Environment Parameters (`ENV_PARAMS`) (draft), which `CONTROL_FLOW` requires (see [RFC 0011 Design
+    Choice 13](0011-control-flow.md#13-control_flow-requires-env_params)): for expression fields (its Template Schemas
+    §7.6), the form of a loop's *enableIf*, *while*, and *until*, and for the parts that apply its Environment rules to
+    body Step instances, as [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) extends them
 * Related:
   * Use case U17 of [RFC 0011 §Use cases](0011-control-flow.md#use-cases), which this RFC covers
   * Discussion #22, immutability vs. dynamic adjustments
@@ -202,7 +202,7 @@ sketch in earlier drafts of RFC 0011 did not cover.
 
 ```yaml
 specificationVersion: jobtemplate-2023-09
-extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+extensions: [EXPR, ENV_PARAMS, CONTROL_FLOW, FEATURE_BUNDLE_1]
 name: "Render {{path(RawParam.SceneFile).stem}} until clean"
 parameterDefinitions:
   - name: SceneFile
@@ -343,7 +343,7 @@ the mesh being relaxed, stays in a file, and only control data flows through the
 
 ```yaml
 specificationVersion: jobtemplate-2023-09
-extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+extensions: [EXPR, ENV_PARAMS, CONTROL_FLOW, FEATURE_BUNDLE_1]
 name: "Relax {{path(RawParam.Mesh).stem}}"
 parameterDefinitions:
   - name: Mesh
@@ -437,7 +437,7 @@ holds more keys than one output value should, and it shows a `while` loop with a
 
 ```yaml
 specificationVersion: jobtemplate-2023-09
-extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+extensions: [EXPR, ENV_PARAMS, CONTROL_FLOW, FEATURE_BUNDLE_1]
 name: "Process s3://{{Param.Bucket}}/{{Param.Prefix}}"
 parameterDefinitions:
   - name: Bucket
@@ -830,8 +830,8 @@ Changed semantics of *steps*: with `CONTROL_FLOW`, an element that has a `loop` 
    This replaces the rule of §3, item 1, that each Step's name differs from those of the other Steps.
 2. A top-level Step's `dependencies` name only top-level Steps.
 
-In these constraints and the others of this RFC on `dependencies`, an entry is one that names a Step. With RFC 0010's
-`ENV_PARAMS`, an `environment:` entry names an Environment instead, and these constraints don't apply to it.
+In these constraints and the others of this RFC on `dependencies`, an entry is one that names a Step. An `environment:`
+entry (RFC 0010) names an Environment instead, and these constraints don't apply to it.
 
 #### `<StepLoop>`
 
@@ -870,9 +870,9 @@ Where:
     3. No two elements in this list may have the same value for the `name` property.
 
 A `<StepLoop>` has no other properties: in particular no `script`, `parameterSpace`, `hostRequirements`,
-`stepEnvironments`, or `let`. With RFC 0010's `ENV_PARAMS`, its `dependencies` may not have an `environment:` entry: a
-loop has no Sessions, so it requests no Environment, and it has no Environment selection (see
-[RFC 0011 §`<Environment>`](0011-control-flow.md#environment)). Its body Steps may have them.
+`stepEnvironments`, or `let`. Its `dependencies` may not have an `environment:` entry (RFC 0010): a loop has no
+Sessions, so it requests no Environment, and it has no Environment selection (see [RFC 0011
+§`<Environment>`](0011-control-flow.md#environment)). Its body Steps may have them.
 
 Where the base specification and RFC 0011 speak of a Step as a node of the step graph, by its name, its
 `dependencies`, its *enableIf*, its state, or the `dependsOn` of another Step, a loop is a Step. It has no Tasks,
@@ -899,15 +899,15 @@ Where:
 2. *while* — Whether to run another iteration, checked before each iteration, including the first. It is an expression
    field of type `bool` (RFC 0010's Template Schemas §7.6), as a loop's *enableIf* is, so it is written without `{{ }}`
    and a `null` result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters),
-   `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), `Loop.*` and `RawLoop.*` (with values whose type
-   is or contains `path` only through `RawLoop.*`), and the `Steps.*` symbols of the loop's dependencies (see [`Steps.*`
-   in and around a loop](#steps-in-and-around-a-loop)). It may not reference the body's Steps, `Step.Name`, `Task.*`,
-   `Session.*`, or names bound by `let`.
+   `RawParam.*`, `Job.Name`, `Job.EnvNames`, `Loop.*` and `RawLoop.*` (with values whose type is or contains `path` only
+   through `RawLoop.*`), and the `Steps.*` symbols of the loop's dependencies (see [`Steps.*` in and around a
+   loop](#steps-in-and-around-a-loop)). It may not reference the body's Steps, `Step.Name`, `Task.*`, `Session.*`, or
+   names bound by `let`.
 3. *until* — Whether to stop, checked after each iteration. An expression field of type `bool`, as *while* is. It may
    reference everything *while* may, and the `Steps.*` symbols of every body Step of the loop.
 4. *maxIterations* — The most iterations the loop may run. Its target type is `int`. It may reference only `Param.*`
-   (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, and `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`),
-   so it is known at Job creation. Its value must be from 1 to 1,000.
+   (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`, `Job.Name`, and `Job.EnvNames`, so it is known at Job
+   creation. Its value must be from 1 to 1,000.
 5. *steps* — The body: the Steps that run in each iteration. Constraints:
     1. Minimum number of elements: 1.
     2. Each element is a `<StepTemplate>`. A `<StepLoop>` in a body is an error: loops do not nest.
@@ -942,8 +942,8 @@ Where:
    mapping to expression types and the same constraint properties. `LIST[LIST[INT]]` is allowed.
 3. *initial* — The value for iteration 0, as a format string whose target type is the expression type of *type*. A
    `null` result is an error. It may reference `Param.*` (except `PATH` and `LIST[PATH]` parameters), `RawParam.*`,
-   `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), and the `Steps.*` symbols of the loop's dependencies. It may not
-   reference `Loop.*`, `RawLoop.*`, the body's Steps, `Step.Name`, `Task.*`, `Session.*`, or names bound by `let`.
+   `Job.Name`, `Job.EnvNames`, and the `Steps.*` symbols of the loop's dependencies. It may not reference `Loop.*`,
+   `RawLoop.*`, the body's Steps, `Step.Name`, `Task.*`, `Session.*`, or names bound by `let`.
 4. *next* — The value for the following iteration, evaluated at each iteration boundary at which *until*, if
    present, did not end the loop, before *while* and the bound. So a `while` loop evaluates *next* at its final
    boundary too, and an error or constraint violation there fails the loop. Its target type and `null` rule are those
@@ -1016,15 +1016,15 @@ CONTROL_FLOW adds three value references for loops:
 1. In a body Step of `L`, in the fields where [RFC 0011 §The `Steps.*` scope](0011-control-flow.md#the-steps-scope)
    *Where available* rule 3 allows `Steps.*`: its *enableIf*, *let*, *hostRequirements*, *parameterSpace* Task parameter
    `range`s and the other format strings of *parameterSpace* (not *combination*), *stepEnvironments* (any format string,
-   and with `ENV_PARAMS` their *enableIf*), *script*, and, with `TASK_DEPENDENCIES`, the subspace ranges of its
-   *dependencies*. There, the values are those of the iteration that the body Step instance belongs to.
+   and their *enableIf*), *script*, and, with `TASK_DEPENDENCIES`, the subspace ranges of its *dependencies*. There, the
+   values are those of the iteration that the body Step instance belongs to.
 2. In `L`'s *while*, where the values are those of the iteration about to start; and in `L`'s *until*, *next*, and
    loop output *value*s, where the values are those of the iteration that just finished. See
    [The iteration boundary](#the-iteration-boundary).
 3. Nowhere else: not in `L`'s *enableIf*, *maxIterations*, or *initial*; not in another loop or its body; not in a
-   top-level Step, a job output, a Job Environment, or an Environment Template; and, with RFC 0010's `ENV_PARAMS`, not
-   in an `environment:` entry of a body Step's *dependencies*, directly or through a *let* binding (see
-   [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) item 2).
+   top-level Step, a job output, a Job Environment, or an Environment Template; and not in an `environment:` entry of a
+   body Step's *dependencies*, directly or through a *let* binding (see [RFC 0011
+   §`<Environment>`](0011-control-flow.md#environment) item 2).
 
 A `Loop.<VarName>` whose type is or contains `path` is available only in format strings resolved on the worker host,
 as a `PATH` `Param.*` is. Format strings and expression fields resolved earlier, including all of `L`'s own
@@ -1083,8 +1083,8 @@ says for any Step, within its iteration.
 | **Template validation** | as today | as today | as today, and `Loop.*`, `RawLoop.*` | Every rule of [Validation](#validation) is checked, with `Loop.*` and `RawLoop.*` as `unresolved` values of their types. |
 | **Job creation** | as today | as today; for the loop's first *while*, `Loop.*` and `RawLoop.*` for iteration 0 | as today, and every body Step's values | A loop is a Step for RFC 0011's Job creation rules: its *enableIf* and groups whose inputs are concrete are evaluated (see [Loop binding](#loop-binding)). Nothing of a body Step is evaluated (RFC 0010's Job-level work, such as resolving its `environment:` entries, is still done; see [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) item 3), and the `minLength` check of the loop's `APPEND` outputs is never part of Job creation. |
 | **Step input binding** | as RFC 0011, for a loop and for each body Step instance | as RFC 0011; for a body Step instance, `Loop.*` and `RawLoop.*`; for the loop's first *while*, `Loop.*` and `RawLoop.*` for iteration 0 | as RFC 0011 | As RFC 0011. A body Step instance is bound within its iteration. |
-| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each body Step, `Loop.*` and `RawLoop.*` for `N`, the `Steps.*` of the loop's dependencies; with `ENV_PARAMS`, `Job.EnvNames` and the values RFC 0010 lets its fields read | the body Step instances' `Steps.*` values that are not yet concrete, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
-| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`), `Loop.*` and `RawLoop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Step.Name`, `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
+| **Iteration start** (new, `CONTROL_FLOW` only) | When a loop starts iteration `N` | `Param.*`, `RawParam.*`, `Job.Name`, `Step.Name` of each body Step, `Loop.*` and `RawLoop.*` for `N`, the `Steps.*` of the loop's dependencies, `Job.EnvNames`, and the values RFC 0010 lets its fields read | the body Step instances' `Steps.*` values that are not yet concrete, `Task.*`, `Session.*` | An instance of every body Step is created; each instance's groups whose inputs are concrete are evaluated. See [Iterations](#iterations). |
+| **Iteration boundary** (new, `CONTROL_FLOW` only) | When every body Step instance of iteration `N` has succeeded or been skipped | `Param.*`, `RawParam.*`, `Job.Name`, `Job.EnvNames`, `Loop.*` and `RawLoop.*` for `N` (for *while*, for `N + 1`), the `Steps.*` of the loop's dependencies and of every body Step instance of `N` | `Step.Name`, `Task.*`, `Session.*` | Loop outputs, then *until*, then *next*, then *while*, then the bound. See [The iteration boundary](#the-iteration-boundary). |
 | **Job output evaluation** | as RFC 0011 | as RFC 0011 | as RFC 0011 | A job output may read a loop's `Steps.*` symbols, and not a body Step's. |
 | **Task execution** | as today | as RFC 0011, and for a body Step instance, `Loop.*`, `RawLoop.*`, and the `Steps.*` of the loop's dependencies | *(none)* | As RFC 0011. |
 
@@ -1120,11 +1120,11 @@ When a loop starts iteration `N`:
    `N = 0`) or from the last boundary's *next*, and `Loop.Iteration` is `N`.
 2. An instance of every body Step is created. Each instance is a Step for every rule of RFC 0011 and RFC 0012: it has
    the states of a Step, is bound progressively, has its own Tasks and outputs, and its *enableIf*, when present, is
-   decided first. With `ENV_PARAMS`, an instance's Environment selection is made once its *enableIf* is `true`, as [RFC
-   0011 §`<Environment>`](0011-control-flow.md#environment) item 3 says, and has the same result in every iteration,
-   because it reads no `Loop.*` or `Steps.*` symbol. An instance's `dependencies` are the instances of the same
-   iteration of the body Steps it names, and are satisfied as RFC 0011 says. An instance with no dependencies is gated
-   only by its own binding.
+   decided first. An instance's Environment selection is made once its *enableIf* is `true`, as [RFC 0011
+   §`<Environment>`](0011-control-flow.md#environment) item 3 says, and has the same result in every iteration, because
+   it reads no `Loop.*` or `Steps.*` symbol. An instance's `dependencies` are the instances of the same iteration of the
+   body Steps it names, and are satisfied as RFC 0011 says. An instance with no dependencies is gated only by its own
+   binding.
 3. Each instance's groups whose inputs are concrete at the start of the iteration MUST be evaluated then, as a
    Step's groups whose inputs are concrete at Job creation are. An error in one fails the instance, and so the loop,
    finally (see [Failure](#failure)).
@@ -1223,13 +1223,12 @@ later retried or requeued and succeeds.
 #### Sessions
 
 A body Step instance is a Step for the rules of Sessions: a Session holds the Step Environments of one Step, so a
-Session that runs Tasks of two instances, of the same body Step in two iterations or of two body Steps, exits the
-first instance's Step Environments and enters the second's. A scheduler MAY run instances of different iterations in
-one Session under those rules, keeping its Job Environments entered, but need not. With RFC 0010's `ENV_PARAMS`, a
-Session runs a Step's Tasks only if it entered exactly that Step's Environments, with values equal to that Step's
-effective values (RFC 0010's Template Schemas §3.2.2), and the instances of one body Step always have the same Job
-Environments, attached Environments, and values (see [RFC 0011 §`<Environment>`](0011-control-flow.md#environment)
-item 7).
+Session that runs Tasks of two instances, of the same body Step in two iterations or of two body Steps, exits the first
+instance's Step Environments and enters the second's. A scheduler MAY run instances of different iterations in one
+Session under those rules, keeping its Job Environments entered, but need not. By RFC 0010, a Session runs a Step's
+Tasks only if it entered exactly that Step's Environments, with values equal to that Step's effective values (RFC 0010's
+Template Schemas §3.2.2), and the instances of one body Step always have the same Job Environments, attached
+Environments, and values (see [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) item 7).
 
 #### Retries and re-runs
 
@@ -1313,15 +1312,14 @@ Every rule this RFC adds, and when it is checked, in the form of
 2. A body is a non-empty list of `<StepTemplate>`s, none a `<StepLoop>`.
 3. The names of all Steps of the template, top-level, loops, and body Steps, are distinct.
 4. A top-level Step's `dependencies` name only top-level Steps; a body Step's name only Steps of the same body; each
-   body's dependency graph is acyclic, as is the top-level graph. With `ENV_PARAMS`, a loop's `dependencies` have no
-   `environment:` entry.
+   body's dependency graph is acyclic, as is the top-level graph. A loop's `dependencies` have no `environment:` entry.
 5. *variables*: 1 to 32 elements with unique `<Identifier>` names other than `Iteration`; types are
    `<OutputVariableType>`s; constraint properties are valid for the type.
 6. *outputVariables* of a loop: 1 to 32 elements with unique `<Identifier>` names; *collect* is present and is `LAST`
    or `APPEND`, and `APPEND` only with a `LIST[...]` type; *value* is present; types, constraint properties, and
    *unit* as for RFC 0012's *outputVariables*.
 7. *maxIterations*: an integer from 1 to 1,000, or a format string that references only `Param.*` (except `PATH` and
-   `LIST[PATH]` parameters), `RawParam.*`, and `Job.Name` (with `ENV_PARAMS`, also `Job.EnvNames`) and has type `int`.
+   `LIST[PATH]` parameters), `RawParam.*`, `Job.Name`, and `Job.EnvNames`, and has type `int`.
 8. `Loop.*` and `RawLoop.*` appear only where [The `Loop.*` scope](#the-loop-scope) allows, name a declared variable
    or `Iteration`, and a `Loop.*` whose type is or contains `path` only in format strings resolved on the worker host.
 9. `Steps.*` symbols in a loop's expressions and in its body Steps name only the Steps that
@@ -1333,10 +1331,11 @@ Every rule this RFC adds, and when it is checked, in the form of
     4): a value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type
     that does not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each
     loop output *value* has its output's type, or under `APPEND` its element type.
-11. Which errors in a body Step's materialization expressions template validation reports is decided as [RFC 0011
-    §Validation](0011-control-flow.md#validation) item 10 says, with the loop's *enableIf* and *while* among the
-    fields the check depends on. Which of the loop's own fields each condition guards is [RFC 0011 Open Question
-    16](0011-control-flow.md#open-questions).
+11. Template validation reports an error that it can compute in a body Step's materialization expressions, and in the
+    loop's own expressions, whatever the loop's *enableIf* and *while* and the body Step's *enableIf*, as [RFC 0011
+    §Validation](0011-control-flow.md#validation) item 10 says for a Step ([RFC 0011 Open Question
+    16](0011-control-flow.md#open-questions), answered). With `FEATURE_BUNDLE_1`, a body Step's *timeout* of
+    `"{{1 - 1}}"` is an error at template validation even in a loop whose *while* is `"Param.Run"`.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`

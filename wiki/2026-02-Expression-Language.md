@@ -455,6 +455,11 @@ At each stage, known values are evaluated concretely while unresolved values pro
    It is not evaluated for a Step whose effective value for a parameter it reads is missing, fails to resolve, or
    does not convert ([Template Schemas §3.2.2](2023-09-Template-Schemas#322-effective-environment-parameter-values)
    item 2).
+   With the `CONTROL_FLOW` extension, some expressions in TEMPLATE scope are evaluated after this stage, at step input
+   binding or within a loop's iteration: those that read the outputs of other Steps (`Steps.*`) or a loop's values
+   (`Loop.*`, `RawLoop.*`), a Step Environment's *enableIf*, and, for a Step not enabled when the Job is created, the
+   *enableIf* of its `environment:` entries and of the Environments that apply to it ([Template Schemas
+   §7.4](2023-09-Template-Schemas#74-template-processing-stages)).
 
 3. **Worker host execution**. All symbols are known — `Task.Param.*`, `Session.*`, file paths,
    and path mapping rules are all concrete. Every expression is fully evaluated with no

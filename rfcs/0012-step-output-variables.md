@@ -80,7 +80,7 @@ which is the whole point. The example uses each of the three `collect` modes.
 
 ```yaml
 specificationVersion: jobtemplate-2023-09
-extensions: [EXPR, CONTROL_FLOW, FEATURE_BUNDLE_1]
+extensions: [EXPR, ENV_PARAMS, CONTROL_FLOW, FEATURE_BUNDLE_1]
 name: hand-tracking-sweep-01
 steps:
   - name: ExtractHandActions
@@ -384,11 +384,14 @@ Where:
 5. *unit* — The unit of the output's values, such as `mm`, `%`, or `frames/s`, for display. It has no functional
    purpose: values are not converted. A string of 1 to 32 characters, none of which is in the Unicode Cc (control)
    category.
-6. Constraint properties — Checked against each Task's value as the Task reports it (see
-   [Processing a directive](#processing-a-directive)). A value that violates one fails the Task. Only the properties
-   the definition declares are checked: a default that a job parameter definition implies when a property is omitted (such as the
+6. Constraint properties — Checked against each Task's value as the Task reports it (see [Processing a
+   directive](#processing-a-directive)). A value that violates one fails the Task. Only the properties the definition
+   declares are checked: a default that a job parameter definition implies when a property is omitted (such as the
    1024-character default `maxLength` of a `RANGE_EXPR` parameter) does not apply. The `default` and `userInterface`
-   properties of job parameter definitions are not available.
+   properties of job parameter definitions are not available. A `RANGE_EXPR` value's `minLength` and `maxLength` are
+   checked against both the value as reported and its canonical form, as Template Schemas §2.10 says for a document that
+   lists `ENV_PARAMS`, which a Job Template that lists `CONTROL_FLOW` does (see [RFC 0011 Design Choice
+   13](0011-control-flow.md#13-control_flow-requires-env_params)).
 
 Constraints:
 

@@ -18,7 +18,7 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 
 ## What this extension does
 
-`CONTROL_FLOW` (which requires `EXPR`) lets a Step declare typed `outputVariables` that
+`CONTROL_FLOW` (which requires `ENV_PARAMS` and `EXPR`) lets a Step declare typed `outputVariables` that
 each Task reports with an `openjd_output_var: <Name>=<JSON>` (or `=@<file>`) stdout
 directive. Steps that depend *directly* on the producer read the values as
 `Steps.<Step>.Output.<Var>` (plus `TaskParam`, `RawOutput`, and `TaskRawParam`), so a Step
@@ -40,7 +40,7 @@ The filename prefix is the [Template Schemas](../../../wiki/2023-09-Template-Sch
 section; each file's header comment cites the RFC (0011, 0012, or 0013) that holds the rule,
 and its section.
 
-- **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `EXPR`; every new field
+- **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `ENV_PARAMS` and `EXPR`; every new field
   and symbol requires `CONTROL_FLOW`; Environment Templates can't declare `CONTROL_FLOW` or
   reference `Steps.*` or `Loop.*`, and without `ENV_PARAMS` can't use `enableIf`. An
   Environment Template can't list `CONTROL_FLOW`, so these rules give the same result as
@@ -176,10 +176,12 @@ and its section.
 
 ## Conventions in this directory
 
-- **Extensions.** Every template lists `EXPR` and `CONTROL_FLOW` (plus `TASK_CHUNKING`, or
-  `FEATURE_BUNDLE_1` for a format-string amount `min` or action `timeout`, where needed)
-  unless the test is about gating. Environment templates used under `environments:` list
-  only what they need.
+- **Extensions.** Every Job Template lists `EXPR`, `ENV_PARAMS`, and `CONTROL_FLOW` (plus
+  `TASK_CHUNKING`, or `FEATURE_BUNDLE_1` for a format-string amount `min` or action
+  `timeout`, where needed) unless the test is about gating, because a Job Template that lists
+  `CONTROL_FLOW` must also list `ENV_PARAMS` and `EXPR` (RFC 0011 §Extension name and
+  dependencies). Environment templates used under `environments:` list only what they need,
+  so some of them don't list `ENV_PARAMS`.
 - **Observing values portably.** Output values are never asserted from a CLI's own
   printing of outputs. A consumer Step that depends on the producer prints them:
 
@@ -234,14 +236,13 @@ and its section.
 ## Not covered
 
 - The `enableIf` of an Environment and of an `environment:` entry, which RFC 0010
-  (`ENV_PARAMS`) defines and RFC 0011 extends. These tests don't use `ENV_PARAMS` yet. The
-  Environment `enableIf` tests (`job_templates/4--enableif-*`, `jobs/4--enableif-*`) still
-  give an Environment an `enableIf` without `ENV_PARAMS`, most of them in the format-string
-  form, which the RFCs no longer allow, and
+  (`ENV_PARAMS`) defines and RFC 0011 extends, beyond the Environment `enableIf` tests
+  (`job_templates/4--enableif-*`, `jobs/4--enableif-*`). Those must use the expression-field
+  form that RFC 0010 defines, and
   `job_templates/1.1--environment-enableif-without-extension`,
   `env_templates/4--enableif-in-environment-template` and
-  `jobs/4--enableif-in-environment-template-with-control-flow-job` cite an RFC 0011 rule
-  that RFC 0010 has replaced. They are to be rewritten with `ENV_PARAMS`.
+  `jobs/4--enableif-in-environment-template-with-control-flow-job` must cite RFC 0010's
+  rule that an `enableIf` needs `ENV_PARAMS` in the document that has it.
 - A `null` value for `while` or `until`. It is an error, but alone it gives the same result
   as an implementation that read it as an omitted field, which rejects a loop with neither
   `while` nor `until`, and beside the other of the two it also breaks the rule that a loop
@@ -251,12 +252,11 @@ and its section.
   0010's Template Schemas §7.6 rule 5, such as `true`, `"true"` or, with a BOOL Job
   Parameter `F`, `"Param.F or true"`, and for a body Step also a loop whose `enableIf` is
   absent or known to be `true` and that has no `while` or one known to be `true`. It decides
-  when `ENV_PARAMS`'s checks that depend on whether a Step runs are made, which no
-  submission without `ENV_PARAMS` can show, and, by RFC 0011 §Validation item 10, which
-  errors in values template validation reports (the next item).
-- Whether template validation reports an error in a value it can compute, such as, with
-  `FEATURE_BUNDLE_1`, a `timeout` of `"{{1 - 1}}"`, in a Step that is not known to be
-  enabled. RFC 0011 Open Question 16 asks; no test depends on the answer yet.
+  when `ENV_PARAMS`'s checks that depend on whether a Step runs are made.
+- That template validation reports an error in a value it can compute, such as, with
+  `FEATURE_BUNDLE_1`, a `timeout` of `"{{1 - 1}}"`, whether or not the Step, or a Step
+  Environment that holds it, is known to be enabled (RFC 0011 §Validation item 10; Open
+  Question 16, answered). No test checks it yet.
 - That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
   (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
   Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph

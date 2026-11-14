@@ -153,6 +153,13 @@ templates. So before anything runs, the render management system knows which **E
 **Sessions** enter and with which values. [Template Schemas §3.2](2023-09-Template-Schemas#32-stepdependency) and
 [§4](2023-09-Template-Schemas#4-environment) give the exact rules, including when a submission is rejected.
 
+With the CONTROL_FLOW extension, these values and decisions, and the checks above, are worked out for each Step only
+once the Step is enabled, which can be after the Job is created, and for a Step in a loop's body, in each iteration
+(see [Step States and Step Input Binding](#step-states-and-step-input-binding)). They still depend only on the Job
+Parameters and the templates, so they come out the same whenever they are worked out. An error in them fails only that
+Step when it is found after the Job is created, and a skipped Step is not held to them. Whether each of a Step's own
+Step Environments is entered is decided later still, with its other fields.
+
 When a **Session** enters an **Environment**, it keeps the same parameter values until it exits that **Environment**.
 The **Environment**'s `onEnter`, its `onExit`, and what it provides to every Task run while it is entered, such as its
 `variables` and wrap hooks, all use the same values. A Task's own script still cannot read them. This
@@ -175,6 +182,9 @@ Because the values are known when the Job is created, a render management system
 them, and can prefer a Worker Host that recently entered an **Environment** with the same values, such as one that has
 a matching Conda environment or container image cached. In the video pipeline above, each Step's **Sessions** then
 install or pull only the software that Step needs.
+
+With the CONTROL_FLOW extension, a Step's values are known once the Step is enabled, before any of its Tasks is
+scheduled.
 
 Path mapping rules are applied on the Worker Host to PATH and LIST[PATH] parameter values, as they are to PATH Job
 Parameters. A Step's own script cannot read `Env.Param.*`. A Step that needs a value in both places can bind it with
@@ -200,14 +210,14 @@ The `OPENJD_SESSION_WORKING_DIR` environment variable is an example of this cons
 Without the CONTROL_FLOW extension (introduced in [RFC 0011](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0011-control-flow.md) and [RFC 0012](https://github.com/OpenJobDescription/openjd-specifications/blob/mainline/rfcs/0012-step-output-variables.md), draft), every Step's Tasks are known when the Job is
 created, and a Step's Tasks are scheduled once the Steps it depends on have completed successfully.
 
-With CONTROL_FLOW, a Step may compute its parameter space, its host requirements, its `let` bindings, its Step
-Environments, or whether it runs at all from the output variables of the Steps it depends on. Whether it runs is its
-`enableIf`, a condition written as an expression without `{{ }}`, such as
-`enableIf: "Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold"`, the same field that the `ENV_PARAMS` extension
-gives Environments and their dependency entries. The values a Step reads from other Steps don't exist until the
-producing Steps have run, or (for `TaskParam`) their Tasks are known, so such a Step is **pending inputs**
-(`PENDING_INPUTS`) from Job creation until it is bound (every group of its fields described below has been evaluated),
-skipped, or failed. None of its Tasks can be scheduled while it is pending inputs.
+With CONTROL_FLOW, which a Job Template can list only together with ENV_PARAMS and EXPR, a Step may compute its
+parameter space, its host requirements, its `let` bindings, its Step Environments, or whether it runs at all from the
+output variables of the Steps it depends on. Whether it runs is its `enableIf`, a condition written as an expression
+without `{{ }}`, such as `enableIf: "Steps.QualityCheck.Output.MeanNoise > Param.NoiseThreshold"`, the same field that
+the `ENV_PARAMS` extension gives Environments and their dependency entries. The values a Step reads from other Steps
+don't exist until the producing Steps have run, or (for `TaskParam`) their Tasks are known, so such a Step is **pending
+inputs** (`PENDING_INPUTS`) from Job creation until it is bound (every group of its fields described below has been
+evaluated), skipped, or failed. None of its Tasks can be scheduled while it is pending inputs.
 
 The scheduler performs **step input binding** progressively. The Step's fields that are resolved before its Tasks run
 are divided into groups, and each group can be evaluated as soon as the values it reads are available. A scheduler
@@ -215,18 +225,17 @@ should evaluate it then, and must have evaluated every group before it schedules
 
 1. `enableIf` is always decided first. Nothing else of the Step is evaluated until it is. If it is `false`, the Step is
    **skipped**: it has zero Tasks, and none of its other fields is evaluated. A Step without `enableIf` is enabled at
-   once. With the `ENV_PARAMS` extension, once the Step is enabled the scheduler decides at once which of the Job's
-   Environments and attached Environments its Sessions enter, with which parameter values. They depend only on values
-   known when the Job is created, but are decided only once the Step is enabled: when the Job is created for a Step
-   enabled then, otherwise when it is enabled, and for a Step in a loop's body, in each iteration. Whether each of its
-   Step Environments is entered is decided later, with its other fields. An error in that choice, which would reject the
-   Job if found when the Job is created, fails only that Step when found later (and for a Step in a loop's body, so the
-   loop). A skipped Step enters none, and is held to none of those checks except an error in an Environment's own
-   definition, such as an `ALWAYS` Environment whose `enableIf` is known to be `false` from the template alone, which is
-   reported whatever any Step's `enableIf`. Since any Step may be skipped, checking the Job Template reports the other
-   errors of that choice only for a Step known to be enabled: one whose `enableIf` is absent or known to be `true` from
-   the template alone, and, in a loop's body, whose loop's `enableIf` is too and whose loop has no `while` or one known
-   to be `true`.
+   once. Once the Step is enabled, the scheduler decides at once which of the Job's Environments and attached
+   Environments its Sessions enter, with which parameter values. They depend only on values known when the Job is
+   created, but are decided only once the Step is enabled: when the Job is created for a Step enabled then, otherwise
+   when it is enabled, and for a Step in a loop's body, in each iteration. Whether each of its Step Environments is
+   entered is decided later, with its other fields. An error in that choice, which would reject the Job if found when
+   the Job is created, fails only that Step when found later (and for a Step in a loop's body, so the loop). A skipped
+   Step enters none, and is held to none of those checks except an error in an Environment's own definition, such as an
+   `ALWAYS` Environment whose `enableIf` is known to be `false` from the template alone, which is reported whatever any
+   Step's `enableIf`. Since any Step may be skipped, checking the Job Template reports the other errors of that choice
+   only for a Step known to be enabled: one whose `enableIf` is absent or known to be `true` from the template alone,
+   and, in a loop's body, whose loop's `enableIf` is too and whose loop has no `while` or one known to be `true`.
 2. Then, independently and in whichever order their values arrive (when several can be evaluated at once, in the
    order listed here):
    * its parameter space is evaluated and checked against the scheduler's limits on the number of Tasks per Step and
@@ -235,8 +244,8 @@ should evaluate it then, and must have evaluated every group before it schedules
    * with a future task-task dependencies extension (`TASK_DEPENDENCIES`), the dependencies between its Tasks are
      evaluated and checked, once its Tasks, and the Tasks of the Steps those dependencies name, are known and the
      values they read are available;
-   * the rest of its fields, such as its Step Environments (with `ENV_PARAMS`, including whether each is entered, and
-     the action timeouts of each one that is) and its own action timeouts, are evaluated.
+   * the rest of its fields, such as its Step Environments (including whether each is entered, and the action
+     timeouts of each one that is) and its own action timeouts, are evaluated.
 
    A `let` binding of the Step is evaluated with the first group that uses it, and every one is evaluated before
    the Step is bound.
@@ -260,12 +269,11 @@ The Step then becomes one of:
   read them. A Step outside a loop's body whose `enableIf` reads only values available at Job creation, such as Job
   Parameters, is decided at Job creation instead.
 * **Failed** — An expression in any group failed, its Task count exceeded the scheduler's per-Step limit or would take
-  the Job over its per-Job limit, (with the `ENV_PARAMS` extension) a check of the Environments it enters or of its
-  combined host requirements failed, or (with a future `TASK_DEPENDENCIES` extension) the dependencies between its Tasks
-  have a cycle or an index out of range. It fails as soon as the group with the error is evaluated, without waiting for
-  the values its other groups read, and none of its Tasks runs. Such a Step has no failed Tasks to retry, so it stays
-  failed. A Step that failed because one of its Tasks failed can still succeed if a retry or requeue of its failed Tasks
-  succeeds.
+  the Job over its per-Job limit, a check of the Environments it enters or of its combined host requirements failed, or
+  (with a future `TASK_DEPENDENCIES` extension) the dependencies between its Tasks have a cycle or an index out of
+  range. It fails as soon as the group with the error is evaluated, without waiting for the values its other groups
+  read, and none of its Tasks runs. Such a Step has no failed Tasks to retry, so it stays failed. A Step that failed
+  because one of its Tasks failed can still succeed if a retry or requeue of its failed Tasks succeeds.
 
 No Task of a Step is scheduled until every group has been evaluated, so evaluating groups early changes when a Step's
 Tasks and host requirements can be seen, not when its Tasks run.
@@ -421,6 +429,10 @@ parameters and are worked out for each Step, so a Docker **Environment** can req
 it to use one. A Step whose **Sessions** do not enter the **Environment** is not affected by its requirements. If the
 requirements contradict each other, such as a minimum amount above a maximum, the Job is rejected when it is created.
 [Template Schemas §3.3.3](2023-09-Template-Schemas#333-combined-host-requirements) gives the rules for combining them.
+
+With the CONTROL_FLOW extension, a Step's requirements are combined once it is enabled and its own host requirements
+are evaluated, which can be after the Job is created, and a contradiction found then fails only that Step (see
+[Step States and Step Input Binding](#step-states-and-step-input-binding)).
 
 ## Stdout/Stderr Messages
 
