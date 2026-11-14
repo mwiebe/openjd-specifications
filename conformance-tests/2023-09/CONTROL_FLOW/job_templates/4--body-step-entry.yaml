@@ -1,0 +1,49 @@
+# RFC 0011 §<Environment> item 2 and RFC 0013 §<StepLoop>: a body Step of a loop may have an
+# environment: entry, whose enableIf reads no Loop.*. The constraints that a body Step's
+# dependencies stay inside the body apply only to entries that name a Step. B's entry for E
+# has the enableIf Param.F. The valid companion of 4--body-step-entry-enableif-reads-loop and
+# 3.8--loop-environment-entry.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+    default: d
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: L
+  loop:
+    until: Loop.Iteration >= 1
+    maxIterations: 3
+    steps:
+    - name: B
+      dependencies:
+      - environment: E
+        enableIf: Param.F
+        parameters:
+          Pkg: b
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('B_' + 'RAN')

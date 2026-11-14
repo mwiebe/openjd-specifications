@@ -1,0 +1,65 @@
+# RFC 0011 §<Environment> item 3 ("Before Job creation" bullet) and RFC 0010's Template Schemas
+# §3.3 item 3 and §4 item 5: an Environment's hostRequirements are resolved with each Step's
+# values in that Step's Environment selection, so an error in them is not reported before Job
+# creation for a Step not known to be enabled, and never for a skipped Step. E is a BY_DEFAULT
+# Job Environment whose anyOf is empty unless its INT parameter N is 1. T supplies N: 1, and
+# S supplies N: 2 and has the enableIf Param.Run.
+#
+# S is not known to be enabled, so the template is valid.
+# jobs/4--environment-host-requirements-skipped-step-runs and
+# jobs/4--environment-host-requirements-enabled-step-fails run it.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Run
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: N
+    type: INT
+  hostRequirements:
+    attributes:
+    - name: conformance:attr.flavor
+      anyOf: '{{ [f for f in [''a''] if Env.Param.N == 1] }}'
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.N}}')
+steps:
+- name: T
+  dependencies:
+  - environment: E
+    parameters:
+      N: 1
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('T_' + 'RAN')
+- name: S
+  enableIf: Param.Run
+  dependencies:
+  - environment: E
+    parameters:
+      N: 2
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

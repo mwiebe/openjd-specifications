@@ -6,8 +6,9 @@
 # by Template Schemas §7.6 rule 5, whose loop's enableIf is too, and whose loop has no while
 # or one known to be true, with Steps.*, Loop.*, and RawLoop.* not yet known.
 #
-# L's while reads Loop.Iteration, which is not known before Job creation, so L may run no
-# iteration, B is not known to be enabled, and the template is valid.
+# L's while is Param.F and Loop.Iteration < 1, which is not known before Job creation and is
+# false before the first iteration when F is false, so B is not known to be enabled, and the
+# template is valid.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
@@ -34,7 +35,7 @@ jobEnvironments:
 steps:
 - name: L
   loop:
-    while: Loop.Iteration < 1
+    while: Param.F and Loop.Iteration < 1
     maxIterations: 3
     steps:
     - name: B

@@ -1,0 +1,41 @@
+# RFC 0011 §<Environment> (the paragraph on Job.EnvNames) and §<StepTemplate> enableIf: a
+# Step's enableIf may read Job.EnvNames, which is concrete at Job creation. The Job has the
+# Job Environment E and no Environment X, so S, whose enableIf asks for X, is skipped, and T,
+# whose enableIf asks for E, runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  jobEnvironments:
+  - name: E
+    variables:
+      CF_E: '1'
+  steps:
+  - name: S
+    enableIf: "'X' in Job.EnvNames"
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+  - name: T
+    enableIf: "'E' in Job.EnvNames"
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + 'RAN')
+expected:
+  output:
+  - T_RAN
+  forbidden:
+  - S_RAN

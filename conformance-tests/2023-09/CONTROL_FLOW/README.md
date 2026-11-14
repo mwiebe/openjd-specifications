@@ -5,9 +5,10 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 493 tests: 4 in `env_templates`, 247 in `job_templates`, and 242 in
-> `jobs`. Every Job Template lists `ENV_PARAMS`, because a Job Template that lists
-> `CONTROL_FLOW` must also list `ENV_PARAMS` and `EXPR` (RFC 0011 Design Choice 13). No
+> **Status.** There are 506 tests: 4 in `env_templates`, 254 in `job_templates`, and 248 in
+> `jobs`. Every Job Template that lists `CONTROL_FLOW` lists `ENV_PARAMS`, except
+> `1.1--control-flow-without-env-params`, because a Job Template that lists `CONTROL_FLOW`
+> must also list `ENV_PARAMS` and `EXPR` (RFC 0011 Design Choice 13). No
 > implementation supports `CONTROL_FLOW` together with `ENV_PARAMS` yet, so no implementation
 > has run this version of the tests. The `ENV_PARAMS` prototype of openjd-rs checked the
 > `ENV_PARAMS` parts of the new Environment tests whose only other `CONTROL_FLOW` feature is
@@ -43,7 +44,9 @@ and its section.
 
 - **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `ENV_PARAMS` and `EXPR`
   (`1.1--control-flow-without-env-params` and `1.1--control-flow-without-expr`, with
-  `1.1--control-flow-without-features` as the valid companion); every new field and symbol
+  `1.1--control-flow-without-features` as the valid companion; RFC 0010's rule that
+  `ENV_PARAMS` requires `EXPR` also rejects the second, so no test can show the `EXPR` half of
+  the rule alone); every new field and symbol
   requires `CONTROL_FLOW`, while an Environment's `enableIf` is RFC 0010's and needs only
   `ENV_PARAMS` (`1.1--environment-enableif-without-control-flow`); Environment Templates
   can't declare `CONTROL_FLOW` or reference `Steps.*` or `Loop.*`, also in an `enableIf`
@@ -80,8 +83,9 @@ and its section.
   `maxLength` violations fail the producer; only declared constraints apply; a `LAST`
   value that a later directive replaces stops counting toward the 1 MiB floor; a
   `RANGE_EXPR` value's `minLength` and `maxLength` are checked against both the value as
-  reported and its canonical form (`3.7--range-expr-*-length*`), the rule of Template
-  Schemas §2.10 for a document that lists `ENV_PARAMS`.
+  reported and its canonical form (`3.7--range-expr-max-length-as-reported`,
+  `3.7--range-expr-min-length-canonical`, and `3.7--range-expr-length-both-forms-fit`), the
+  rule of Template Schemas §2.10 for a document that lists `ENV_PARAMS`.
 - **Chunked Steps** (`*--chunk*`, with `TASK_CHUNKING`): the `[<value>]` selector is
   required (even for a chunk of one), forbidden without `CHUNK[INT]`, must be in the chunk
   being run (not merely in the range), is matched by integer value, may be negative, and
@@ -131,13 +135,15 @@ and its section.
   expressions in a Step that may not run: with `FEATURE_BUNDLE_1`, an action `timeout` of
   `{{1 - 1}}` in a Step whose `enableIf` is a parameter or `false`
   (`job_templates/3--timeout-error-*`, with `3--timeout-step-not-known-enabled` as the valid
-  companion), in a body Step of a `while` loop (`3.8.1--timeout-error-in-while-loop-body`),
+  companion), in a body Step of a `while` loop or a conditional loop
+  (`3.8.1--timeout-error-in-*-loop-body`),
   and in a Step Environment whose `enableIf` reads `Steps.*`
   (`4--step-environment-timeout-error-dynamic-enableif`); a Step's own `anyOf` that resolves
   to no values (`3--host-requirements-any-of-empty-step-not-known-enabled`); an error in an
-  Environment's or an entry's `enableIf` itself, a type error and an evaluation error; and a
-  literal `default` that its own constraints reject
-  (`4--literal-default-violation-no-step-known-enabled`).
+  Environment's or an entry's `enableIf` itself, a type error and an evaluation error
+  (`4--*-reported-whatever-enableif`); a literal `default` that its own constraints reject
+  (`4--literal-default-violation-no-step-known-enabled`); and an `ALWAYS` Environment whose
+  `enableIf` is known to be `false` (`4--always-enableif-known-false-no-step-known-enabled`).
 - **Environments and Environment selection** (`job_templates/4--*`, `jobs/4--*`): the scope
   of a Step Environment's `enableIf`, which also reads the direct dependencies' `Steps.*`,
   directly or through the Step's `let`, and in a body Step `Loop.*`; no `Steps.*` in a Job
@@ -153,18 +159,26 @@ and its section.
   `enableIf` is absent or known and its loop has no `while` or one known to be `true`
   (`4--known-enabled-*`, `4--not-known-enabled-*`). The checks that depend on whether a Step
   runs or on which Environments it enters are not made before Job creation for a Step not
-  known to be enabled (`job_templates/4--*-step-not-known-enabled`, each valid with a
-  `.invalid` companion for a Step known to be enabled where template validation makes the
-  check), never for a skipped Step (`jobs/4--*-skipped-step-runs`), and are made in the
-  Step's Environment selection, at Job creation or at step input binding, for one that runs
-  (`jobs/4--*-fails*`): constraint 7 for every Environment that applies, even one whose own
+  known to be enabled (the valid `job_templates/4--*-step-not-known-enabled` tests, with an
+  `.invalid` `4--*-step-known-enabled` companion where template validation makes the check
+  for a Step known to be enabled), never for a skipped Step (`jobs/4--*-skipped-step-runs`),
+  and are made in the Step's Environment selection, at Job creation
+  (`jobs/4--*-enabled-step-fails*`) or at step input binding (`jobs/4--*-at-binding-fails`),
+  for one that runs: constraint 7 for every Environment that applies, even one whose own
   `enableIf` is `false`; a disabled entry for an Environment whose `activation` is `ALWAYS`
   as written, in a Job Environment and in an attached Environment Template, while a disabled
   entry for the Environment of an attached Environment Template that does not list
-  `ENV_PARAMS` has no effect (`jobs/4--pre-extension-*`); an entry value that fails to
-  resolve; a `required: true` entry that names no Environment; a conflict in the combined
-  host requirements; and the `WRAP_ACTIONS` single-layer rule. An entry's undeclared key and
-  a literal value its parameter rejects are tested at template validation only.
+  `ENV_PARAMS` has no effect (`jobs/4--pre-extension-*`); an `ALWAYS` Environment whose
+  `enableIf` is `false` for the Step; an entry value that fails to resolve; a
+  `required: true` entry that names no Environment; an Environment's `hostRequirements`
+  resolved with the Step's values; a conflict in the combined host requirements; and the
+  `WRAP_ACTIONS` single-layer rule. An entry's undeclared key and a literal value its
+  parameter rejects are tested at template validation only. A `step:` entry is a whole-Step
+  dependency for `Steps.*` (`7.3.1--steps-symbol-through-step-entry`), a loop's
+  `dependencies` have no `environment:` entry while its body Steps' may
+  (`3.8--loop-environment-entry`, `4--body-step-entry`), and `Job.EnvNames` may be read by the
+  fields `CONTROL_FLOW` adds (`3--job-envnames-in-control-flow-fields`,
+  `jobs/3--enableif-reads-job-envnames`).
 - **Job outputs** (`*2.17--*`): count and name rules, separate namespace from parameters,
   `LIST[LIST[INT]]`, any Step readable without a dependency, path rules (`RawParam`,
   `RawOutput`, and `TaskRawParam` allowed; `Param` of `PATH` and `LIST[PATH]` parameters
@@ -228,8 +242,10 @@ and its section.
 ## Conventions in this directory
 
 - **Extensions.** Every Job Template lists `EXPR`, `ENV_PARAMS`, and `CONTROL_FLOW` (plus
-  `TASK_CHUNKING`, or `FEATURE_BUNDLE_1` for a format-string amount `min` or action
-  `timeout`, where needed) unless the test is about gating, because a Job Template that lists
+  `TASK_CHUNKING`, `WRAP_ACTIONS`, or `FEATURE_BUNDLE_1` for a format-string amount `min` or
+  action `timeout`, where needed) unless the test is about gating or, as
+  `jobs/3.7.1--directive-without-control-flow-is-ordinary-output`, about a Job without
+  `CONTROL_FLOW`, because a Job Template that lists
   `CONTROL_FLOW` must also list `ENV_PARAMS` and `EXPR` (RFC 0011 §Extension name and
   dependencies). Environment templates used under `environments:` list only what they need,
   so some of them don't list `ENV_PARAMS`.
@@ -287,9 +303,9 @@ and its section.
 ## Not covered
 
 - Some of RFC 0010's per-Step work as it moves into a Step's Environment selection under
-  `CONTROL_FLOW` (RFC 0011 §`<Environment>` items 3 and 8): `exclusiveGroup`, an
-  Environment's `hostRequirements` resolved with a Step's values, a non-literal `default`
-  that a Step takes, and the 1024-character limit on a value. The tests probe the deferral
+  `CONTROL_FLOW` (RFC 0011 §`<Environment>` items 3 and 8): `exclusiveGroup`, a non-literal
+  `default` that a Step takes, the 1024-character limit on a value, and constraint 7 for an
+  attached `ON_REQUEST` or `ALWAYS` Environment. The tests probe the deferral
   with the checks listed under *Environments and Environment selection*, and the
   `ENV_PARAMS` tests cover the checks themselves. A validator given the Environment
   Templates checks an external entry's keys and values before Job creation, but `openjd

@@ -1,0 +1,66 @@
+# RFC 0011 §<Environment> item 3 and RFC 0010's Template Schemas §4 item 4: an ALWAYS
+# Environment's enableIf being false for a Step is an error found in the Step's Environment
+# selection, and never for a skipped Step. Lic is an ALWAYS Job Environment whose enableIf is
+# Env.Param.X == 1, which is not known before Job creation. P takes X's default 1, so Lic is
+# enabled for P. C supplies X: 2 and its enableIf reads P's output, so its Environment
+# selection is made at step input binding.
+#
+# P reports Go=true, so C's selection finds Lic's enableIf false for C, and C fails before any
+# of its Tasks runs. 4--always-enableif-false-skipped-step-runs is the companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  jobEnvironments:
+  - name: Lic
+    activation: ALWAYS
+    enableIf: Env.Param.X == 1
+    envParameterDefinitions:
+    - name: X
+      type: INT
+      default: 1
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('L_' + 'IN', {{Env.Param.X}})
+  steps:
+  - name: P
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: Go=true')
+  - name: C
+    enableIf: Steps.P.Output.Go
+    dependencies:
+    - dependsOn: P
+    - environment: Lic
+      parameters:
+        X: 2
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - P_RAN
+  forbidden:
+  - C_RAN

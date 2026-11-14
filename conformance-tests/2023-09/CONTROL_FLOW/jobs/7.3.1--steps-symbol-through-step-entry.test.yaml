@@ -1,0 +1,65 @@
+# RFC 0011 §The Steps.* scope, Where available item 1, with RFC 0010's Template Schemas §3.2
+# item 2: a step: entry means exactly what a dependsOn: entry means. C names P in a step:
+# entry and prints P's output, and D names the skipped Step Q in a step: entry, which a
+# skipped Step satisfies (RFC 0011 Design Choice 5), and sees Q's output as null.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: N
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: N=7')
+  - name: Q
+    enableIf: false
+    outputVariables:
+    - name: M
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: M=1')
+  - name: C
+    dependencies:
+    - step: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'GOT:' + str({{Steps.P.Output.N}}))
+  - name: D
+    dependencies:
+    - step: Q
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('D_' + 'NULL:' + json.dumps(json.loads({{repr_py(repr_json(Steps.Q.Output.M == null))}})))
+expected:
+  output:
+  - C_GOT:7
+  - D_NULL:true
+  forbidden:
+  - Q_RAN

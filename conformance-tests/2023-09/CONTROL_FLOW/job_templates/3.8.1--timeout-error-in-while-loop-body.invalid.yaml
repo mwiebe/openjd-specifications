@@ -4,8 +4,8 @@
 # With FEATURE_BUNDLE_1, an action timeout of {{1 - 1}} resolves to 0, which is not a positive
 # integer, wherever it is evaluated.
 #
-# B is a body Step of a loop whose while reads Loop.Iteration, so the loop may run no
-# iteration, and B's timeout is still an error.
+# B is a body Step of a loop whose while is Param.F and Loop.Iteration < 1, so the loop runs
+# no iteration when F is false, and B's timeout is still an error.
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
@@ -13,10 +13,14 @@ extensions:
 - FEATURE_BUNDLE_1
 - CONTROL_FLOW
 name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
 steps:
 - name: L
   loop:
-    while: Loop.Iteration < 1
+    while: Param.F and Loop.Iteration < 1
     maxIterations: 3
     steps:
     - name: B
