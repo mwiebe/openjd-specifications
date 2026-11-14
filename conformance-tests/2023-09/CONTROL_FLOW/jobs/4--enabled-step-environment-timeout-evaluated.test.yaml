@@ -1,0 +1,62 @@
+# RFC 0011 §<Environment> item 4: a Step Environment's enableIf is evaluated before its
+# TEMPLATE-scope format strings, which with FEATURE_BUNDLE_1 are its Actions' timeout and
+# cancelation, and when it is false they are not evaluated. CEnv's enableIf and its onEnter
+# timeout read P's outputs: Go, and T, which P reports as 0, not a valid timeout. Template
+# validation can't compute the timeout, so it is not an error there.
+#
+# The companion of 4--disabled-step-environment-timeout-not-evaluated with P reporting
+# Go=true: CEnv is enabled, its timeout of 0 is evaluated and fails C before any of its
+# Tasks runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - FEATURE_BUNDLE_1
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: Go
+      type: BOOL
+    - name: T
+      type: INT
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: Go=true'); print('openjd_output_var: T=0')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    stepEnvironments:
+    - name: CEnv
+      enableIf: Steps.P.Output.Go
+      script:
+        actions:
+          onEnter:
+            command: python
+            timeout: '{{Steps.P.Output.T}}'
+            args:
+            - -c
+            - |-
+              print('CE_' + 'IN')
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - P_RAN
+  forbidden:
+  - CE_IN
+  - C_RAN

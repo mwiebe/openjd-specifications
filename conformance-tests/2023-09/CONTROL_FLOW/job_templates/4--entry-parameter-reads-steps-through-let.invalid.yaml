@@ -1,0 +1,54 @@
+# RFC 0011 §<Environment> item 2: an environment: entry's parameters values may not reference
+# Steps.* through a let binding either, however indirectly. C's binding m reads P's output,
+# n reads m, and the entry supplies E's Pkg from n. RFC 0010 lets a value read the Step's let
+# (Template Schemas §7.3.2), so only the Steps.* behind it makes this invalid.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+    default: d
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: P
+  outputVariables:
+  - name: Name
+    type: STRING
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Name="a"')
+- name: C
+  dependencies:
+  - dependsOn: P
+  - environment: E
+    parameters:
+      Pkg: '{{n}}'
+  let:
+  - m = Steps.P.Output.Name
+  - n = m + 'x'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('C_' + 'RAN')

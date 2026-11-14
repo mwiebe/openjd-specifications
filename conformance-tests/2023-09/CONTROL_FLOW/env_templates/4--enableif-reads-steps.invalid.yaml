@@ -1,0 +1,13 @@
+# RFC 0011 §<Environment> item 1 and §The Steps.* scope: an attached Environment's enableIf
+# reads no Steps.*, and nothing in an Environment Template can reference the symbols
+# CONTROL_FLOW adds. This Environment Template lists ENV_PARAMS, so its enableIf is allowed;
+# only the Steps.* symbol it reads makes it invalid.
+specificationVersion: environment-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+environment:
+  name: Env
+  enableIf: Steps.P.Output.Go
+  variables:
+    CF_VAR: '1'

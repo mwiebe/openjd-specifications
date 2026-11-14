@@ -1,0 +1,40 @@
+# RFC 0011 §<Environment> item 2: an environment: entry's enableIf may not reference Loop.*, so
+# a body Step's Environment parameter values and Environments are the same in every iteration.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+    default: d
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: L
+  loop:
+    until: Loop.Iteration >= 1
+    maxIterations: 3
+    steps:
+    - name: B
+      dependencies:
+      - environment: E
+        enableIf: Loop.Iteration > 0
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('B_' + 'RAN')

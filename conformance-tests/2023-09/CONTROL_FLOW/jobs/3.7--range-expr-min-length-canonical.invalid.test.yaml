@@ -1,0 +1,39 @@
+# RFC 0012 §<OutputVariableDefinition> item 6, with Template Schemas §2.10: a RANGE_EXPR
+# output's minLength and maxLength are checked against both the value as reported and its
+# canonical form, the rule for a RANGE_EXPR Job Parameter in a document that lists ENV_PARAMS.
+#
+# V has minLength 4. The Task reports 1-3:2, which is 5 characters as reported but whose
+# canonical form 1,3 is 3, so the Task fails.
+# 3.7--range-expr-length-both-forms-fit is the valid companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: V
+      type: RANGE_EXPR
+      minLength: 4
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('openjd_output_var: V="1-3:2"')
+  - name: C
+    dependencies:
+    - dependsOn: P
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import json; print('GOT:' + json.dumps(json.loads({{repr_py(repr_json(string(Steps.P.Output.V)))}})))

@@ -1,0 +1,37 @@
+# RFC 0011 §Validation item 10 and Open Question 16 (answered): template validation reports an
+# error that it can compute in a Step's materialization expressions, whatever the Step's
+# enableIf, a Step Environment's enableIf, and for a body Step the loop's enableIf and while.
+# With FEATURE_BUNDLE_1, an action timeout of {{1 - 1}} resolves to 0, which is not a positive
+# integer, wherever it is evaluated.
+#
+# S's enableIf is the literal false, so S never runs and its timeout is never evaluated at run
+# time, and the timeout is still an error at template validation. A second Step keeps the Job
+# from having no Step that runs.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- FEATURE_BUNDLE_1
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: S
+  enableIf: false
+  script:
+    actions:
+      onRun:
+        command: python
+        timeout: '{{1 - 1}}'
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')
+- name: T
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('T_' + 'RAN')

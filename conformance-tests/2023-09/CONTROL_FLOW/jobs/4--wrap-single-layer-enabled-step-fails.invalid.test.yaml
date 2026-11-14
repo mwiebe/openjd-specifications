@@ -1,0 +1,100 @@
+# RFC 0011 §<Environment> item 6 and RFC 0008's single-layer rule: a check over the whole set
+# of Environments a Step's Sessions enter is never made for a skipped Step, and before Job
+# creation only for a Step known to be enabled. W1 and W2 are wrapping Job Environments: W1 is
+# BY_DEFAULT and W2 is ON_REQUEST, requested only by S, whose enableIf is Param.Run, so S's
+# Sessions would enter both. T's Sessions enter only W1, whose onWrapTaskRun runs in place of
+# T's onRun.
+#
+# Run is true, so S's Sessions would enter both wrapping Environments, and the Job fails
+# before S runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - WRAP_ACTIONS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
+  jobEnvironments:
+  - name: W1
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W1_' + 'IN')
+        onWrapEnvEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W1_' + 'WENTER')
+        onWrapTaskRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W1_' + 'WRAP')
+        onWrapEnvExit:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W1_' + 'WEXIT')
+  - name: W2
+    activation: ON_REQUEST
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W2_' + 'IN')
+        onWrapEnvEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W2_' + 'WENTER')
+        onWrapTaskRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W2_' + 'WRAP')
+        onWrapEnvExit:
+          command: python
+          args:
+          - -c
+          - |-
+            print('W2_' + 'WEXIT')
+  steps:
+  - name: T
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + 'RAN')
+  - name: S
+    enableIf: Param.Run
+    dependencies:
+    - environment: W2
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+parameters:
+  Run: true

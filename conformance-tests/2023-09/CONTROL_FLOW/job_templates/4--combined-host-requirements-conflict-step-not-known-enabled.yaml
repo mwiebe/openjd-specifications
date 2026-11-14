@@ -1,0 +1,40 @@
+# RFC 0011 §<Environment> items 3 and 5 and §Validation item 10, with RFC 0010's Template
+# Schemas §3.3.3: a conflict in a Step's combined host requirements, its own with those of the
+# Environments its Sessions enter, is checked before Job creation only for a Step known to be
+# enabled. The BY_DEFAULT Job Environment Hw requires at least 2 widgets and S at most 1, but
+# S's enableIf is Param.F, so S is not known to be enabled and the template is valid.
+# jobs/4--combined-host-requirements-conflict-skipped-step-runs and
+# jobs/4--combined-host-requirements-conflict-enabled-step-fails run a template like it.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: Hw
+  hostRequirements:
+    amounts:
+    - name: conformance:amount.widgets
+      min: 2
+  variables:
+    CF_HW: '1'
+steps:
+- name: S
+  enableIf: Param.F
+  hostRequirements:
+    amounts:
+    - name: conformance:amount.widgets
+      max: 1
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

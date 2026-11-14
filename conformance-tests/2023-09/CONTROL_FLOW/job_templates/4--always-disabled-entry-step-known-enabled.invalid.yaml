@@ -1,0 +1,37 @@
+# RFC 0011 §<Environment> item 3 ("Before Job creation" bullet) and RFC 0010's Template Schemas
+# §3.2 enableIf and §4 item 4: a disabled entry for an Environment whose activation is ALWAYS
+# as written is an error. Before Job creation it is reported only for a Step known to be
+# enabled, and otherwise in the Step's Environment selection, or never if the Step is skipped.
+#
+# S's entry for the ALWAYS Job Environment Lic is disabled by the literal false, and S's
+# enableIf is Param.F or true, so S is known to be enabled and the entry is an error at
+# template validation. 4--always-disabled-entry-step-not-known-enabled is the companion.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: Lic
+  activation: ALWAYS
+  variables:
+    CF_LIC: '1'
+steps:
+- name: S
+  enableIf: Param.F or true
+  dependencies:
+  - environment: Lic
+    enableIf: false
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

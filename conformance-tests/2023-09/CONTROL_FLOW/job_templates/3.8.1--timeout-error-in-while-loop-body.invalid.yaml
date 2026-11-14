@@ -1,0 +1,31 @@
+# RFC 0011 §Validation item 10 and Open Question 16 (answered): template validation reports an
+# error that it can compute in a Step's materialization expressions, whatever the Step's
+# enableIf, a Step Environment's enableIf, and for a body Step the loop's enableIf and while.
+# With FEATURE_BUNDLE_1, an action timeout of {{1 - 1}} resolves to 0, which is not a positive
+# integer, wherever it is evaluated.
+#
+# B is a body Step of a loop whose while reads Loop.Iteration, so the loop may run no
+# iteration, and B's timeout is still an error.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- FEATURE_BUNDLE_1
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: L
+  loop:
+    while: Loop.Iteration < 1
+    maxIterations: 3
+    steps:
+    - name: B
+      script:
+        actions:
+          onRun:
+            command: python
+            timeout: '{{1 - 1}}'
+            args:
+            - -c
+            - |-
+              print('B_' + 'RAN')

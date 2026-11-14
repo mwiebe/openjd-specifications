@@ -1,0 +1,29 @@
+# RFC 0011 §<Environment> item 1: an Environment parameter default reads no Steps.*. E's Pkg
+# default reads P's output.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+    default: '{{Steps.P.Output.Name}}'
+  variables:
+    CF_PKG: '{{Env.Param.Pkg}}'
+steps:
+- name: P
+  outputVariables:
+  - name: Name
+    type: STRING
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Name="a"')

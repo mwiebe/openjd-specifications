@@ -1,8 +1,10 @@
-# RFC 0011 §<Environment> enableIf: the target type is bool and a null result is an error,
-# as for a Step's enableIf. A Step Environment's enableIf is a materialization expression
-# (§Materialization groups item 5), so a null from a skipped producer's output fails
-# P before any of its Tasks runs. Q is skipped at Job creation, so the null is concrete then
-# and the Environment's enableIf is evaluated then, which fails Job creation.
+# RFC 0011 §<Environment> item 4 and RFC 0010's Template Schemas §4 item 6: a Step
+# Environment's enableIf is an expression field of type bool whose null result is an error.
+# It is evaluated in the Step's remaining group (RFC 0011 §Materialization groups item 5), so
+# the null output of a skipped producer fails P before any of its Tasks runs. Q is skipped at
+# Job creation, so the null is concrete then and the Environment's enableIf is evaluated
+# then, which fails Job creation. The field's static type is bool? (Steps.Q is conditional),
+# which an expression field of type bool accepts (Template Schemas §7.6 rule 2).
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -29,7 +31,7 @@ template:
     - dependsOn: Q
     stepEnvironments:
     - name: SEnv
-      enableIf: '{{Steps.Q.Output.Go}}'
+      enableIf: Steps.Q.Output.Go
       variables:
         CF_X: '1'
     script:

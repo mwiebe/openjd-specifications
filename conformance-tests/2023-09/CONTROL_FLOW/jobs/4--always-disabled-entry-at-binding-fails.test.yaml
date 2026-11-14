@@ -1,0 +1,58 @@
+# RFC 0011 §<Environment> item 3 and RFC 0010's Template Schemas §3.2 enableIf and §4 item 4: a
+# disabled entry for an Environment whose activation is ALWAYS as written in its document is
+# an error, found in the Step's Environment selection. C's enableIf reads P's output, so its
+# Environment selection is made at step input binding.
+#
+# C's entry for the ALWAYS Job Environment Lic is disabled, so C fails before any of its Tasks
+# runs. 4--always-disabled-entry-skipped-step-runs is the companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  jobEnvironments:
+  - name: Lic
+    activation: ALWAYS
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('L_' + 'IN')
+  steps:
+  - name: P
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: Go=true')
+  - name: C
+    enableIf: Steps.P.Output.Go
+    dependencies:
+    - dependsOn: P
+    - environment: Lic
+      enableIf: false
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C_' + 'RAN')
+expected:
+  taskFailure: {}
+  output:
+  - P_RAN
+  forbidden:
+  - C_RAN

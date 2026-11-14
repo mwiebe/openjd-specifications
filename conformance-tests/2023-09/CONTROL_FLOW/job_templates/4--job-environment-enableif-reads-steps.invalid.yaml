@@ -1,5 +1,6 @@
-# RFC 0011 §<Environment> enableIf constraint 1 / §The Steps.* scope: a Job Environment's
-# enableIf may not reference Steps.* (it is evaluated at Job creation).
+# RFC 0011 §<Environment> item 1: no field that RFC 0010 adds gains a scope other than a Step
+# Environment's enableIf, so a Job Environment's enableIf reads no Steps.* (it is decided per
+# Step from values concrete at Job creation, item 2).
 specificationVersion: jobtemplate-2023-09
 extensions:
 - EXPR
@@ -8,9 +9,9 @@ extensions:
 name: TestJob
 jobEnvironments:
 - name: E
-  enableIf: '{{Steps.P.Output.Go}}'
+  enableIf: Steps.P.Output.Go
   variables:
-    CF_VAR: set
+    CF_VAR: '1'
 steps:
 - name: P
   outputVariables:

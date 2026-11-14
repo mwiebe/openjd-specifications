@@ -1,0 +1,58 @@
+# RFC 0011 §<Environment> items 3 and 5 and RFC 0010's Template Schemas §3.3.3: a conflict
+# between a Step's own host requirements and those of the Environments its Sessions enter is
+# found when the Step's host selection group is evaluated, and never for a skipped Step. The
+# BY_DEFAULT Job Environment Hw requires at least 2 widgets, S at most 1, and S's enableIf is
+# Param.Run. T has no requirements of its own, so its combined requirements have no conflict.
+#
+# Run is true, so S's host requirements are evaluated at Job creation, the conflict is
+# found, and Job creation fails.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
+  jobEnvironments:
+  - name: Hw
+    hostRequirements:
+      amounts:
+      - name: conformance:amount.widgets
+        min: 2
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('H_' + 'IN')
+  steps:
+  - name: T
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + 'RAN')
+  - name: S
+    enableIf: Param.Run
+    hostRequirements:
+      amounts:
+      - name: conformance:amount.widgets
+        max: 1
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+parameters:
+  Run: true

@@ -1,0 +1,45 @@
+# RFC 0011 §<Environment> item 1: a Step Environment's enableIf may also read the Steps.*
+# symbols of the enclosing Step's direct dependencies, directly or through the Step's let
+# bindings, beside what RFC 0010 lets it read (Step.Name and the Step's let). CEnv reads
+# Steps.P.Output.Go and Step.Name directly, and DEnv reads it through the binding go.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: P
+  outputVariables:
+  - name: Go
+    type: BOOL
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Go=true')
+- name: C
+  dependencies:
+  - dependsOn: P
+  let:
+  - go = Steps.P.Output.Go
+  stepEnvironments:
+  - name: CEnv
+    enableIf: Steps.P.Output.Go and Step.Name == 'C'
+    variables:
+      CF_C: '1'
+  - name: DEnv
+    enableIf: go
+    variables:
+      CF_D: '1'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('C_' + 'RAN')

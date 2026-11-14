@@ -1,0 +1,45 @@
+# RFC 0011 §<Environment> item 3 ("Before Job creation" bullet) and RFC 0010's Template Schemas
+# §4.5: a literal default is checked whether or not any Step enters its Environment, so it is
+# reported whatever any enableIf. E's Pkg allows only a and defaults to b, and the only Step,
+# S, has the enableIf Param.Run and supplies a.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Run
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+    allowedValues:
+    - a
+    default: b
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: S
+  enableIf: Param.Run
+  dependencies:
+  - environment: E
+    parameters:
+      Pkg: a
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

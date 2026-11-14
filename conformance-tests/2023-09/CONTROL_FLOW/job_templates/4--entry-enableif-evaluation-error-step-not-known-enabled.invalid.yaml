@@ -1,0 +1,43 @@
+# RFC 0011 §<Environment> item 3 ("Before Job creation" bullet) and §Validation item 10: an
+# error in an entry's enableIf itself, such as an evaluation error that holds whatever values
+# it reads, is reported whatever any enableIf. S's entry for E has the enableIf
+# int('x') > 0, which reads no value and fails whenever it is evaluated, and S's enableIf is
+# Param.Run.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: Run
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+    default: d
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: S
+  enableIf: Param.Run
+  dependencies:
+  - environment: E
+    enableIf: int('x') > 0
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

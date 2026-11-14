@@ -1,5 +1,7 @@
-# RFC 0011 §<Environment> enableIf constraint 2: a Step Environment's enableIf may read
-# Steps.*; when false the environment is not entered but the Step's Tasks still run.
+# RFC 0011 §<Environment> items 1 and 4: a Step Environment's enableIf may read the Steps.*
+# symbols of the Step's direct dependencies, and is evaluated with the Step's remaining group
+# once Q's output is concrete. It is false, so CEnv is not entered and its variables are not
+# set, but C's Tasks still run (RFC 0010's Template Schemas §4 item 6).
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -25,7 +27,7 @@ template:
     - dependsOn: Q
     stepEnvironments:
     - name: CEnv
-      enableIf: '{{Steps.Q.Output.Go}}'
+      enableIf: Steps.Q.Output.Go
       script:
         actions:
           onEnter:

@@ -1,0 +1,49 @@
+# RFC 0011 §<Environment> item 1 and §The Steps.* scope: a Step Environment's enableIf reads
+# only the Steps.* symbols of the enclosing Step's direct dependencies. C depends on P, which
+# depends on A, and CEnv's enableIf reads A's output.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+steps:
+- name: A
+  outputVariables:
+  - name: Go
+    type: BOOL
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Go=true')
+- name: P
+  dependencies:
+  - dependsOn: A
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('P_' + 'RAN')
+- name: C
+  dependencies:
+  - dependsOn: P
+  stepEnvironments:
+  - name: CEnv
+    enableIf: Steps.A.Output.Go
+    variables:
+      CF_C: '1'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('C_' + 'RAN')

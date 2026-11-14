@@ -5,16 +5,17 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 436 tests: 4 in `env_templates`, 216 in `job_templates`, and 216 in
-> `jobs`. A Step's and a loop's `enableIf`, and a loop's `while` and `until`, are written as
-> expression fields (RFC 0010's Template Schemas §7.6), without `{{ }}`. The openjd-rs
-> prototype (branch `control-flow-prototype`), the only implementation that has run these
-> tests, still reads those fields as format strings. At commit `116bb23` it passes 359 of
-> the 436 on Linux. Every test it fails either writes one of those fields as an expression
-> or checks that a value written with `{{ }}` or a `null` value is rejected. Before this
-> change, all 418 tests then present passed at the same commit. The tests were written from
-> the RFC text. If a test and the RFC disagree, the RFC wins: fix the test, or raise the
-> question on the RFC.
+> **Status.** There are 493 tests: 4 in `env_templates`, 247 in `job_templates`, and 242 in
+> `jobs`. Every Job Template lists `ENV_PARAMS`, because a Job Template that lists
+> `CONTROL_FLOW` must also list `ENV_PARAMS` and `EXPR` (RFC 0011 Design Choice 13). No
+> implementation supports `CONTROL_FLOW` together with `ENV_PARAMS` yet, so no implementation
+> has run this version of the tests. The `ENV_PARAMS` prototype of openjd-rs checked the
+> `ENV_PARAMS` parts of the new Environment tests whose only other `CONTROL_FLOW` feature is
+> a Step's `enableIf` that reads Job Parameters: with `CONTROL_FLOW` and that `enableIf`
+> removed, it reports every check that the test defers for a Step not known to be enabled,
+> and with that Step removed, the rest of the Job runs. The tests were written from the RFC
+> text. If a test and the RFC disagree, the RFC wins: fix the test, or raise the question on
+> the RFC.
 
 ## What this extension does
 
@@ -40,14 +41,18 @@ The filename prefix is the [Template Schemas](../../../wiki/2023-09-Template-Sch
 section; each file's header comment cites the RFC (0011, 0012, or 0013) that holds the rule,
 and its section.
 
-- **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `ENV_PARAMS` and `EXPR`; every new field
-  and symbol requires `CONTROL_FLOW`; Environment Templates can't declare `CONTROL_FLOW` or
-  reference `Steps.*` or `Loop.*`, and without `ENV_PARAMS` can't use `enableIf`. An
-  Environment Template can't list `CONTROL_FLOW`, so these rules give the same result as
-  extension gating; the `jobs/*-in-environment-template-with-control-flow-job` tests check
-  that a Job's `CONTROL_FLOW` doesn't make `enableIf`, `Steps.*`, or `Loop.*` available to
-  the Environment Templates used with it, with
-  `jobs/4--environment-template-in-control-flow-job-runs` as their valid companion.
+- **Gating** (`1.1--*`, `env_templates/*`): `CONTROL_FLOW` requires `ENV_PARAMS` and `EXPR`
+  (`1.1--control-flow-without-env-params` and `1.1--control-flow-without-expr`, with
+  `1.1--control-flow-without-features` as the valid companion); every new field and symbol
+  requires `CONTROL_FLOW`, while an Environment's `enableIf` is RFC 0010's and needs only
+  `ENV_PARAMS` (`1.1--environment-enableif-without-control-flow`); Environment Templates
+  can't declare `CONTROL_FLOW` or reference `Steps.*` or `Loop.*`, also in an `enableIf`
+  that `ENV_PARAMS` allows (`env_templates/4--enableif-reads-steps`). An Environment Template
+  can't list `CONTROL_FLOW`, so the symbol rules give the same result as extension gating;
+  the `jobs/*-in-environment-template-*with-control-flow-job` tests check that a Job's
+  extensions don't make `enableIf` (in an Environment Template that does not list
+  `ENV_PARAMS`), `Steps.*`, or `Loop.*` available to the Environment Templates used with it,
+  with `jobs/4--environment-template-in-control-flow-job-runs` as their valid companion.
 - **`<OutputVariableDefinition>`** (`job_templates/3.7--*`): each `<OutputVariableType>`,
   case-insensitive type names, 1 to 32 outputs with unique `<Identifier>` names,
   `LIST[LIST[INT]]` only without a `parameterSpace`, no `default`/`userInterface`/`dataFlow`,
@@ -73,7 +78,10 @@ and its section.
   takes the last and checks every value, `APPEND` order, `[]` when empty, a list as one
   element, `maxLength`/`minLength`/`item` checks; `minValue`/`maxValue`/`allowedValues`/
   `maxLength` violations fail the producer; only declared constraints apply; a `LAST`
-  value that a later directive replaces stops counting toward the 1 MiB floor.
+  value that a later directive replaces stops counting toward the 1 MiB floor; a
+  `RANGE_EXPR` value's `minLength` and `maxLength` are checked against both the value as
+  reported and its canonical form (`3.7--range-expr-*-length*`), the rule of Template
+  Schemas §2.10 for a document that lists `ENV_PARAMS`.
 - **Chunked Steps** (`*--chunk*`, with `TASK_CHUNKING`): the `[<value>]` selector is
   required (even for a chunk of one), forbidden without `CHUNK[INT]`, must be in the chunk
   being run (not merely in the range), is matched by integer value, may be negative, and
@@ -117,14 +125,55 @@ and its section.
   null`, `or`), skipped Steps don't evaluate their `let`, a `null` `enableIf` result is an
   error (here at Job creation), while an `enableIf` of type `bool?` is accepted, and a
   skipped Step whose own dependency failed never satisfies `dependsOn` (failure is not
-  skipping). The Environment `enableIf` tests (`job_templates/4--*`, `jobs/4--*`) are not
-  yet in the form the RFCs require; see *Not covered*.
+  skipping).
+- **Errors reported whatever the `enableIf`** (RFC 0011 §Validation item 10, Open Question
+  16): template validation reports an error it can compute in a Step's materialization
+  expressions in a Step that may not run: with `FEATURE_BUNDLE_1`, an action `timeout` of
+  `{{1 - 1}}` in a Step whose `enableIf` is a parameter or `false`
+  (`job_templates/3--timeout-error-*`, with `3--timeout-step-not-known-enabled` as the valid
+  companion), in a body Step of a `while` loop (`3.8.1--timeout-error-in-while-loop-body`),
+  and in a Step Environment whose `enableIf` reads `Steps.*`
+  (`4--step-environment-timeout-error-dynamic-enableif`); a Step's own `anyOf` that resolves
+  to no values (`3--host-requirements-any-of-empty-step-not-known-enabled`); an error in an
+  Environment's or an entry's `enableIf` itself, a type error and an evaluation error; and a
+  literal `default` that its own constraints reject
+  (`4--literal-default-violation-no-step-known-enabled`).
+- **Environments and Environment selection** (`job_templates/4--*`, `jobs/4--*`): the scope
+  of a Step Environment's `enableIf`, which also reads the direct dependencies' `Steps.*`,
+  directly or through the Step's `let`, and in a body Step `Loop.*`; no `Steps.*` in a Job
+  Environment's `enableIf` or `hostRequirements` or a parameter `default`, and no `Steps.*`
+  or `Loop.*` in an `environment:` entry's `enableIf` or `parameters`, even through `let`
+  (RFC 0011 §`<Environment>` items 1 and 2). A Step Environment's `enableIf` decided at step
+  input binding, its `null` result failing the Step, and its `false` result leaving the
+  Environment's `timeout` unevaluated (item 4); a Job Environment's `enableIf` decided for a
+  Step whose Environment selection comes at step input binding. *Known to be enabled*
+  (RFC 0011 §Terminology, item 3), probed with constraint 7 at template validation: `true`,
+  `'true'`, `Param.F or true`, and `Steps.A.Output.Ok or true` are known, `Param.F` and
+  `Steps.A.Output.Ok` are not, and a body Step is known to be enabled only when its loop's
+  `enableIf` is absent or known and its loop has no `while` or one known to be `true`
+  (`4--known-enabled-*`, `4--not-known-enabled-*`). The checks that depend on whether a Step
+  runs or on which Environments it enters are not made before Job creation for a Step not
+  known to be enabled (`job_templates/4--*-step-not-known-enabled`, each valid with a
+  `.invalid` companion for a Step known to be enabled where template validation makes the
+  check), never for a skipped Step (`jobs/4--*-skipped-step-runs`), and are made in the
+  Step's Environment selection, at Job creation or at step input binding, for one that runs
+  (`jobs/4--*-fails*`): constraint 7 for every Environment that applies, even one whose own
+  `enableIf` is `false`; a disabled entry for an Environment whose `activation` is `ALWAYS`
+  as written, in a Job Environment and in an attached Environment Template, while a disabled
+  entry for the Environment of an attached Environment Template that does not list
+  `ENV_PARAMS` has no effect (`jobs/4--pre-extension-*`); an entry value that fails to
+  resolve; a `required: true` entry that names no Environment; a conflict in the combined
+  host requirements; and the `WRAP_ACTIONS` single-layer rule. An entry's undeclared key and
+  a literal value its parameter rejects are tested at template validation only.
 - **Job outputs** (`*2.17--*`): count and name rules, separate namespace from parameters,
   `LIST[LIST[INT]]`, any Step readable without a dependency, path rules (`RawParam`,
   `RawOutput`, and `TaskRawParam` allowed; `Param` of `PATH` and `LIST[PATH]` parameters
   and `TaskParam` of a `PATH` Task parameter forbidden), other forbidden symbols, type and `collect`; at run time, failures at Job
   creation and after a Step fail the run, valid or `null` job outputs don't, and job
-  outputs totaling exactly 1 MiB are accepted.
+  outputs totaling exactly 1 MiB are accepted; a `RANGE_EXPR` job output's `minLength` and
+  `maxLength` are checked against both its value as written and its canonical form, and a
+  single `{{ }}` expression whose result is a `range_expr` has only its canonical form
+  (`jobs/2.17--job-output-range-expr-*`).
 - **Loop schema** (`1.1--loop-*`, `job_templates/3.8--*`, `3.8.1--*`, `3.8.2--*`,
   `3.8.3--*`): gating; no `script` or `parameterSpace` on a loop; names unique across
   top-level Steps, loops, and body Steps (also across two loops, and a loop and its own body
@@ -172,7 +221,9 @@ and its section.
   ends the loop fail the loop. A body Step whose range fails at
   the start of an iteration fails the loop. Size: loop values totaling exactly 1 MiB are
   accepted, with each `APPEND` element counted on its own and replaced loop variable and
-  `LAST` output values not counted.
+  `LAST` output values not counted. A `RANGE_EXPR` loop output's `maxLength` and loop
+  variable's `minLength`, checked against both the value as written and its canonical form,
+  fail the loop (`3.8.5--loop-*-range-expr-*`).
 
 ## Conventions in this directory
 
@@ -235,34 +286,21 @@ and its section.
 
 ## Not covered
 
-- The `enableIf` of an Environment and of an `environment:` entry, which RFC 0010
-  (`ENV_PARAMS`) defines and RFC 0011 extends, beyond the Environment `enableIf` tests
-  (`job_templates/4--enableif-*`, `jobs/4--enableif-*`). Those tests are still to be
-  rewritten in the expression-field form that RFC 0010 defines, and
-  `job_templates/1.1--environment-enableif-without-extension`,
-  `env_templates/4--enableif-in-environment-template` and
-  `jobs/4--enableif-in-environment-template-with-control-flow-job` are still to cite RFC 0010's
-  rule that an `enableIf` needs `ENV_PARAMS` in the document that has it.
+- Some of RFC 0010's per-Step work as it moves into a Step's Environment selection under
+  `CONTROL_FLOW` (RFC 0011 §`<Environment>` items 3 and 8): `exclusiveGroup`, an
+  Environment's `hostRequirements` resolved with a Step's values, a non-literal `default`
+  that a Step takes, and the 1024-character limit on a value. The tests probe the deferral
+  with the checks listed under *Environments and Environment selection*, and the
+  `ENV_PARAMS` tests cover the checks themselves. A validator given the Environment
+  Templates checks an external entry's keys and values before Job creation, but `openjd
+  check` is not given them, so the tests check external entries only at run time.
+- Which Step Environments a Step enters deciding which Sessions may run its Tasks (RFC 0011
+  §`<Environment>` item 7): Session reuse is a scheduler decision with no definite output in
+  `openjd run`.
 - A `null` value for `while` or `until`. It is an error, but alone it gives the same result
   as an implementation that read it as an omitted field, which rejects a loop with neither
   `while` nor `until`, and beside the other of the two it also breaks the rule that a loop
   has exactly one of them. The `null` value tests are for `enableIf`, which may be omitted.
-- Which Steps are *known to be enabled* before Job creation (RFC 0011 §Terminology and
-  §`<Environment>` item 3): a Step whose `enableIf` is absent or known to be `true` by RFC
-  0010's Template Schemas §7.6 rule 5, such as `true`, `"true"` or, with a BOOL Job
-  Parameter `F`, `"Param.F or true"`, and for a body Step also a loop whose `enableIf` is
-  absent or known to be `true` and that has no `while` or one known to be `true`. It decides
-  when `ENV_PARAMS`'s checks that depend on whether a Step runs are made.
-- That template validation reports an error in a value it can compute, such as, with
-  `FEATURE_BUNDLE_1`, a `timeout` of `"{{1 - 1}}"`, whatever the Step's, its loop's, or a
-  Step Environment's `enableIf` and the loop's `while` (RFC 0011 §Validation item 10; Open
-  Question 16, answered), except an error from a check of `ENV_PARAMS` that depends on
-  whether the Step runs or on which Environments its Sessions enter. No test checks it yet.
-- That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
-  (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
-  Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph
-  after item 6). No test yet disables a Step Environment that has an Action `timeout` or
-  `cancelation`.
 - Re-runs and retries, including the recovery of a loop, which is `FAILED` until every
   failed body Step instance of the iteration in progress has succeeded after a retry or
   requeue of its Tasks and then returns to `RUNNING`, and the rule that no recovery

@@ -1,0 +1,33 @@
+# RFC 0011 §Extension name and dependencies and §<Environment>: CONTROL_FLOW adds no field to
+# <Environment>. An Environment's enableIf is RFC 0010's, and needs only ENV_PARAMS (and EXPR).
+# This template lists EXPR and ENV_PARAMS but not CONTROL_FLOW, and gives a Job Environment and
+# a Step Environment an enableIf, so a validator that required CONTROL_FLOW for them fails it.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  enableIf: Param.F
+  variables:
+    CF_VAR: '1'
+steps:
+- name: S
+  stepEnvironments:
+  - name: SEnv
+    enableIf: Step.Name == 'S'
+    variables:
+      CF_S: '1'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

@@ -1,0 +1,66 @@
+# RFC 0011 §<Environment> item 3 ("Before Job creation" bullet) and §Validation item 10, with
+# RFC 0010's Template Schemas §3.2 constraint 6 and §3.2.2 item 2: an entry value that fails to
+# resolve is an error in the Step's Environment selection, so it is not reported for a Step
+# that is skipped, and template validation, which checks constraint 6 against literal values
+# only, does not report it. S's entry supplies E's INT parameter N as {{int('x')}}, which
+# fails whenever it is evaluated, and S's enableIf is Param.Run.
+#
+# Run is false, so S is skipped at Job creation and the Job runs. This is the counter-case
+# of Open Question 16: the error is excepted because it depends on whether S runs.
+# 4--entry-value-unresolvable-enabled-step-fails-job-creation is the companion.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
+  jobEnvironments:
+  - name: E
+    envParameterDefinitions:
+    - name: N
+      type: INT
+      default: 1
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('E_' + 'IN', '{{Env.Param.N}}')
+  steps:
+  - name: T
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + 'RAN')
+  - name: S
+    enableIf: Param.Run
+    dependencies:
+    - environment: E
+      parameters:
+        N: '{{int(''x'')}}'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+parameters:
+  Run: false
+expected:
+  output:
+  - E_IN 1
+  - T_RAN
+  forbidden:
+  - S_RAN

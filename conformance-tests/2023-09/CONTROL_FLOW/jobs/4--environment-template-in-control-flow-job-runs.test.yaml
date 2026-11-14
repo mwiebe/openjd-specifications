@@ -1,6 +1,7 @@
 # RFC 0011 §Extension name and dependencies: an Environment Template used with a Job whose
-# template lists CONTROL_FLOW is an ordinary Environment Template. The companion of
-# 4--enableif-in-environment-template-with-control-flow-job,
+# template lists CONTROL_FLOW is an ordinary Environment Template, and one that does not list
+# ENV_PARAMS behaves as an ALWAYS Environment (RFC 0010's Template Schemas §4 item 4). The
+# companion of 4--enableif-in-environment-template-without-env-params-with-control-flow-job,
 # 7.3.1--steps-symbol-in-environment-template-with-control-flow-job, and
 # 3.8.4--loop-symbol-in-environment-template-with-control-flow-job: a Job like theirs and
 # their Environment Template without the forbidden field or symbol run, so a runtime that

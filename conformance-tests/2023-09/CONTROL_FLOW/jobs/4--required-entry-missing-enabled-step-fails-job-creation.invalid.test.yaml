@@ -1,0 +1,41 @@
+# RFC 0011 §<Environment> item 3 and RFC 0010's Template Schemas §3.2 required and §3.2.1: an
+# enabled entry with required: true whose name resolves to no Environment is rejected in the
+# Step's Environment selection. Resolving the name stays at Job creation, but resolving to
+# nothing is an error only there. S's entry names Missing, which no Job Environment or
+# attached Environment has, and S's enableIf is Param.Run.
+#
+# Run is true, so S's Environment selection is made at Job creation and Job creation fails.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
+  steps:
+  - name: T
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + 'RAN')
+  - name: S
+    enableIf: Param.Run
+    dependencies:
+    - environment: Missing
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+parameters:
+  Run: true

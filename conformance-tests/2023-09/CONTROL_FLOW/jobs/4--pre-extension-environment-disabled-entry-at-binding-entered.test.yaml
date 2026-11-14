@@ -1,0 +1,62 @@
+# RFC 0011 §<Environment> item 3 and §Extension name and dependencies, and RFC 0010's Template
+# Schemas §4 item 4: the Environment of an attached Environment Template that does not list
+# ENV_PARAMS behaves as ALWAYS, but not as written, so a Step's disabled entry for it has no
+# effect and is not an error, also when the Step's Environment selection is made at step input
+# binding. C's enableIf reads P's output, and its entry for Lic is disabled, yet C's Sessions
+# enter Lic and see its variable. 4--attached-always-disabled-entry-at-binding-fails is the
+# companion whose Environment Template lists ENV_PARAMS and has activation ALWAYS.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  steps:
+  - name: P
+    outputVariables:
+    - name: Go
+      type: BOOL
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('P_' + 'RAN'); print('openjd_output_var: Go=true')
+  - name: C
+    enableIf: Steps.P.Output.Go
+    dependencies:
+    - dependsOn: P
+    - environment: Lic
+      enableIf: false
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            import os; print('C_' + 'LIC:' + os.environ.get('CF_LIC', 'UNSET'))
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  environment:
+    name: Lic
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('L_' + 'IN')
+    variables:
+      CF_LIC: set
+expected:
+  output:
+  - L_IN
+  - P_RAN
+  - C_LIC:set

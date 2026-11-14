@@ -1,0 +1,43 @@
+# RFC 0011 §Terminology "Known to be enabled" and §<Environment> item 3 ("Before Job creation"
+# and "Known to be enabled" bullets), with RFC 0010's Template Schemas §3.2 constraint 7: E is
+# a BY_DEFAULT Job Environment whose Pkg has no default, so it applies to S, which supplies no
+# value for Pkg. Constraint 7 is checked before Job creation only for a Step known to be
+# enabled, one whose enableIf is absent or known to be true by Template Schemas §7.6 rule 5,
+# with Steps.*, Loop.*, and RawLoop.* not yet known.
+#
+# S's enableIf is the expression true, written as a string, which is known to be true, so
+# the missing value is an error at template validation.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: S
+  enableIf: 'true'
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('S_' + 'RAN')

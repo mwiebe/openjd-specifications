@@ -1,0 +1,48 @@
+# RFC 0011 §Terminology "Known to be enabled" and §<Environment> item 3 ("Before Job creation"
+# and "Known to be enabled" bullets), with RFC 0010's Template Schemas §3.2 constraint 7: E is
+# a BY_DEFAULT Job Environment whose Pkg has no default, so it applies to the body Step B,
+# which supplies no value for Pkg. Constraint 7 is checked before Job creation only for a Step
+# known to be enabled: for a body Step, one whose own enableIf is absent or known to be true
+# by Template Schemas §7.6 rule 5, whose loop's enableIf is too, and whose loop has no while
+# or one known to be true, with Steps.*, Loop.*, and RawLoop.* not yet known.
+#
+# L's while reads Loop.Iteration, which is not known before Job creation, so L may run no
+# iteration, B is not known to be enabled, and the template is valid.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+parameterDefinitions:
+- name: F
+  type: BOOL
+  default: true
+jobEnvironments:
+- name: E
+  envParameterDefinitions:
+  - name: Pkg
+    type: STRING
+  script:
+    actions:
+      onEnter:
+        command: python
+        args:
+        - -c
+        - |-
+          print('E_' + 'IN', '{{Env.Param.Pkg}}')
+steps:
+- name: L
+  loop:
+    while: Loop.Iteration < 1
+    maxIterations: 3
+    steps:
+    - name: B
+      script:
+        actions:
+          onRun:
+            command: python
+            args:
+            - -c
+            - |-
+              print('B_' + 'RAN')

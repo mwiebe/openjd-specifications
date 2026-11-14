@@ -1,0 +1,38 @@
+# RFC 0011 §<JobOutputDefinition> and RFC 0012 §<OutputVariableDefinition> item 6, with
+# Template Schemas §2.10 and §4.5 item 4: a RANGE_EXPR job output's minLength and maxLength are
+# checked against both its value as written, the string its format string resolves to, and
+# its canonical form, except that a single {{ }} expression whose result is a range_expr has
+# only its canonical form. The output is evaluated at Job creation, so a failure fails it.
+#
+# R has maxLength 3 and its value is the single expression {{Param.F}}, whose result is the
+# range_expr of the RANGE_EXPR parameter F, submitted as 1,2,3. It has only its canonical
+# form 1-3, which fits, so the Job runs.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: F
+    type: RANGE_EXPR
+    default: 1,2,3
+  jobOutputDefinitions:
+  - name: R
+    type: RANGE_EXPR
+    value: '{{Param.F}}'
+    maxLength: 3
+  steps:
+  - name: S
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+expected:
+  output:
+  - S_RAN

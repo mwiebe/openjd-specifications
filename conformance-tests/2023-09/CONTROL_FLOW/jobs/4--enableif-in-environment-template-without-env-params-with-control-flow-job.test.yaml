@@ -1,10 +1,10 @@
-# RFC 0011 §<Environment> enableIf constraint 4 and §Extension name and dependencies: enableIf
-# is permitted only in a Job Template, and a Job's CONTROL_FLOW doesn't make it available to
-# the Environment Templates used with it. The Environment Template's
-# enableIf is true, so a runtime that allowed it would enter the Environment and run the
-# Steps. The template is rejected before anything runs. This run fails before any Task;
-# expected.taskFailure is used because the runner ignores forbidden markers in .invalid
-# tests. env_templates/4--enableif-in-environment-template checks the template alone, and
+# RFC 0011 §Extension name and dependencies and RFC 0010's Template Schemas §1.2 item 3 and
+# §4 item 6: an Environment's enableIf requires ENV_PARAMS in the document that has it, and
+# extensions are per document, so a Job Template's ENV_PARAMS and CONTROL_FLOW don't make
+# enableIf available to an Environment Template that lists only EXPR. The Environment
+# Template's enableIf is true, so a runtime that allowed it would enter the Environment and
+# run the Steps. The submission is rejected before anything runs; expected.taskFailure is used
+# because the runner ignores forbidden markers in .invalid tests.
 # 4--environment-template-in-control-flow-job-runs is the companion without enableIf.
 template:
   specificationVersion: jobtemplate-2023-09

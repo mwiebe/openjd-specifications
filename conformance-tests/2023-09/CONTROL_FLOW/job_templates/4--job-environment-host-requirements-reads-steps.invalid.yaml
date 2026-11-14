@@ -1,0 +1,30 @@
+# RFC 0011 §<Environment> item 1: a Job Environment's hostRequirements read no Steps.*. E's
+# attribute requirement reads P's output.
+specificationVersion: jobtemplate-2023-09
+extensions:
+- EXPR
+- ENV_PARAMS
+- CONTROL_FLOW
+name: TestJob
+jobEnvironments:
+- name: E
+  hostRequirements:
+    attributes:
+    - name: conformance:attr.flavor
+      anyOf:
+      - '{{Steps.P.Output.Flavor}}'
+  variables:
+    CF_VAR: '1'
+steps:
+- name: P
+  outputVariables:
+  - name: Flavor
+    type: STRING
+  script:
+    actions:
+      onRun:
+        command: python
+        args:
+        - -c
+        - |-
+          print('openjd_output_var: Flavor="a"')
