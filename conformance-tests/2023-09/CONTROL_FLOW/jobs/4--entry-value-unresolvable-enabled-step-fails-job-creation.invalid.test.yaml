@@ -1,8 +1,9 @@
 # RFC 0011 §<Environment> item 3 ("Before Job creation" bullet) and §Validation item 10, with
 # RFC 0010's Template Schemas §3.2 constraint 6 and §3.2.2 item 2: an entry value that fails to
 # resolve is an error in the Step's Environment selection, so it is not reported for a Step
-# that is skipped, and template validation, which checks constraint 6 against literal values
-# only, does not report it. S's entry supplies E's INT parameter N as {{int('x')}}, which
+# that is skipped, and template validation does not report it for a Step not known to be
+# enabled (RFC 0010's Template Schemas §3.2 checks constraint 6 there against literal values
+# only in any case). S's entry supplies E's INT parameter N as {{int('x')}}, which
 # fails whenever it is evaluated, and S's enableIf is Param.Run.
 #
 # Run is true, so S's Environment selection is made at Job creation, the value fails to

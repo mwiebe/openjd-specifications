@@ -320,10 +320,10 @@ and its section.
 - Some of RFC 0010's per-Step work as it moves into a Step's Environment selection under
   `CONTROL_FLOW` (RFC 0011 §`<Environment>` items 3 and 8): `exclusiveGroup`, a non-literal
   `default` that a Step takes, the 1024-character limit on a value, constraint 7 for an
-  attached Environment that a Step reaches by name, and a known-enabled Step's combined
-  host-requirement conflict or `WRAP_ACTIONS` violation at template validation, which
-  `ENV_PARAMS`'s own tests check only at Job creation. The tests probe the deferral
-  with the checks listed under *Environments and Environment selection*, and the
+  attached Environment other than one named like a Job Environment, and a known-enabled
+  Step's combined host-requirement conflict or `WRAP_ACTIONS` violation at template
+  validation, which `ENV_PARAMS`'s own tests check only at Job creation. The tests probe the
+  deferral with the checks listed under *Environments and Environment selection*, and the
   `ENV_PARAMS` tests cover the checks themselves. A validator given the Environment
   Templates checks an external entry's keys and values before Job creation, but `openjd
   check` is not given them, so the tests check external entries only at run time.

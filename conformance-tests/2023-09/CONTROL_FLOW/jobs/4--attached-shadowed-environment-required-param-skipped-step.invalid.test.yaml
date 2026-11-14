@@ -5,12 +5,13 @@
 # the Job Environment Conda, and the attached Environment Template's BY_DEFAULT Environment is
 # also named Conda.
 #
-# Its Pkg has no default, and the only Step, S, has the enableIf Param.Run, which is false, so S
-# is skipped, and the submission is still rejected. Every Step that runs would itself break the
-# rule, so the test can't include one; RFC 0011 §Step states implies that a Job whose Steps
-# are all skipped is valid, though no test can show it succeeds. 4--attached-shadowed-environment-with-default-runs is the valid companion: the
-# same template with a default for Pkg and a Step T without enableIf, which shows the
-# template is otherwise accepted.
+# Its Pkg has no default, and the only Step, S, has the enableIf Param.Run, which is false, so
+# S is skipped, and the submission is still rejected. Every Step that runs would itself break
+# the rule, so the test can't include one; RFC 0011 §Step states implies that a Job whose
+# Steps are all skipped is valid, though no test can show it succeeds.
+# 4--attached-shadowed-environment-with-default-runs is the valid companion: the same template
+# with a default for Pkg and a Step T without enableIf, which shows the template is otherwise
+# accepted.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

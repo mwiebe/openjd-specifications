@@ -5,7 +5,8 @@
 # only its canonical form. The output is evaluated at Job creation, so a failure fails it.
 #
 # R has minLength 4 and its value 1-3:{{Param.N}} resolves to 1-3:2, 5 characters as written,
-# whose canonical form 1,3 is 3.
+# whose canonical form 1,3 is 3. 2.17--job-output-range-expr-format-string-fits is the valid
+# companion.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

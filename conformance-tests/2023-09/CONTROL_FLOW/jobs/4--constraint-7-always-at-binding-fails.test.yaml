@@ -1,6 +1,6 @@
 # RFC 0011 §<Environment> item 3 and RFC 0010's Template Schemas §3.2 constraint 7: a Step's
 # Environment selection checks constraint 7 for every Environment that applies to the Step,
-# before any of their enableIf is evaluated. 
+# before any of their enableIf is evaluated.
 # E is an ALWAYS Job Environment whose Pkg has no default, so it applies to every Step. C's
 # enableIf reads P's output, so its Environment selection is made at step input binding, and
 # C supplies no value for Pkg, so C fails before any of its Tasks runs.
