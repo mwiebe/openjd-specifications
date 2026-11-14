@@ -471,8 +471,8 @@ At each stage, known values are evaluated concretely while unresolved values pro
      *enableIf*, *hostRequirements*, and non-literal `default`s of the Environments that apply to it, which the
      `ENV_PARAMS` extension evaluates at this stage (see [Template Schemas §4](2023-09-Template-Schemas#4-environment)
      `CONTROL_FLOW` rule 3);
-   * every expression of a Step of a loop's body, including the fields evaluated for its Environments, as above, which
-     may also read the loop's values (`Loop.*`, `RawLoop.*`);
+   * every expression of a Step of a loop's body, including the fields evaluated for its Environments, as above; the
+     Step's own fields may also read the loop's values (`Loop.*`, `RawLoop.*`);
    * a loop's expressions evaluated at an iteration boundary, such as its `until`.
 
 3. **Worker host execution**. All symbols are known — `Task.Param.*`, `Session.*`, file paths,

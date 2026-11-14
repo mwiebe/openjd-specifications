@@ -1107,12 +1107,12 @@ of a loop's body the loop's *enableIf* and *while*: [7.6](#76-expression-fields)
 reports, and none of those fields is among the fields that the check of such a value depends on, since the value is
 wrong wherever it is evaluated. The exceptions are the checks of the `ENV_PARAMS` extension that depend on whether a
 Step runs or on which Environments its Sessions enter, such as constraints 5 to 7 of
-[&lt;StepDependency&gt;](#32-stepdependency) and an Environment's *hostRequirements* resolved for the Step, including an
-*environment* value or a non-literal `default` that fails to resolve or convert: before the Job is created they are made
-only for a Step known to be enabled (`CONTROL_FLOW` rule 3 of [4](#4-environment)). An *anyOf* or *allOf* of the Step's
-own *hostRequirements* that resolves to no values is an error in the Step's own field, and is reported; a conflict in
-its combined host requirements is excepted. The groups are listed below. When more than one group can be evaluated at
-the same moment, they are evaluated in this order:
+[&lt;StepDependency&gt;](#32-stepdependency) (which include an *environment* value or a non-literal `default` that fails
+to resolve or convert) and an Environment's *hostRequirements* resolved for the Step: before the Job is created they are
+made only for a Step known to be enabled (`CONTROL_FLOW` rule 3 of [4](#4-environment)). An *anyOf* or *allOf* of the
+Step's own *hostRequirements* that resolves to no values is an error in the Step's own field, and is reported; a
+conflict in its combined host requirements is excepted. The groups are listed below. When more than one group can be
+evaluated at the same moment, they are evaluated in this order:
 
 1. *enableIf*, which is decided before any other group is evaluated, followed, once it is `true`, by the Step's
    Environment selection (see [&lt;Environment&gt;](#4-environment));
@@ -1453,16 +1453,16 @@ Environment again with that Step's values; or the render management system runs 
 [How Jobs Are Run](How-Jobs-Are-Run#environment-parameters)).
 
 With the `CONTROL_FLOW` extension, a Step's effective values, and whether each Job Environment and attached Environment
-that applies to it is disabled for it, are determined, and the checks of this section other than those of an entry's
-form (item 4, which `CONTROL_FLOW` rule 3 makes whatever any Step's *enableIf*) are made, when the Step's Environment
-selection is made, which may be after the Job is created (`CONTROL_FLOW` rule 3 of
-[&lt;Environment&gt;](#4-environment)). They read only values known when the Job is created, so they are the same
-whenever they are determined, and the same for every instance of a Step of a loop's body. A Step Environment's
-*enableIf* is evaluated later, with the Step's other Step Environment fields, and may read `Steps.*` and `Loop.*`
-values, so whether a Step Environment is disabled can differ between instances (`CONTROL_FLOW` rule 1). A skipped Step
-has no effective values, and none of these checks is made for it. A disabled Step Environment's format strings that are
-resolved before its Sessions run are not resolved, an exception to the paragraph after item 6 (`CONTROL_FLOW` rule 1).
-No Task of a Step is dispatched before all of this is decided for it.
+that applies to it is disabled for it, are determined, and the checks of this section other than the rule that each
+value is one of the forms of an `<EnvironmentParameterValue>` (item 4), which `CONTROL_FLOW` rule 3 makes whatever any
+Step's *enableIf*, are made, when the Step's Environment selection is made, which may be after the Job is created
+(`CONTROL_FLOW` rule 3 of [&lt;Environment&gt;](#4-environment)). They read only values known when the Job is created,
+so they are the same whenever they are determined, and the same for every instance of a Step of a loop's body. A Step
+Environment's *enableIf* is evaluated later, with the Step's other Step Environment fields, and may read `Steps.*` and
+`Loop.*` values, so whether a Step Environment is disabled can differ between instances (`CONTROL_FLOW` rule 1). A
+skipped Step has no effective values, and none of these checks is made for it. A disabled Step Environment's format
+strings that are resolved before its Sessions run are not resolved, an exception to the paragraph after item 6
+(`CONTROL_FLOW` rule 1). No Task of a Step is dispatched before all of this is decided for it.
 
 With the `CONTROL_FLOW` extension, a dependency is also satisfied by a depended-upon Step that completed with zero
 Tasks, or that was skipped by its *enableIf*, once that Step's own dependencies are satisfied. A Step that failed, or
