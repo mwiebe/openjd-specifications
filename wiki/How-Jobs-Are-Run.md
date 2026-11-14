@@ -159,8 +159,8 @@ once the Step is enabled, which can be after the Job is created, and for a Step 
 and the templates, so they come out the same whenever they are worked out. An error in them fails only that Step (and
 for a Step in a loop's body, so the loop) when it is found after the Job is created, and a skipped Step is not held to
 them, except an error in an Environment's own definition, which is reported whatever any Step's `enableIf`. Checking the
-Job Template reports them only for a Step known to be enabled. Whether each of a Step's own Step Environments is entered
-is decided later still, with its other fields.
+Job Template reports them only for a Step known to be enabled (see below). Whether each of a Step's own Step
+Environments is entered is decided later still, with its other fields.
 
 When a **Session** enters an **Environment**, it keeps the same parameter values until it exits that **Environment**.
 The **Environment**'s `onEnter`, its `onExit`, and what it provides to every Task run while it is entered, such as its
@@ -185,8 +185,8 @@ them, and can prefer a Worker Host that recently entered an **Environment** with
 a matching Conda environment or container image cached. In the video pipeline above, each Step's **Sessions** then
 install or pull only the software that Step needs.
 
-With the CONTROL_FLOW extension, a Step's values are known once the Step is enabled, before any of its Tasks is
-scheduled.
+With the CONTROL_FLOW extension, a Step's Environment parameter values are known once the Step is enabled, before any of
+its Tasks is scheduled.
 
 Path mapping rules are applied on the Worker Host to PATH and LIST[PATH] parameter values, as they are to PATH Job
 Parameters. A Step's own script cannot read `Env.Param.*`. A Step that needs a value in both places can bind it with
@@ -434,8 +434,8 @@ requirements contradict each other, such as a minimum amount above a maximum, th
 
 With the CONTROL_FLOW extension, a Step's **Environments**' requirements are combined once the Step is enabled, and its
 own host requirements once they are evaluated, either of which can be after the Job is created, and a contradiction
-found then fails only that Step, and for a Step in a loop's body the loop (see [Step States and Step Input
-Binding](#step-states-and-step-input-binding)).
+found after the Job is created fails only that Step, and for a Step in a loop's body the loop (see [Step States and Step
+Input Binding](#step-states-and-step-input-binding)).
 
 ## Stdout/Stderr Messages
 

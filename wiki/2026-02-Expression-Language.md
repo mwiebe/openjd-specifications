@@ -445,6 +445,9 @@ At each stage, known values are evaluated concretely while unresolved values pro
    that is not unresolved, by the rules for unknown operands ([§2.1.6](#216-logical-operators))
    and for conditionals with unknown conditions (above), as [Template Schemas
    §7.6](2023-09-Template-Schemas#76-expression-fields) rule 5 describes.
+   With the `CONTROL_FLOW` extension, a Step that may be skipped is not such a part: an error that this stage can
+   compute in its fields is reported whatever its `enableIf` ([Template Schemas
+   §3](2023-09-Template-Schemas#3-steptemplate)).
 
 2. **Job parameter binding** ("submit time"). Job parameter values are now known, so `Param.*`
    symbols are concrete. Expressions in TEMPLATE scope can be fully evaluated. Expressions in
@@ -456,12 +459,15 @@ At each stage, known values are evaluated concretely while unresolved values pro
    does not convert ([Template Schemas §3.2.2](2023-09-Template-Schemas#322-effective-environment-parameter-values)
    item 2).
    With the `CONTROL_FLOW` extension, some expressions in TEMPLATE scope may be evaluated after this stage, at step
-   input binding or within a loop's iteration: those that read outputs of other Steps (`Steps.*`) that are not yet
-   known, every expression of a Step whose `enableIf` is not decided `true` at this stage, including the *enableIf* of
-   its `environment:` entries and of the Environments that apply to it, and every expression of a Step of a loop's
-   body, which may also read the loop's values (`Loop.*`, `RawLoop.*`), and a loop's expressions evaluated at an
-   iteration boundary, such as its `until` ([Template Schemas
-   §7.4](2023-09-Template-Schemas#74-template-processing-stages)).
+   input binding or within a loop's iteration ([Template Schemas
+   §7.4](2023-09-Template-Schemas#74-template-processing-stages)):
+   * those that read outputs of other Steps (`Steps.*`) that are not yet known, directly or through another field of
+     the same group of the Step's fields;
+   * every expression of a Step whose `enableIf` is not decided `true` at this stage, including the fields evaluated
+     for that Step's Environments: its `environment:` entries' *parameters* and *enableIf*, and the *enableIf* and
+     *hostRequirements* of the Environments that apply to it;
+   * every expression of a Step of a loop's body, which may also read the loop's values (`Loop.*`, `RawLoop.*`);
+   * a loop's expressions evaluated at an iteration boundary, such as its `until`.
 
 3. **Worker host execution**. All symbols are known — `Task.Param.*`, `Session.*`, file paths,
    and path mapping rules are all concrete. Every expression is fully evaluated with no

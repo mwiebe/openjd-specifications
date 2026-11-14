@@ -1227,8 +1227,8 @@ Session that runs Tasks of two instances, of the same body Step in two iteration
 instance's Step Environments and enters the second's. A scheduler MAY run instances of different iterations in one
 Session under those rules, keeping its Job Environments entered, but need not. By RFC 0010, a Session runs a Step's
 Tasks only if it entered exactly that Step's Environments, with values equal to that Step's effective values (RFC 0010's
-Template Schemas §3.2.2), and the instances of one body Step always have the same Job Environments, attached
-Environments, and values (see [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) item 7).
+Template Schemas §3.2.2). By RFC 0011, the instances of one body Step always have the same Job Environments, attached
+Environments, and values (see [RFC 0011 §`<Environment>`](0011-control-flow.md#environment) items 2 and 7).
 
 #### Retries and re-runs
 
@@ -1331,11 +1331,13 @@ Every rule this RFC adds, and when it is checked, in the form of
     4): a value written as a format string, such as `"{{Loop.Iteration < 3}}"`, is an error, and so is a static type
     that does not fit `bool` or `bool?`, such as `string`. Each *initial* and *next* has its variable's type, and each
     loop output *value* has its output's type, or under `APPEND` its element type.
-11. Template validation reports an error that it can compute in a body Step's materialization expressions, other than
-    the fields of its Environment selection, and in the loop's own expressions, whatever the loop's *enableIf* and
-    *while* and the body Step's *enableIf*, as [RFC 0011 §Validation](0011-control-flow.md#validation) item 10 says for
-    a Step ([RFC 0011 Open Question 16](0011-control-flow.md#open-questions), answered). With `FEATURE_BUNDLE_1`, a body
-    Step's *timeout* of `"{{1 - 1}}"` is an error at template validation even in a loop whose *while* is `"Param.Run"`.
+11. Template validation reports an error that it can compute in a body Step's materialization expressions and in the
+    loop's own expressions, whatever the loop's *enableIf* and *while* and the body Step's *enableIf*, as [RFC 0011
+    §Validation](0011-control-flow.md#validation) item 10 says for a Step ([RFC 0011 Open Question
+    16](0011-control-flow.md#open-questions), answered). With `FEATURE_BUNDLE_1`, a body Step's *timeout* of
+    `"{{1 - 1}}"` is an error at template validation even in a loop whose *while* is `"Param.Run"`. The checks of RFC
+    0010 that depend on whether a Step runs are made for a body Step before Job creation only as RFC 0011 §Validation
+    item 10 says.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`

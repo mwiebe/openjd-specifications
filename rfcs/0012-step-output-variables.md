@@ -391,14 +391,15 @@ Where:
    declares are checked: a default that a job parameter definition implies when a property is omitted (such as the
    1024-character default `maxLength` of a `RANGE_EXPR` parameter) does not apply. The `default` and `userInterface`
    properties of job parameter definitions are not available. A `RANGE_EXPR` value's `minLength` and `maxLength` are
-   checked against both the value as reported and its canonical form, as Template Schemas §2.10 says for a document that
-   lists `ENV_PARAMS`, which a Job Template that lists `CONTROL_FLOW` does (see [RFC 0011 Design Choice
-   13](0011-control-flow.md#13-control_flow-requires-env_params)). The same holds for job outputs and for loop variables
-   and loop outputs, whose constraint properties are those of this object ([RFC 0011
+   checked against both the value as reported and its canonical form, the rule that Template Schemas §2.10 gives a
+   `RANGE_EXPR` Job Parameter in a document that lists `ENV_PARAMS`, which a Job Template that lists `CONTROL_FLOW` does
+   (see [RFC 0011 Design Choice 13](0011-control-flow.md#13-control_flow-requires-env_params)). The same holds for job
+   outputs and for loop variables and loop outputs, whose constraint properties are those of this object ([RFC 0011
    §`<JobOutputDefinition>`](0011-control-flow.md#joboutputdefinition), [RFC 0013
-   §`<StepLoop>`](0013-step-loops.md#steploop)). Their value as written is the string their format string resolves to,
-   as Template Schemas §4.5 item 4 says for a computed value: a single `{{ }}` expression whose result is a `range_expr`
-   has only its canonical form.
+   §`<LoopVariableDefinition>`](0013-step-loops.md#loopvariabledefinition), [RFC 0013
+   §`<LoopOutputVariableDefinition>`](0013-step-loops.md#loopoutputvariabledefinition)). Their value as written is the
+   string their format string resolves to, as Template Schemas §4.5 item 4 says for a computed value: a single `{{ }}`
+   expression whose result is a `range_expr` has only its canonical form.
 
 Constraints:
 
