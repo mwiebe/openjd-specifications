@@ -153,14 +153,16 @@ templates. So before anything runs, the render management system knows which **E
 **Sessions** enter and with which values. [Template Schemas §3.2](2023-09-Template-Schemas#32-stepdependency) and
 [§4](2023-09-Template-Schemas#4-environment) give the exact rules, including when a submission is rejected.
 
-With the CONTROL_FLOW extension, these values and decisions, and the checks above, are worked out for each Step only
-once the Step is enabled, which can be after the Job is created, and for a Step in a loop's body, in each iteration (see
-[Step States and Step Input Binding](#step-states-and-step-input-binding)). They still depend only on the Job Parameters
-and the templates, so they come out the same whenever they are worked out. An error in them fails only that Step (and
-for a Step in a loop's body, so the loop) when it is found after the Job is created, and a skipped Step is not held to
-them, except an error in an Environment's own definition, which is reported whatever any Step's `enableIf`. Checking the
-Job Template reports them only for a Step known to be enabled (see below). Whether each of a Step's own Step
-Environments is entered is decided later still, with its other fields.
+With the CONTROL_FLOW extension, these values and decisions, and the checks made when the Job is created, are made for
+each Step only once the Step is enabled, which can be after the Job is created, and for a Step in a loop's body, in each
+iteration (see [Step States and Step Input Binding](#step-states-and-step-input-binding)). They still depend only on the
+Job Parameters and the templates, so they come out the same whenever they are worked out. An error in them fails only
+that Step (and for a Step in a loop's body, so the loop) when it is found after the Job is created, and a skipped Step
+is not held to them. The exceptions are errors in an Environment's own definition that do not depend on the Step, such
+as an `ALWAYS` Environment whose `enableIf` is known to be `false` from the template alone, which are reported whatever
+any Step's `enableIf`. Checking the Job Template reports the other errors only for a Step known to be enabled (see [Step
+States and Step Input Binding](#step-states-and-step-input-binding)). Whether each of a Step's own Step Environments is
+entered is decided later still, with its other fields.
 
 When a **Session** enters an **Environment**, it keeps the same parameter values until it exits that **Environment**.
 The **Environment**'s `onEnter`, its `onExit`, and what it provides to every Task run while it is entered, such as its

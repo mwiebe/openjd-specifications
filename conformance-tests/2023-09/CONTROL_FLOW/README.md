@@ -256,8 +256,8 @@ and its section.
 - That template validation reports an error in a value it can compute, such as, with
   `FEATURE_BUNDLE_1`, a `timeout` of `"{{1 - 1}}"`, whatever the Step's, its loop's, or a
   Step Environment's `enableIf` and the loop's `while` (RFC 0011 §Validation item 10; Open
-  Question 16, answered), except the checks of `ENV_PARAMS` that depend on whether the Step
-  runs. No test checks it yet.
+  Question 16, answered), except an error from a check of `ENV_PARAMS` that depends on
+  whether the Step runs or on which Environments its Sessions enter. No test checks it yet.
 - That a disabled Step Environment's Actions' `timeout` and `cancelation` are not evaluated
   (RFC 0011 §`<Environment>` item 4), while a disabled Job Environment's or attached
   Environment's are resolved and checked (RFC 0010's Template Schemas §3.2.2, the paragraph

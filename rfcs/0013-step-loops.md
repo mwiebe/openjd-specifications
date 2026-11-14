@@ -1336,8 +1336,8 @@ Every rule this RFC adds, and when it is checked, in the form of
     §Validation](0011-control-flow.md#validation) item 10 says for a Step ([RFC 0011 Open Question
     16](0011-control-flow.md#open-questions), answered). With `FEATURE_BUNDLE_1`, a body Step's *timeout* of
     `"{{1 - 1}}"` is an error at template validation even in a loop whose *while* is `"Param.Run"`. The checks of RFC
-    0010 that depend on whether a Step runs are made for a body Step before Job creation only as RFC 0011 §Validation
-    item 10 says.
+    0010 that depend on whether a Step runs or on which Environments its Sessions enter are made for a body Step before
+    Job creation only as RFC 0011 §Validation item 10 says.
 
 **At Job creation and loop binding** (by the scheduler): *maxIterations* evaluates to an integer from 1 to 1,000;
 every *initial* evaluates, converts, and satisfies its variable's constraints; the first *while* evaluates to `true`
