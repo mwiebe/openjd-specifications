@@ -1,8 +1,8 @@
-# RFC 0011 §Validation item 10 and Open Question 16 (answered): template validation reports an
-# error that it can compute in a Step's materialization expressions, whatever the Step's
-# enableIf, a Step Environment's enableIf, and for a body Step the loop's enableIf and while.
-# With FEATURE_BUNDLE_1, an action timeout of {{1 - 1}} resolves to 0, which is not a positive
-# integer, wherever it is evaluated.
+# RFC 0013 §Validation item 11, RFC 0011 §Validation item 10 and Open Question 16 (answered):
+# template validation reports an error that it can compute in a Step's materialization
+# expressions, whatever the Step's enableIf, a Step Environment's enableIf, and for a body
+# Step the loop's enableIf and while. With FEATURE_BUNDLE_1, an action timeout of {{1 - 1}}
+# resolves to 0, which is not a positive integer, wherever it is evaluated.
 #
 # B is a body Step of a loop whose enableIf is Param.F, so the loop may be skipped, and B's
 # timeout is still an error.

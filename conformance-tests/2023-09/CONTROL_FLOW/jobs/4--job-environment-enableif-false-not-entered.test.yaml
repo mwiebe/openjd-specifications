@@ -2,7 +2,9 @@
 # Environment's enableIf is decided per Step in the Step's Environment selection. S's enableIf
 # reads P's output, so its Environment selection is made at step input binding, with the same
 # Job Parameter value. E's enableIf is false, so neither P's nor S's Sessions enter E or set
-# its variables. 4--job-environment-enableif-true-entered is the companion.
+# its variables. E's enableIf reads only a Job Parameter, so its result is the same whenever it
+# is decided, and the test shows the result on the step-input-binding path, not when it is
+# decided. 4--job-environment-enableif-true-entered is the companion.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:

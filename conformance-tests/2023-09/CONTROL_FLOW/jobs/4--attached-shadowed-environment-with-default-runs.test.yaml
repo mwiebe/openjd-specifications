@@ -5,9 +5,9 @@
 # the Job Environment Conda, and the attached Environment Template's BY_DEFAULT Environment is
 # also named Conda.
 #
-# The companion of 4--attached-shadowed-environment-required-param-skipped-step: Pkg has a
-# default, so the attached Environment applies to every Step without an error, and T, which
-# has no enableIf, runs in it.
+# The companion of 4--attached-shadowed-environment-required-param-skipped-step, with a
+# default for Pkg and a Step T without enableIf: the attached Environment applies to every
+# Step without an error, T runs in it, and S is skipped as there.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -15,6 +15,9 @@ template:
   - ENV_PARAMS
   - CONTROL_FLOW
   name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
   jobEnvironments:
   - name: Conda
     variables:
@@ -29,6 +32,18 @@ template:
           - -c
           - |-
             print('T_' + 'RAN')
+  - name: S
+    enableIf: Param.Run
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+parameters:
+  Run: false
 environments:
 - specificationVersion: environment-2023-09
   extensions:
@@ -52,3 +67,5 @@ expected:
   output:
   - A_IN x
   - T_RAN
+  forbidden:
+  - S_RAN

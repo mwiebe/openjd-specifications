@@ -32,7 +32,7 @@ steps:
         args:
         - -c
         - |-
-          print('C_' + 'RAN')
+          print('C_' + 'RAN', {{Steps.P.Output.N}})
 - name: L
   dependencies:
   - step: P

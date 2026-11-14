@@ -1,7 +1,9 @@
 # RFC 0011 §<Environment> item 3 and RFC 0010's Template Schemas §4 item 6: a Job
 # Environment's enableIf is decided per Step in the Step's Environment selection. S's enableIf
 # reads P's output, so its Environment selection is made at step input binding. E's enableIf
-# is true, so S's Sessions enter E and set its variables.
+# is true, so S's Sessions enter E and set its variables. E's enableIf reads only a Job
+# Parameter, so the test shows the result on the step-input-binding path, not when it is
+# decided.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
