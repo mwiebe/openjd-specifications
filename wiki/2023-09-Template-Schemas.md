@@ -1291,14 +1291,16 @@ Templates a scheduler will attach can resolve the entry as [§3.2.1](#321-resolv
 can then check constraints 5–7 before the Job is created.
 
 With the `CONTROL_FLOW` extension, the work this section does for a Step when the Job is created is part of the Step's
-Environment selection: evaluating its entries' *enableIf*, checking constraints 5 to 7 and *required* for it, and
-rejecting a disabled entry for an `ALWAYS` Environment. It is done once the Step's own *enableIf* is `true`, which may
+Environment selection: evaluating its entries' *enableIf*, checking constraints 5 to 7 and *required* for it,
+rejecting an enabled entry whose name two or more attached Environments share (§3.2.1 item 3), and rejecting a disabled
+entry for an `ALWAYS` Environment. It is done once the Step's own *enableIf* is `true`, which may
 be after the Job is created, and not at all for a skipped Step. Resolving every entry's name against the attached
 Environments, enabled or disabled, stays at Job creation, so names are resolved before the entries' *enableIf* is
-evaluated rather than after. The result is the same, because a disabled entry's name is resolved too. Before the Job is
-created, the checks of constraints 5 to 7 above, the error for a disabled entry that names an `ALWAYS` Environment, and
-the rejection of an enabled `required: true` entry that resolves to no Environment are made only for a Step known to be
-enabled. See `CONTROL_FLOW` rule 3 of [&lt;Environment&gt;](#4-environment).
+evaluated rather than after. The result is the same, because a disabled entry's name is resolved too, and a disabled
+entry that resolves to several Environments applies to each. Before the Job is created, the checks of constraints 5 to 7
+above, the error for a disabled entry that names an `ALWAYS` Environment, and the rejection of an enabled `required:
+true` entry that resolves to no Environment or of an enabled entry whose name is ambiguous are made only for a Step
+known to be enabled. See `CONTROL_FLOW` rule 3 of [&lt;Environment&gt;](#4-environment).
 
 > **NOTE:** Instead of two entries for one Environment with complementary *enableIf* conditions, write one entry whose
 > values are conditional.
@@ -2904,9 +2906,11 @@ when that work is done, and the `ENV_PARAMS` rules hold except where they say ot
 2. An *environment* entry's *parameters* values and *enableIf* may not reference `Steps.*`, `Loop.*`, or `RawLoop.*`,
    directly or through a *let* binding that does.
 3. What `ENV_PARAMS` does for one Step when the Job is created is the Step's *Environment selection*: evaluating its
-   entries' *enableIf*; checking its enabled entries' keys, and rejecting an enabled entry with `required: true` that
-   resolves to no Environment (one whose Environment is disabled or superseded for the Step is not an error); fixing
-   which of the Job's Environments and attached Environments apply to the Step, and rejecting a disabled entry for an
+   entries' *enableIf*; checking its enabled entries' keys, rejecting an enabled entry with `required: true` that
+   resolves to no Environment (one whose Environment is disabled or superseded for the Step is not an error), and
+   rejecting an enabled entry whose name resolves to two or more attached Environments; fixing which of the Job's
+   Environments and attached Environments apply to the Step, where a disabled entry whose name resolves to several
+   applies to each ([3.2.1](#321-resolving-external-environments) item 3), and rejecting a disabled entry for an
    Environment whose *activation* is `ALWAYS` as written in its document (a disabled entry has no effect on the
    Environment of an attached Environment Template that does not list `ENV_PARAMS`); resolving the Step's parameter
    values for them, and checking constraint 7 for every one of them before any of their *enableIf* is evaluated;
@@ -2929,7 +2933,7 @@ when that work is done, and the `ENV_PARAMS` rules hold except where they say ot
    The work that does not depend on which Steps enter an Environment stays at Job creation, whatever any Step's
    *enableIf*, and comes before any Step's Environment selection: attaching the Environment Templates and making
    `Job.EnvNames` concrete, before any Step's *enableIf* is evaluated, resolving every *environment* entry that names no
-   Job Environment against them and rejecting a name that matches two of them, rejecting an `ALWAYS` Environment whose
+   Job Environment against them, rejecting an `ALWAYS` Environment whose
    *enableIf* is known to be `false` with the values of template validation, which template validation already reports
    where it is given that Environment, and rejecting an attached `ALWAYS` or `BY_DEFAULT` Environment with the name of a
    Job Environment and a parameter without a `default`. A skipped Step has no Environment selection, so no Environment
@@ -2946,7 +2950,8 @@ when that work is done, and the `ENV_PARAMS` rules hold except where they say ot
    constraint 6 includes a value's type, such as the rule that a value for a list-typed parameter is a list literal or a
    single `{{ }}` expression, and a value, or a non-literal `default` that the Step takes, that fails to resolve or
    convert), constraint 7, a disabled entry that names an Environment whose *activation* is `ALWAYS` as written, an
-   enabled `required: true` entry that resolves to no Environment, each Environment's *hostRequirements* resolved for
+   enabled `required: true` entry that resolves to no Environment, an enabled entry whose name resolves to two or more
+   attached Environments, each Environment's *hostRequirements* resolved for
    the Step, a conflict in a Step's combined host requirements, its own together with those of the Environments its
    Sessions would enter (see [3.3.3](#333-combined-host-requirements)), but not an *anyOf* or *allOf* of the Step's own
    that resolves to no values (see [3](#3-steptemplate)), and the checks over a Step's whole set of Environments,
@@ -3698,7 +3703,7 @@ Environment parameter PATH and LIST[PATH] values are used as given, never joined
 
 With the `CONTROL_FLOW` extension, steps 1 and 3, and the other work that does not depend on which Steps enter an
 Environment, are taken when the Job is created, except the checks of step 3 that apply only to an enabled entry
-([§3.2.1](#321-resolving-external-environments) items 1 and 2). Those checks, and steps 2 and 4 to 8, are taken for each
+([§3.2.1](#321-resolving-external-environments) items 1 to 3). Those checks, and steps 2 and 4 to 8, are taken for each
 Step in its Environment selection, so step 3 comes before step 2, which gives the same result (see
 [3.2](#32-stepdependency)). They are taken once the Step's own *enableIf* is `true`, which may be at step input binding
 or, for a Step of a loop's body, within its iteration, and are not taken for a skipped Step. A Step Environment's

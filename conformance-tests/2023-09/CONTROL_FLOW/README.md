@@ -5,7 +5,7 @@ Conformance tests for the draft `CONTROL_FLOW` extension defined in
 [RFC 0012 — Step Output Variables](../../../rfcs/0012-step-output-variables.md), and
 [RFC 0013 — Step Loops](../../../rfcs/0013-step-loops.md).
 
-> **Status.** There are 524 tests: 4 in `env_templates`, 258 in `job_templates`, and 262 in
+> **Status.** There are 526 tests: 4 in `env_templates`, 258 in `job_templates`, and 264 in
 > `jobs`. Every Job Template that lists `CONTROL_FLOW` lists `ENV_PARAMS`, except
 > `1.1--control-flow-without-env-params`, because a Job Template that lists `CONTROL_FLOW`
 > must also list `ENV_PARAMS` and `EXPR` (RFC 0011 Design Choice 13). No
@@ -178,7 +178,9 @@ and its section.
   entry for the Environment of an attached Environment Template that does not list
   `ENV_PARAMS` has no effect (`jobs/4--pre-extension-*`); an `ALWAYS` Environment whose
   `enableIf` is `false` for the Step; an entry value that fails to resolve; a
-  `required: true` entry that names no Environment; an Environment's `hostRequirements`
+  `required: true` entry that names no Environment; an enabled entry whose name two attached
+  Environments share (`jobs/4--ambiguous-entry-*`), which RFC 0010 rejects only for an enabled
+  entry; an Environment's `hostRequirements`
   resolved with the Step's values; a conflict in the combined host requirements; and the
   `WRAP_ACTIONS` single-layer rule. An entry's undeclared key and a literal value its
   parameter rejects are tested at template validation only. A `step:` entry is a whole-Step

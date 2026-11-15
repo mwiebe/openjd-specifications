@@ -1466,11 +1466,13 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
    values, and which of the Job's Environments and attached Environments its Sessions enter, depend only on values
    concrete at Job creation, as RFC 0010 says, and are the same for every instance of a loop's body Step.
 3. **Environment selection.** The work that RFC 0010 does for one Step at Job creation is that Step's **Environment
-   selection**: evaluating its entries' *enableIf*; checking constraint 5 for its enabled entries, and rejecting an
-   enabled entry with `required: true` that resolves to no Environment (an enabled `required: true` entry whose
-   Environment is disabled or superseded for the Step is not an error, as RFC 0010's Template Schemas §3.2 *required*
-   says); fixing the set of the Job's Environments and attached Environments that apply to the Step, and rejecting a
-   disabled entry for an Environment whose *activation* is `ALWAYS` as written in its document (a disabled entry for the
+   selection**: evaluating its entries' *enableIf*; checking constraint 5 for its enabled entries, rejecting an enabled
+   entry with `required: true` that resolves to no Environment (an enabled `required: true` entry whose Environment is
+   disabled or superseded for the Step is not an error, as RFC 0010's Template Schemas §3.2 *required* says), and
+   rejecting an enabled entry whose name resolves to two or more attached Environments; fixing the set of the Job's
+   Environments and attached Environments that apply to the Step, where a disabled entry whose name resolves to several
+   attached Environments applies to each of them (RFC 0010's Template Schemas §3.2.1 item 3), and rejecting a disabled
+   entry for an Environment whose *activation* is `ALWAYS` as written in its document (a disabled entry for the
    Environment of an attached Environment Template that does not list `ENV_PARAMS` has no effect, RFC 0010's Template
    Schemas §4 item 4); resolving their parameter values, and checking constraint 7 for every Environment that applies to
    the Step, before any of their *enableIf* is evaluated, as RFC 0010's Template Schemas §7.4.1 step 5 says; evaluating
@@ -1484,7 +1486,7 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
    checking that combination. These are steps 2 and 4 to 8 of RFC 0010's ordering of Job creation (its Template Schemas
    §7.4.1; see [RFC 0010 §Processing stages and expression
    fields](0010-environment-parameters.md#processing-stages-and-expression-fields)), and the checks of its step 3 that
-   apply only to enabled entries (items 1 and 2 of its Template Schemas §3.2.1), less what items 4 to 6 place elsewhere:
+   apply only to enabled entries (items 1 to 3 of its Template Schemas §3.2.1), less what items 4 to 6 place elsewhere:
    the *enableIf* of Step Environments, the checks over the Step's whole set of Environments other than the value
    checks, and everything done with the Step's own host requirements. It is part of the Step's enablement group: it is
    made once the Step's own *enableIf* is decided `true`, before any other group. That is at Job creation for a Step
@@ -1498,7 +1500,9 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
     * **What stays at Job creation.** This RFC 0010 work is done when the Job is created, whatever any Step's
       *enableIf*, before any Step's Environment selection: attaching the Environment Templates and making `Job.EnvNames`
       concrete (step 1); resolving every entry that names no Job Environment against the attached Environments, enabled
-      or disabled (step 3), and rejecting a name that matches two of them; rejecting an `ALWAYS` Environment whose
+      or disabled (step 3), where a disabled entry may resolve to several and then applies to each (the rejection of an
+      enabled entry whose name matches two or more is part of Environment selection, since it applies only to an
+      enabled entry); rejecting an `ALWAYS` Environment whose
       *enableIf* is known to be `false` by RFC 0010's Template Schemas §7.6 rule 5 with the values of template
       validation, which template validation already reports where it is given that Environment; and rejecting an
       attached `ALWAYS` or `BY_DEFAULT` Environment that has the name of a Job Environment and a parameter without a
@@ -1527,7 +1531,8 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
       fails to resolve or convert (its Template Schemas §3.2.2 item 2); constraint 7 for an Environment, wherever RFC
       0010 checks it before Job creation; the error for a disabled entry that names an Environment whose *activation* is
       `ALWAYS` as written in its document; the rejection of an enabled `required: true` entry that resolves to no
-      Environment (its Template Schemas §3.2.1 item 2), where a validator given the Environment Templates makes it; each
+      Environment (its Template Schemas §3.2.1 item 2), and of an enabled entry whose name resolves to two or more
+      attached Environments (its item 3), where a validator given the Environment Templates makes them; each
       entered Environment's *hostRequirements* resolved with the Step's values (its Template Schemas §3.3), and a
       conflict in the combined host requirements (its §3.3.3), but not an *anyOf* or *allOf* of the Step's own that
       resolves to no values, which is an error in the Step's own field (see [Validation](#validation) item 10); and the
@@ -1594,7 +1599,8 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
    the result is checked. A conflict among the Environments' requirements alone is found earlier, by Environment
    selection. The Step's **host requirements are known** (see [Terminology](#terminology)) when its combined host
    requirements are. The checks are RFC 0010's (its Template Schemas §3.3.3), including that an implementation may
-   reject combined requirements that name more capabilities than a limit it documents, which must be at least 50. A
+   reject combined requirements that name more distinct capabilities than a limit it documents, which must be at least
+   50, counting a capability that several sources name once. A
    failure fails the Step at once, or fails Job creation if the group is evaluated then.
 6. **Checks over a Step's whole set of Environments.** A check over the whole set of Environments a Step's Sessions
    enter (in step 7 of RFC 0010's Template Schemas §7.4.1, other than the value checks), such as the `WRAP_ACTIONS`
@@ -2004,8 +2010,8 @@ requirements apply to each body Step instance as to a Step, and are checked when
 and 5 say. An implementation that limits a Step's *dependencies* must accept at least 50 `environment:` entries besides
 its entries that name Steps (its Template Schemas §3 *dependencies*). A STRING or PATH effective value, and each element
 of a LIST[STRING] or LIST[PATH] one, is at most 1024 characters where the Environment is not disabled for the Step (its
-Template Schemas §4.5 item 5). An implementation's limit on the capabilities that a Step's combined host requirements
-name is at least 50 (its Template Schemas §3.3.3). This RFC adds two more:
+Template Schemas §4.5 item 5). An implementation's limit on the distinct capabilities that a Step's combined host
+requirements name is at least 50 (its Template Schemas §3.3.3). This RFC adds two more:
 
 1. A scheduler MAY impose a maximum number of Tasks per Step, and MAY impose a maximum total number of Tasks per Job. A
    materialized parameter space that exceeds the Step limit, or that would take the Job's total over the Job limit, is

@@ -1,0 +1,93 @@
+# RFC 0011 §<Environment> item 3 and RFC 0010's Template Schemas §3.2.1 item 3: an enabled
+# entry whose name two or more attached Environments share is rejected in the Step's
+# Environment selection. Resolving the name stays at Job creation, but an ambiguous name is an
+# error only for an enabled entry, so only in the Step's Environment selection. S's entry names
+# Conda, which two attached Environment Templates share, and S's enableIf is Param.Run.
+#
+# Run is false, so S is skipped and the Job runs. 4--ambiguous-entry-at-binding-fails is the
+# companion. D, which depends on S, runs, as it would not if S had failed.
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  - CONTROL_FLOW
+  name: TestJob
+  parameterDefinitions:
+  - name: Run
+    type: BOOL
+  steps:
+  - name: T
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('T_' + 'RAN')
+  - name: S
+    enableIf: Param.Run
+    dependencies:
+    - environment: Conda
+      required: false
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('S_' + 'RAN')
+  - name: D
+    dependencies:
+    - dependsOn: S
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |-
+            print('D_' + 'RAN')
+environments:
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  environment:
+    name: Conda
+    activation: ON_REQUEST
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C1_' + 'IN')
+- specificationVersion: environment-2023-09
+  extensions:
+  - EXPR
+  - ENV_PARAMS
+  environment:
+    name: Conda
+    activation: ON_REQUEST
+    script:
+      actions:
+        onEnter:
+          command: python
+          args:
+          - -c
+          - |-
+            print('C2_' + 'IN')
+parameters:
+  Run: false
+expected:
+  output:
+  - T_RAN
+  - D_RAN
+  forbidden:
+  - S_RAN
+  - C1_IN
+  - C2_IN
