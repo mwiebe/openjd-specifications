@@ -178,7 +178,7 @@ and its section.
   entry for the Environment of an attached Environment Template that does not list
   `ENV_PARAMS` has no effect (`jobs/4--pre-extension-*`); an `ALWAYS` Environment whose
   `enableIf` is `false` for the Step; an entry value that fails to resolve; a
-  `required: true` entry that names no Environment; an enabled entry whose name two attached
+  `required: true` entry that names no Environment; an enabled entry whose name two or more attached
   Environments share (`jobs/4--ambiguous-entry-*`), which RFC 0010 rejects only for an enabled
   entry; an Environment's `hostRequirements`
   resolved with the Step's values; a conflict in the combined host requirements; and the

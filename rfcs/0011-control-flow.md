@@ -1500,9 +1500,8 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
     * **What stays at Job creation.** This RFC 0010 work is done when the Job is created, whatever any Step's
       *enableIf*, before any Step's Environment selection: attaching the Environment Templates and making `Job.EnvNames`
       concrete (step 1); resolving every entry that names no Job Environment against the attached Environments, enabled
-      or disabled (step 3), where a disabled entry may resolve to several and then applies to each (the rejection of an
-      enabled entry whose name matches two or more is part of Environment selection, since it applies only to an
-      enabled entry); rejecting an `ALWAYS` Environment whose
+      or disabled (step 3), where an entry may resolve to several (Environment selection then rejects the entry if it
+      is enabled, and applies it to each if it is disabled); rejecting an `ALWAYS` Environment whose
       *enableIf* is known to be `false` by RFC 0010's Template Schemas §7.6 rule 5 with the values of template
       validation, which template validation already reports where it is given that Environment; and rejecting an
       attached `ALWAYS` or `BY_DEFAULT` Environment that has the name of a Job Environment and a parameter without a
@@ -1511,8 +1510,10 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
       result, because disabled entries are resolved too and a disabled entry that matches nothing has no effect.
     * **A `SKIPPED` Step** has no Environment selection. It has no Sessions, so no entry *enableIf* or Environment
       *enableIf* is evaluated for it, and none of the checks of Environment selection or of item 6 is made for it: not
-      constraints 5 to 7, not the checks of its Environment parameter values, not the `ALWAYS` errors, not combined host
-      requirements, and not the `WRAP_ACTIONS` single-layer rule. There are two exceptions, both errors in an
+      constraints 5 to 7 (constraint 7 included for an attached Environment whose name two or more attached
+      Environments share, whose parameters no enabled entry can supply), not the checks of its Environment parameter
+      values, not the `ALWAYS` errors, not combined host requirements, and not the `WRAP_ACTIONS` single-layer rule.
+      There are two exceptions, both errors in an
       Environment's definition and reported whatever any Step's *enableIf*: an `ALWAYS` Environment whose *enableIf* is
       known to be `false` before Job creation, reported then or at Job creation (see the previous and next bullets), and
       the attached Environment named like a Job Environment of the previous bullet.
@@ -1595,13 +1596,14 @@ Job Template lists `ENV_PARAMS`, RFC 0010's rules apply to every submission of a
    combined host requirements ([RFC 0010 §Host requirements](0010-environment-parameters.md#host-requirements)) are
    completed when its host selection group is evaluated: the Step's own requirements that resolve to nothing are
    discarded (RFC 0010's Template Schemas §7.4.1 step 8), an *anyOf* or *allOf* of its own that resolves to no values is
-   rejected, and the rest are combined with the Environments' requirements that its Environment selection combined, and
-   the result is checked. A conflict among the Environments' requirements alone is found earlier, by Environment
-   selection. The Step's **host requirements are known** (see [Terminology](#terminology)) when its combined host
-   requirements are. The checks are RFC 0010's (its Template Schemas §3.3.3), including that an implementation may
-   reject combined requirements that name more distinct capabilities than a limit it documents, which must be at least
-   50, counting a capability that several sources name once. A
-   failure fails the Step at once, or fails Job creation if the group is evaluated then.
+   rejected, and so is an *allOf* of its own for `attr.worker.os.family` or `attr.worker.cpu.arch` that resolves to
+   more than one value (its §3.3.2.1), and the rest are combined with the Environments' requirements that its
+   Environment selection combined, and the result is checked. A conflict among the Environments' requirements alone is
+   found earlier, by Environment selection. The Step's **host requirements are known** (see
+   [Terminology](#terminology)) when its combined host requirements are. The checks are RFC 0010's (its Template
+   Schemas §3.3.3), including that an implementation may reject combined requirements that name more distinct
+   capabilities than a limit it documents, which must be at least 50, counting a capability that several sources name
+   once. A failure fails the Step at once, or fails Job creation if the group is evaluated then.
 6. **Checks over a Step's whole set of Environments.** A check over the whole set of Environments a Step's Sessions
    enter (in step 7 of RFC 0010's Template Schemas §7.4.1, other than the value checks), such as the `WRAP_ACTIONS`
    single-layer rule, needs the Step Environments the Step enters, which are known once its remaining group has been
