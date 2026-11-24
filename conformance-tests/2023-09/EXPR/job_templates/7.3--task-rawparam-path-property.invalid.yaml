@@ -1,4 +1,4 @@
-# Expression Language "Symbol Types": Task.RawParam.<name> of a PATH task
+# Expression Language "Task Parameter Types": Task.RawParam.<name> of a PATH task
 # parameter is a string, so the path property `name` is not available on it.
 specificationVersion: jobtemplate-2023-09
 extensions:

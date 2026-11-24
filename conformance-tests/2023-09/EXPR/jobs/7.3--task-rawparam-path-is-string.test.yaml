@@ -1,4 +1,4 @@
-# Expression Language "Symbol Types": Task.RawParam.<name> of a PATH task
+# Expression Language "Task Parameter Types": Task.RawParam.<name> of a PATH task
 # parameter is the unmapped value, a string, and Task.Param.<name> is a path.
 # A string method works on the raw value.
 # The value is a Windows-format path, which the raw string keeps as given on

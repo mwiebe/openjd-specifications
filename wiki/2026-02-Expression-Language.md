@@ -974,13 +974,17 @@ value with URI-aware semantics (see [path type description](#121-types)).
 Task parameters defined in `taskParameterDefinitions` are available via `Task.Param.<name>`
 and `Task.RawParam.<name>`:
 
-| Task Parameter Type | Expression Type |
-|---------------------|-----------------|
-| `INT` | `int` |
-| `FLOAT` | `float` |
-| `STRING` | `string` |
-| `PATH` | `path` |
-| `CHUNK[INT]` | `range_expr` |
+| Task Parameter Type | `Task.Param.<name>` Type | `Task.RawParam.<name>` Type |
+|---------------------|--------------------------|-----------------------------|
+| `INT` | `int` | `int` |
+| `FLOAT` | `float` | `float` |
+| `STRING` | `string` | `string` |
+| `PATH` | `path` | `string` |
+| `CHUNK[INT]` | `range_expr` | `range_expr` |
+
+As for a `PATH` job parameter, `Task.Param.<name>` of a `PATH` task parameter has type `path` with path mapping rules
+applied, while `Task.RawParam.<name>` has type `string` containing the unmapped value, since it may be a path for a
+different operating system.
 
 Note: `CHUNK[INT]` produces a `range_expr` type, not `list[int]`, enabling efficient
 representation of frame ranges. Use `list(Task.Param.Frame)` to convert to a list if needed.
