@@ -121,7 +121,7 @@ steps:
             ## an arbitrary integer range expression, e.g. "1-3,5,7-20:2".
             rangeConstraint: NONCONTIGUOUS
     script:
-       actions:
+      actions:
         onRun:
           command: bash
           args: ["{{Task.File.RenderChunk}}"]
@@ -176,7 +176,7 @@ noncontiguous chunks as well when the application interface supports it.
 The purpose of chunking is to improve the performance and efficiency of jobs running
 on worker hosts. We can model a chunk's runtime to help reason about that. The ratio
 of load time to task runtime is an important input to choosing appropriate
-chunks sizes. This ratio varies widely in practice, but can be quite large in GPU workloads
+chunk sizes. This ratio varies widely in practice, but can be quite large in GPU workloads
 such as rendering with a game engine. These diagrams show a ratio large enough to
 make its impact clear visually.
 
@@ -214,7 +214,7 @@ a chunk, without new tasks to start. Here's how that looks.
 ![chunks and stickiness with random](.images/0001-task-chunking-chunks-with-stickiness-random-task-times.svg)
 
 Users can select larger chunks to amortize this drop in parallelism, but there are
-ways to address this remaining inefficency while still allowing a scheduler to handle
+ways to address this remaining inefficiency while still allowing a scheduler to handle
 tasks individually and provide responsive load balancing. One possibility is
 to introduce a mechanism that pipelines tasks from the scheduler to the step script.
 Such a mechanism would add more complexity than the present chunking proposal,
@@ -341,7 +341,7 @@ and is left for future work.
 + the set of **Environments** that are required to run those Tasks are identical. If the parameter space of a Step
 + includes a task parameter with type `CHUNK[INT]`, then the **Session** runs Chunks for that Step instead of
 + individual Tasks. A Chunk is a set of Tasks with all of the Task parameter values identical except for the chunked
-+ Task parameter. It takes values from an integer range expression like "1-3" or 1-3,5,7" depending on whether
++ Task parameter. It takes values from an integer range expression like "1-3" or "1-3,5,7" depending on whether
 + the chunks are constrained to be contiguous or not.
 
   All failures and cancellations in a **Session** are terminal for the **Session**, as the system generally does not know
