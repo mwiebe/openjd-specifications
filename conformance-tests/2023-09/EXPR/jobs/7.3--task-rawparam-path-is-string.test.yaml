@@ -1,0 +1,33 @@
+# Expression Language "Symbol Types": Task.RawParam.<name> of a PATH task
+# parameter is the unmapped value, a string, and Task.Param.<name> is a path.
+# A string method works on the raw value.
+# The value is a Windows-format path, which the raw string keeps as given on
+# every host.
+
+template:
+  specificationVersion: jobtemplate-2023-09
+  extensions:
+  - EXPR
+  name: TestJob
+  steps:
+  - name: Step1
+    parameterSpace:
+      taskParameterDefinitions:
+      - name: Out
+        type: PATH
+        range:
+        - 'C:\Renders\Shot01'
+    script:
+      actions:
+        onRun:
+          command: python
+          args:
+          - -c
+          - |
+            print(r'RAW_UPPER:{{ Task.RawParam.Out.upper() }}')
+            print(r'RAW_SPLIT:{{ Task.RawParam.Out.split("\\")[-1] }}')
+
+expected:
+  output:
+  - 'RAW_UPPER:C:\RENDERS\SHOT01'
+  - 'RAW_SPLIT:Shot01'
