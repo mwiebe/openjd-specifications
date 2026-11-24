@@ -68,6 +68,7 @@ A test passes if:
 WRAP_ACTIONS/
 ├── README.md                       (this file)
 ├── env_templates/                  # Env template validation tests
+│   ├── 3.6.1--let-named-wrappedaction.invalid.yaml
 │   ├── 4.2--minimal-wrap-env-template.yaml
 │   ├── 4.2--wrap-only-environment.yaml
 │   ├── 4.2--wrap-with-timeout.yaml

@@ -1,0 +1,25 @@
+# Template Schemas 3.6.1: a `let` name is a <UserIdentifier>, which starts
+# with a lowercase letter or underscore, so "WrappedAction" is invalid. It
+# is also the root of the scope the wrap hooks define (Template Schemas
+# 4.3.1).
+# The template must be rejected with a validation error for the invalid
+# name.
+specificationVersion: environment-2023-09
+extensions:
+- WRAP_ACTIONS
+- EXPR
+environment:
+  name: WrapEnv
+  script:
+    let:
+    - WrappedAction = 1
+    actions:
+      onWrapEnvEnter:
+        command: python
+        args: ["-c", "print('enter')", "{{WrappedEnv.Name}}"]
+      onWrapTaskRun:
+        command: python
+        args: ["-c", "print('task')", "{{WrappedAction.Command}}"]
+      onWrapEnvExit:
+        command: python
+        args: ["-c", "print('exit')", "{{WrappedEnv.Name}}"]

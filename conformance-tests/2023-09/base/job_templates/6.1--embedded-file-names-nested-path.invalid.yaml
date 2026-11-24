@@ -1,0 +1,20 @@
+# Template Schemas 6.1: an embedded file's name is an <Identifier>, so
+# "Data.Extra" is invalid. Its reference, Task.File.Data.Extra, would also
+# nest under the path that the valid name "Data" binds, Task.File.Data. The
+# template must be rejected with a validation error for the invalid name.
+specificationVersion: jobtemplate-2023-09
+name: TestJob
+steps:
+- name: Step1
+  script:
+    embeddedFiles:
+    - name: Data
+      type: TEXT
+      data: one
+    - name: Data.Extra
+      type: TEXT
+      data: two
+    actions:
+      onRun:
+        command: python
+        args: ["-c", "print()", "{{Task.File.Data}}"]

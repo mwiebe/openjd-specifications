@@ -1,0 +1,19 @@
+# Template Schemas 6.1: an embedded file's name is an <Identifier>, so
+# "Data.Extra" is invalid. Its reference, Env.File.Data.Extra, would also
+# nest under the path that the valid name "Data" binds, Env.File.Data. The
+# template must be rejected with a validation error for the invalid name.
+specificationVersion: environment-2023-09
+environment:
+  name: Env1
+  script:
+    embeddedFiles:
+    - name: Data.Extra
+      type: TEXT
+      data: two
+    - name: Data
+      type: TEXT
+      data: one
+    actions:
+      onEnter:
+        command: python
+        args: ["-c", "print()", "{{Env.File.Data}}"]
