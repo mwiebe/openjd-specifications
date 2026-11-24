@@ -1,6 +1,7 @@
-# A Step Environment's <EnvironmentScript>.let can reference Param.* (3.6.2),
-# directly and through earlier bindings in the same let. The bindings resolve
-# when the environment is entered, as they do for a Job Environment.
+# A Step Environment's <EnvironmentScript>.let can reference Param.*,
+# RawParam.* and Job.Name (3.6.2), directly and through earlier bindings in
+# the same let. The bindings resolve when the environment is entered, as they
+# do for a Job Environment.
 template:
   specificationVersion: jobtemplate-2023-09
   extensions:
@@ -21,12 +22,13 @@ template:
         let:
         - x = Param.Base * 2
         - y = x + Param.Offset
+        - j = Job.Name + '-' + string(RawParam.Base)
         actions:
           onEnter:
             command: python
             args:
             - -c
-            - "print('ENTER_X:{{ x }}|'); print('ENTER_Y:{{ y }}|')"
+            - "print('ENTER_X:{{ x }}|'); print('ENTER_Y:{{ y }}|'); print('ENTER_J:{{ j }}|')"
     script:
       actions:
         onRun:
@@ -38,4 +40,5 @@ expected:
   output:
   - ENTER_X:14|
   - ENTER_Y:15|
+  - ENTER_J:TestJob-7|
   - RAN
